@@ -1,15 +1,21 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
+
+import 'pricing.dart';
 
 const _leadEndpoint = String.fromEnvironment('LEAD_ENDPOINT');
-const _leadEndpointAuthToken = String.fromEnvironment(
-  'LEAD_ENDPOINT_AUTH_TOKEN',
+const _privacyPolicyUrl = String.fromEnvironment(
+  'PRIVACY_POLICY_URL',
+  defaultValue: 'https://induradar.com/privacidad',
 );
 
-const _logoAsset = 'assets/InduradarLogo.png';
+const _logoAsset = 'assets/InduRadarLogoVertical.png';
 const _ink = Color(0xFF102335);
 const _blue = Color(0xFF075A8F);
 const _cyan = Color(0xFF18BFD7);
@@ -17,6 +23,8 @@ const _steel = Color(0xFF66717C);
 const _line = Color(0xFFD8E4EA);
 const _surface = Color(0xFFF4F8FA);
 const _success = Color(0xFF1D7A57);
+
+enum LeadSubmissionState { idle, submitting, success, error }
 
 void main() {
   runApp(const InduRadarApp());
@@ -42,6 +50,7 @@ class InduRadarApp extends StatelessWidget {
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: Colors.white,
+          floatingLabelBehavior: FloatingLabelBehavior.always,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide: const BorderSide(color: _line),
@@ -80,10 +89,15 @@ class InduRadarApp extends StatelessWidget {
 }
 
 class LandingPage extends StatefulWidget {
-  const LandingPage({super.key, LeadSubmissionService? submissionService})
-    : _submissionService = submissionService;
+  const LandingPage({
+    super.key,
+    LeadSubmissionService? submissionService,
+    PricingCatalog? pricingCatalog,
+  }) : _submissionService = submissionService,
+       _initialPricingCatalog = pricingCatalog;
 
   final LeadSubmissionService? _submissionService;
+  final PricingCatalog? _initialPricingCatalog;
 
   @override
   State<LandingPage> createState() => _LandingPageState();
@@ -91,25 +105,22 @@ class LandingPage extends StatefulWidget {
 
 class _LandingPageState extends State<LandingPage> {
   final _formKey = GlobalKey<FormState>();
+  final _formAnchorKey = GlobalKey();
+  final _scrollController = ScrollController();
 
-  final _firstNameController = TextEditingController();
-  final _lastNameController = TextEditingController();
+  final _fullNameController = TextEditingController();
   final _companyController = TextEditingController();
   final _jobTitleController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _websiteController = TextEditingController();
-  final _cityProvinceController = TextEditingController();
+  final _addressController = TextEditingController();
   final _offerDescriptionController = TextEditingController();
   final _otherOfferCategoryController = TextEditingController();
   final _otherProblemController = TextEditingController();
   final _prioritySolutionsController = TextEditingController();
   final _otherSectorController = TextEditingController();
   final _otherTargetCompanyTypeController = TextEditingController();
-  final _geographyCountriesController = TextEditingController();
-  final _geographyRegionsController = TextEditingController();
-  final _geographyProvincesController = TextEditingController();
-  final _geographyFreeZoneController = TextEditingController();
   final _otherMinimumValueController = TextEditingController();
   final _targetCompanyDescriptionController = TextEditingController();
   final _otherNeedController = TextEditingController();
@@ -130,6 +141,8 @@ class _LandingPageState extends State<LandingPage> {
   final Set<String> _problemsSolved = <String>{};
   final Set<String> _targetSectors = <String>{};
   final Set<String> _targetCompanyTypes = <String>{};
+  final Set<String> _geographyCountries = <String>{};
+  final Set<String> _spanishProvinces = <String>{};
   final Set<String> _investmentSignals = <String>{};
   final Set<String> _innovationSignals = <String>{};
   final Set<String> _growthSignals = <String>{};
@@ -140,33 +153,68 @@ class _LandingPageState extends State<LandingPage> {
   String? _targetRevenueRange;
   String? _targetEmployeeRange;
   String? _minimumOpportunityValue;
+  String? _spainCoverage;
+  int _expandedSectionIndex = 0;
   bool _privacyAccepted = false;
   bool _marketingConsent = false;
-  bool _isSubmitting = false;
+  bool _isResettingForm = false;
+  LeadSubmissionState _submissionState = LeadSubmissionState.idle;
+  PricingCatalog? _pricingCatalog;
+  bool _pricingLoadFailed = false;
   String? _privacyError;
   String? _successMessage;
+  String? _submissionError;
+
+  bool get _isSubmitting => _submissionState == LeadSubmissionState.submitting;
+
+  bool get _submissionSucceeded =>
+      _submissionState == LeadSubmissionState.success;
+
+  @override
+  void initState() {
+    super.initState();
+    _pricingCatalog = widget._initialPricingCatalog;
+    if (_pricingCatalog == null) {
+      unawaited(_loadPricingCatalog());
+    }
+    for (final controller in [
+      _offerDescriptionController,
+      _fullNameController,
+      _companyController,
+      _emailController,
+      _otherOfferCategoryController,
+      _otherProblemController,
+      _otherSectorController,
+      _otherTargetCompanyTypeController,
+      _otherMinimumValueController,
+      _otherNeedController,
+      _opportunityTriggerController,
+      _currentClientsController,
+      _idealClientsController,
+      _watchlistAccountsController,
+      _competitorsController,
+      _excludedCompaniesController,
+    ]) {
+      controller.addListener(_refreshFormProgress);
+    }
+  }
 
   @override
   void dispose() {
     for (final controller in [
-      _firstNameController,
-      _lastNameController,
+      _fullNameController,
       _companyController,
       _jobTitleController,
       _emailController,
       _phoneController,
       _websiteController,
-      _cityProvinceController,
+      _addressController,
       _offerDescriptionController,
       _otherOfferCategoryController,
       _otherProblemController,
       _prioritySolutionsController,
       _otherSectorController,
       _otherTargetCompanyTypeController,
-      _geographyCountriesController,
-      _geographyRegionsController,
-      _geographyProvincesController,
-      _geographyFreeZoneController,
       _otherMinimumValueController,
       _targetCompanyDescriptionController,
       _otherNeedController,
@@ -182,35 +230,120 @@ class _LandingPageState extends State<LandingPage> {
     ]) {
       controller.dispose();
     }
+    _scrollController.dispose();
     super.dispose();
   }
 
+  void _refreshFormProgress() {
+    if (mounted && !_isResettingForm) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _loadPricingCatalog() async {
+    try {
+      final source = await rootBundle.loadString(PricingCatalog.assetPath);
+      final catalog = PricingCatalog.fromJsonString(source);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _pricingCatalog = catalog;
+        _pricingLoadFailed = false;
+      });
+    } catch (error) {
+      _logLeadDebug('Pricing catalog error: ${error.runtimeType}');
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _pricingCatalog = null;
+        _pricingLoadFailed = true;
+      });
+    }
+  }
+
+  ResearchScopeEstimate _currentScopeEstimate() {
+    return ResearchScopeCalculator.calculate(
+      targetSectors: _selectedValuesWithOther(
+        _targetSectors,
+        _otherSectorController.text,
+        otherOption: _otherSectorOption,
+      ),
+      targetCompanyTypes: _selectedValuesWithOther(
+        _targetCompanyTypes,
+        _otherTargetCompanyTypeController.text,
+        otherOption: _otherTargetCompanyTypeOption,
+      ),
+      geographyCountries: _geographyCountries.toList(growable: false),
+      spainCoverage: _spainCoverage,
+      geographyProvinces: _spainCoverage == _spainByProvince
+          ? _spanishProvinces.toList(growable: false)
+          : const <String>[],
+      investmentSignals: _investmentSignals.toList(growable: false),
+      innovationSignals: _innovationSignals.toList(growable: false),
+      growthSignals: _growthSignals.toList(growable: false),
+      publicFinanceSignals: _publicFinanceSignals.toList(growable: false),
+      commercialNeeds: _selectedValuesWithOther(
+        _commercialNeeds,
+        _otherNeedController.text,
+        otherOption: _otherNeedOption,
+      ),
+      currentClients: _splitLineValues(_currentClientsController.text),
+      idealClients: _splitLineValues(_idealClientsController.text),
+      watchlistAccounts: _splitLineValues(_watchlistAccountsController.text),
+      competitors: _splitLineValues(_competitorsController.text),
+      excludedCompanies: _splitLineValues(_excludedCompaniesController.text),
+    );
+  }
+
+  PricingQuote? _currentPricingQuote([ResearchScopeEstimate? scopeEstimate]) {
+    final catalog = _pricingCatalog;
+    if (catalog == null) {
+      return null;
+    }
+    return catalog.quote(
+      researchUnits: (scopeEstimate ?? _currentScopeEstimate()).units,
+      serviceTypes: _serviceTypes,
+    );
+  }
+
   Future<void> _submit() async {
+    if (_isSubmitting || _submissionSucceeded) {
+      return;
+    }
+
     setState(() {
       _privacyError = _privacyAccepted
           ? null
           : 'Necesitamos tu consentimiento para responderte.';
       _successMessage = null;
+      _submissionError = null;
+      _submissionState = LeadSubmissionState.idle;
     });
 
-    if (!(_formKey.currentState?.validate() ?? false) ||
-        _privacyError != null) {
+    final isFormValid = _formKey.currentState?.validate() ?? false;
+    if (!isFormValid || _privacyError != null) {
+      setState(() {
+        _expandedSectionIndex = _firstInvalidSectionIndex();
+      });
+    }
+    if (!isFormValid || _privacyError != null) {
       return;
     }
 
     setState(() {
-      _isSubmitting = true;
+      _submissionState = LeadSubmissionState.submitting;
     });
 
     final request = LeadRequest(
-      firstName: _firstNameController.text.trim(),
-      lastName: _lastNameController.text.trim(),
+      fullName: _fullNameController.text.trim(),
       company: _companyController.text.trim(),
       jobTitle: _jobTitleController.text.trim(),
       email: _emailController.text.trim(),
       phone: _phoneController.text.trim(),
       website: _websiteController.text.trim(),
-      cityProvince: _cityProvinceController.text.trim(),
+      address: _addressController.text.trim(),
       offerDescription: _offerDescriptionController.text.trim(),
       offerCategories: _selectedValuesWithOther(
         _offerCategories,
@@ -233,14 +366,11 @@ class _LandingPageState extends State<LandingPage> {
         _otherTargetCompanyTypeController.text,
         otherOption: _otherTargetCompanyTypeOption,
       ),
-      geographyCountries: _splitFreeTextValues(
-        _geographyCountriesController.text,
-      ),
-      geographyRegions: _splitFreeTextValues(_geographyRegionsController.text),
-      geographyProvinces: _splitFreeTextValues(
-        _geographyProvincesController.text,
-      ),
-      geographyFreeZone: _geographyFreeZoneController.text.trim(),
+      geographyCountries: _geographyCountries.toList(growable: false),
+      spainCoverage: _spainCoverage,
+      geographyProvinces: _spainCoverage == _spainByProvince
+          ? _spanishProvinces.toList(growable: false)
+          : const <String>[],
       targetRevenueRange: _targetRevenueRange,
       targetEmployeeRange: _targetEmployeeRange,
       minimumOpportunityValue:
@@ -270,6 +400,7 @@ class _LandingPageState extends State<LandingPage> {
       privacyAccepted: _privacyAccepted,
       marketingConsent: _marketingConsent,
       submittedAt: DateTime.now().toUtc(),
+      pricingQuote: _currentPricingQuote(),
     );
 
     try {
@@ -277,36 +408,93 @@ class _LandingPageState extends State<LandingPage> {
       if (!mounted) {
         return;
       }
-      setState(() {
-        _successMessage =
-            'Solicitud enviada. Revisaremos el encaje y responderemos por email.';
-        _isSubmitting = false;
-      });
+      _clearFormAfterSuccess();
     } on LeadSubmissionException catch (error) {
       if (!mounted) {
         return;
       }
+      _logLeadDebug(error.technicalDetail ?? error.message);
       setState(() {
-        _isSubmitting = false;
+        _submissionState = LeadSubmissionState.error;
+        _submissionError = error.message;
       });
-      _showError(error.message);
-    } on TimeoutException {
+    } catch (error) {
       if (!mounted) {
         return;
       }
+      _logLeadDebug('Unhandled lead submission error: ${error.runtimeType}');
       setState(() {
-        _isSubmitting = false;
+        _submissionState = LeadSubmissionState.error;
+        _submissionError =
+            'No hemos podido enviar la solicitud. Inténtalo de nuevo en unos minutos.';
       });
-      _showError('El envío ha tardado demasiado. Inténtalo de nuevo.');
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _isSubmitting = false;
-      });
-      _showError('No hemos podido enviar la solicitud. Inténtalo de nuevo.');
     }
+  }
+
+  void _clearFormAfterSuccess() {
+    _isResettingForm = true;
+    _formKey.currentState?.reset();
+    for (final controller in [
+      _fullNameController,
+      _companyController,
+      _jobTitleController,
+      _emailController,
+      _phoneController,
+      _websiteController,
+      _addressController,
+      _offerDescriptionController,
+      _otherOfferCategoryController,
+      _otherProblemController,
+      _prioritySolutionsController,
+      _otherSectorController,
+      _otherTargetCompanyTypeController,
+      _otherMinimumValueController,
+      _targetCompanyDescriptionController,
+      _otherNeedController,
+      _opportunityTriggerController,
+      _recentCaseController,
+      _currentClientsController,
+      _idealClientsController,
+      _watchlistAccountsController,
+      _competitorsController,
+      _excludedCompaniesController,
+      _noBuyReasonController,
+      _serviceCommentsController,
+    ]) {
+      controller.clear();
+    }
+
+    setState(() {
+      for (final values in [
+        _offerCategories,
+        _problemsSolved,
+        _targetSectors,
+        _targetCompanyTypes,
+        _geographyCountries,
+        _spanishProvinces,
+        _investmentSignals,
+        _innovationSignals,
+        _growthSignals,
+        _publicFinanceSignals,
+        _commercialNeeds,
+        _serviceTypes,
+      ]) {
+        values.clear();
+      }
+      _targetRevenueRange = null;
+      _targetEmployeeRange = null;
+      _minimumOpportunityValue = null;
+      _spainCoverage = null;
+      _expandedSectionIndex = 0;
+      _privacyAccepted = false;
+      _marketingConsent = false;
+      _privacyError = null;
+      _submissionError = null;
+      _successMessage =
+          'Solicitud recibida correctamente. Hemos recibido tu solicitud y comenzaremos a revisarla.';
+      _submissionState = LeadSubmissionState.success;
+    });
+    _isResettingForm = false;
   }
 
   void _showError(String message) {
@@ -315,74 +503,188 @@ class _LandingPageState extends State<LandingPage> {
     );
   }
 
+  int _firstInvalidSectionIndex() {
+    final email = _emailController.text.trim();
+    if (_offerDescriptionController.text.trim().isEmpty ||
+        _fullNameController.text.trim().isEmpty ||
+        _companyController.text.trim().isEmpty ||
+        !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email) ||
+        (_offerCategories.contains(_otherOfferCategoryOption) &&
+            _otherOfferCategoryController.text.trim().isEmpty) ||
+        (_problemsSolved.contains(_otherProblemOption) &&
+            _otherProblemController.text.trim().isEmpty)) {
+      return 0;
+    }
+
+    if (_geographyCountries.isEmpty ||
+        (_geographyCountries.contains(_spainCountry) &&
+            _spainCoverage == null) ||
+        (_spainCoverage == _spainByProvince && _spanishProvinces.isEmpty) ||
+        (_targetSectors.contains(_otherSectorOption) &&
+            _otherSectorController.text.trim().isEmpty) ||
+        (_targetCompanyTypes.contains(_otherTargetCompanyTypeOption) &&
+            _otherTargetCompanyTypeController.text.trim().isEmpty) ||
+        (_minimumOpportunityValue == _otherMinimumValueOption &&
+            _otherMinimumValueController.text.trim().isEmpty)) {
+      return 1;
+    }
+
+    if ((_commercialNeeds.contains(_otherNeedOption) &&
+            _otherNeedController.text.trim().isEmpty) ||
+        _opportunityTriggerController.text.trim().isEmpty) {
+      return 3;
+    }
+
+    if (!_privacyAccepted) {
+      return 4;
+    }
+
+    return 0;
+  }
+
+  bool _isSectionComplete(int index) {
+    final email = _emailController.text.trim();
+
+    switch (index) {
+      case 0:
+        return _offerDescriptionController.text.trim().isNotEmpty &&
+            _fullNameController.text.trim().isNotEmpty &&
+            _companyController.text.trim().isNotEmpty &&
+            RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email) &&
+            (!_offerCategories.contains(_otherOfferCategoryOption) ||
+                _otherOfferCategoryController.text.trim().isNotEmpty) &&
+            (!_problemsSolved.contains(_otherProblemOption) ||
+                _otherProblemController.text.trim().isNotEmpty);
+      case 1:
+        return _geographyCountries.isNotEmpty &&
+            (!_geographyCountries.contains(_spainCountry) ||
+                _spainCoverage != null) &&
+            (_spainCoverage != _spainByProvince ||
+                _spanishProvinces.isNotEmpty) &&
+            (!_targetSectors.contains(_otherSectorOption) ||
+                _otherSectorController.text.trim().isNotEmpty) &&
+            (!_targetCompanyTypes.contains(_otherTargetCompanyTypeOption) ||
+                _otherTargetCompanyTypeController.text.trim().isNotEmpty) &&
+            (_minimumOpportunityValue != _otherMinimumValueOption ||
+                _otherMinimumValueController.text.trim().isNotEmpty);
+      case 2:
+        return _investmentSignals.isNotEmpty ||
+            _innovationSignals.isNotEmpty ||
+            _growthSignals.isNotEmpty ||
+            _publicFinanceSignals.isNotEmpty;
+      case 3:
+        return _opportunityTriggerController.text.trim().isNotEmpty &&
+            (!_commercialNeeds.contains(_otherNeedOption) ||
+                _otherNeedController.text.trim().isNotEmpty);
+      case 4:
+        return _privacyAccepted;
+      default:
+        return false;
+    }
+  }
+
+  Future<void> _scrollToForm() async {
+    final formContext = _formAnchorKey.currentContext;
+    if (formContext == null) {
+      return;
+    }
+    await Scrollable.ensureVisible(
+      formContext,
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeOutCubic,
+      alignment: 0.04,
+    );
+  }
+
+  Future<void> _openPrivacyPolicy() async {
+    final launched = await launchUrl(
+      Uri.parse(_privacyPolicyUrl),
+      mode: LaunchMode.externalApplication,
+    );
+    if (!launched && mounted) {
+      _showError('No se ha podido abrir la Política de privacidad.');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isWide = constraints.maxWidth >= 980;
+        child: SingleChildScrollView(
+          controller: _scrollController,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _LandingBand(
+                color: _surface,
+                topPadding: 24,
+                bottomPadding: 72,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const _BrandHeader(),
+                    const SizedBox(height: 46),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isWide = constraints.maxWidth >= 940;
+                        final form = KeyedSubtree(
+                          key: _formAnchorKey,
+                          child: _buildFormPanel(),
+                        );
 
-            return SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: Center(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isWide ? 40 : 20,
-                      vertical: isWide ? 36 : 20,
+                        if (!isWide) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const _LandingIntro(),
+                              const SizedBox(height: 36),
+                              form,
+                            ],
+                          );
+                        }
+
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Expanded(flex: 7, child: _LandingIntro()),
+                            const SizedBox(width: 48),
+                            Expanded(flex: 9, child: form),
+                          ],
+                        );
+                      },
                     ),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 1200),
-                      child: isWide
-                          ? Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Expanded(flex: 7, child: _LandingIntro()),
-                                const SizedBox(width: 40),
-                                Expanded(flex: 8, child: _buildFormPanel()),
-                              ],
-                            )
-                          : Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                const _LandingIntro(),
-                                const SizedBox(height: 28),
-                                _buildFormPanel(),
-                              ],
-                            ),
-                    ),
-                  ),
+                  ],
                 ),
               ),
-            );
-          },
+              const _OpportunityExampleSection(),
+              const _HowItWorksSection(),
+              const _TrustSection(),
+              _FinalCallToAction(onPressed: _scrollToForm),
+              const _LandingFooter(),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildFormPanel() {
+    final scopeEstimate = _currentScopeEstimate();
     return _LeadFormPanel(
       formKey: _formKey,
-      firstNameController: _firstNameController,
-      lastNameController: _lastNameController,
+      fullNameController: _fullNameController,
       companyController: _companyController,
       jobTitleController: _jobTitleController,
       emailController: _emailController,
       phoneController: _phoneController,
       websiteController: _websiteController,
-      cityProvinceController: _cityProvinceController,
+      addressController: _addressController,
       offerDescriptionController: _offerDescriptionController,
       otherOfferCategoryController: _otherOfferCategoryController,
       otherProblemController: _otherProblemController,
       prioritySolutionsController: _prioritySolutionsController,
       otherSectorController: _otherSectorController,
       otherTargetCompanyTypeController: _otherTargetCompanyTypeController,
-      geographyCountriesController: _geographyCountriesController,
-      geographyRegionsController: _geographyRegionsController,
-      geographyProvincesController: _geographyProvincesController,
-      geographyFreeZoneController: _geographyFreeZoneController,
       otherMinimumValueController: _otherMinimumValueController,
       targetCompanyDescriptionController: _targetCompanyDescriptionController,
       otherNeedController: _otherNeedController,
@@ -399,6 +701,8 @@ class _LandingPageState extends State<LandingPage> {
       problemsSolved: _problemsSolved,
       targetSectors: _targetSectors,
       targetCompanyTypes: _targetCompanyTypes,
+      geographyCountries: _geographyCountries,
+      spanishProvinces: _spanishProvinces,
       investmentSignals: _investmentSignals,
       innovationSignals: _innovationSignals,
       growthSignals: _growthSignals,
@@ -408,11 +712,20 @@ class _LandingPageState extends State<LandingPage> {
       targetRevenueRange: _targetRevenueRange,
       targetEmployeeRange: _targetEmployeeRange,
       minimumOpportunityValue: _minimumOpportunityValue,
+      spainCoverage: _spainCoverage,
+      expandedSectionIndex: _expandedSectionIndex,
+      completedSections: List<bool>.generate(5, _isSectionComplete),
       privacyAccepted: _privacyAccepted,
       marketingConsent: _marketingConsent,
       privacyError: _privacyError,
       successMessage: _successMessage,
+      submissionError: _submissionError,
       isSubmitting: _isSubmitting,
+      submissionSucceeded: _submissionSucceeded,
+      researchScopeUnits: scopeEstimate.units,
+      pricingQuote: _currentPricingQuote(scopeEstimate),
+      pricingLoadFailed: _pricingLoadFailed,
+      entryPilotPriceEur: _pricingCatalog?.entryPilotPriceEur,
       onToggleOption: _toggleOption,
       onRevenueChanged: (value) => setState(() => _targetRevenueRange = value),
       onEmployeeRangeChanged: (value) {
@@ -421,10 +734,34 @@ class _LandingPageState extends State<LandingPage> {
       onMinimumValueChanged: (value) {
         setState(() => _minimumOpportunityValue = value);
       },
+      onGeographyCountriesChanged: _setGeographyCountries,
+      onSpainCoverageChanged: (value) {
+        setState(() {
+          _spainCoverage = value;
+          if (value != _spainByProvince) {
+            _spanishProvinces.clear();
+          }
+        });
+      },
+      onSpanishProvincesChanged: (values) {
+        setState(() {
+          _spanishProvinces
+            ..clear()
+            ..addAll(values);
+        });
+      },
+      onSetAllSignals: _setAllSignals,
+      onSetAllCommercialNeeds: _setAllCommercialNeeds,
+      onSectionChanged: (index) {
+        setState(() {
+          _expandedSectionIndex = index;
+        });
+      },
       onPrivacyChanged: _setPrivacyAccepted,
       onMarketingChanged: (value) {
         setState(() => _marketingConsent = value ?? false);
       },
+      onPrivacyPolicyTap: _openPrivacyPolicy,
       onSubmit: _submit,
     );
   }
@@ -445,6 +782,49 @@ class _LandingPageState extends State<LandingPage> {
       _privacyError = _privacyAccepted
           ? null
           : 'Necesitamos tu consentimiento para responderte.';
+    });
+  }
+
+  void _setGeographyCountries(Set<String> values) {
+    setState(() {
+      final hadSpain = _geographyCountries.contains(_spainCountry);
+      _geographyCountries
+        ..clear()
+        ..addAll(values);
+      if (_geographyCountries.contains(_spainCountry) && !hadSpain) {
+        _spainCoverage = _spainAll;
+        _spanishProvinces.clear();
+      } else if (!_geographyCountries.contains(_spainCountry)) {
+        _spainCoverage = null;
+        _spanishProvinces.clear();
+      }
+    });
+  }
+
+  void _setAllSignals(bool selected) {
+    setState(() {
+      for (final selection in [
+        (_investmentSignals, _investmentSignalOptions),
+        (_innovationSignals, _innovationSignalOptions),
+        (_growthSignals, _growthSignalOptions),
+        (_publicFinanceSignals, _publicFinanceSignalOptions),
+      ]) {
+        selection.$1.clear();
+        if (selected) {
+          selection.$1.addAll(selection.$2);
+        }
+      }
+    });
+  }
+
+  void _setAllCommercialNeeds(bool selected) {
+    setState(() {
+      _commercialNeeds.clear();
+      if (selected) {
+        _commercialNeeds.addAll(
+          _commercialNeedOptions.where((option) => option != _otherNeedOption),
+        );
+      }
     });
   }
 
@@ -479,6 +859,78 @@ class _LandingPageState extends State<LandingPage> {
   }
 }
 
+class _LandingBand extends StatelessWidget {
+  const _LandingBand({
+    required this.child,
+    required this.color,
+    this.topPadding = 72,
+    this.bottomPadding = 72,
+  });
+
+  final Widget child;
+  final Color color;
+  final double topPadding;
+  final double bottomPadding;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: color,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final horizontalPadding = constraints.maxWidth >= 980 ? 40.0 : 20.0;
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+              horizontalPadding,
+              topPadding,
+              horizontalPadding,
+              bottomPadding,
+            ),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: child,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _BrandHeader extends StatelessWidget {
+  const _BrandHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      header: true,
+      label: 'InduRadar, Industrial Opportunity Intelligence',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Image.asset(
+            _logoAsset,
+            width: 205,
+            fit: BoxFit.contain,
+            excludeFromSemantics: true,
+          ),
+          const SizedBox(height: 7),
+          Text(
+            'Industrial Opportunity Intelligence',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: _steel,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _LandingIntro extends StatelessWidget {
   const _LandingIntro();
 
@@ -490,57 +942,72 @@ class _LandingIntro extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Image.asset(_logoAsset, width: 246, fit: BoxFit.contain),
-        const SizedBox(height: 28),
         Text(
-          'InduRadar',
+          'Convierte cambios industriales en oportunidades comerciales',
           style: textTheme.displaySmall?.copyWith(
             color: _ink,
+            fontSize: 44,
+            height: 1.08,
             fontWeight: FontWeight.w800,
             letterSpacing: 0,
           ),
         ),
-        const SizedBox(height: 12),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 620),
-          child: Text(
-            'Radar comercial para detectar cambios industriales que pueden convertirse en oportunidades de venta.',
-            style: textTheme.headlineSmall?.copyWith(
-              color: _ink,
-              height: 1.25,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0,
-            ),
+        const SizedBox(height: 22),
+        Text(
+          'Identificamos inversiones, ampliaciones, nuevas líneas, maquinaria, ayudas y otros cambios empresariales, y analizamos qué oportunidades comerciales pueden derivarse de ellos.',
+          style: textTheme.titleMedium?.copyWith(
+            color: _ink,
+            height: 1.5,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0,
           ),
+        ),
+        const SizedBox(height: 14),
+        Text(
+          'Define qué vendes, qué empresas buscas y qué señales te interesan. InduRadar prioriza los resultados y conserva la evidencia que los respalda.',
+          style: textTheme.bodyLarge?.copyWith(color: _steel, height: 1.55),
+        ),
+        const SizedBox(height: 30),
+        const _BenefitItem(
+          icon: Icons.fact_check_outlined,
+          title: 'Señales verificadas',
+          text:
+              'Inversiones, nuevas plantas, ampliaciones, maquinaria, ayudas y cambios empresariales.',
         ),
         const SizedBox(height: 18),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 620),
-          child: Text(
-            'Este formulario define qué ofrece tu empresa, qué compañías buscas y qué señales deben activar el radar. Solo algunos campos son obligatorios; el resto ayuda a afinar la investigación.',
-            style: textTheme.bodyLarge?.copyWith(color: _steel, height: 1.55),
-          ),
+        const _BenefitItem(
+          icon: Icons.filter_alt_outlined,
+          title: 'Oportunidades priorizadas',
+          text:
+              'Qué proyecto existe, qué necesidad podría generar y para qué tipo de proveedor resulta relevante.',
+        ),
+        const SizedBox(height: 18),
+        const _BenefitItem(
+          icon: Icons.arrow_outward_outlined,
+          title: 'Siguiente acción',
+          text:
+              'Fuentes, nivel de confianza y recomendación sobre qué validar o a quién abordar.',
         ),
         const SizedBox(height: 28),
-        const Wrap(
-          spacing: 14,
-          runSpacing: 14,
+        const Divider(color: _line),
+        const SizedBox(height: 12),
+        Text(
+          'Fuentes corporativas · Administraciones · Registros · Ayudas · Medios sectoriales',
+          style: textTheme.bodySmall?.copyWith(color: _steel, height: 1.45),
+        ),
+        const SizedBox(height: 7),
+        Row(
           children: [
-            _BenefitItem(
-              icon: Icons.radar_outlined,
-              title: 'Señales trazables',
-              text: 'Inversiones, proyectos, cambios corporativos y ayudas.',
-            ),
-            _BenefitItem(
-              icon: Icons.fact_check_outlined,
-              title: 'Encaje comercial',
-              text:
-                  'Oferta, problemas resueltos, empresa objetivo y geografía.',
-            ),
-            _BenefitItem(
-              icon: Icons.rule_outlined,
-              title: 'Seguimiento',
-              text: 'Informes puntuales, vigilancia sectorial o alertas.',
+            const Icon(Icons.verified_user_outlined, size: 17, color: _blue),
+            const SizedBox(width: 7),
+            Flexible(
+              child: Text(
+                'Evidencia trazable · Revisión humana',
+                style: textTheme.bodySmall?.copyWith(
+                  color: _ink,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
           ],
         ),
@@ -562,39 +1029,231 @@ class _BenefitItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 188,
-      child: Row(
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: const Color(0xFFE2F6F8),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: _blue, size: 21),
+        ),
+        const SizedBox(width: 13),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: _ink,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                text,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: _steel, height: 1.4),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _OpportunityExampleSection extends StatelessWidget {
+  const _OpportunityExampleSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return const _LandingBand(
+      color: Colors.white,
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 36,
-            height: 36,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE6F8FA),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: _blue, size: 20),
+          _SectionHeading(
+            title: 'Así convierte InduRadar una señal en una oportunidad',
+            text:
+                'Una señal documentada se conecta con un proyecto, una necesidad comercial probable y una acción concreta.',
           ),
-          const SizedBox(width: 10),
-          Expanded(
+          SizedBox(height: 30),
+          _OpportunityExampleCard(),
+          SizedBox(height: 34),
+          _SignalFlow(),
+        ],
+      ),
+    );
+  }
+}
+
+class _OpportunityExampleCard extends StatelessWidget {
+  const _OpportunityExampleCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: _line),
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0F102335),
+            blurRadius: 24,
+            offset: Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF0F8FA),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(7)),
+            ),
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDDF4F7),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'Ejemplo ilustrativo',
+                    style: textTheme.labelMedium?.copyWith(
+                      color: _blue,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                Text(
+                  'Fabricante industrial · Comunitat Valenciana',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: _ink,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: _ink,
+                  'PROYECTO IDENTIFICADO',
+                  style: textTheme.labelMedium?.copyWith(
+                    color: _blue,
                     fontWeight: FontWeight.w800,
+                    letterSpacing: 0,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 7),
                 Text(
-                  text,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: _steel, height: 1.35),
+                  'Ampliación de capacidad productiva',
+                  style: textTheme.headlineSmall?.copyWith(
+                    color: _ink,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                const Divider(color: _line),
+                const SizedBox(height: 20),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    const signal = _ExampleFact(
+                      icon: Icons.radar_outlined,
+                      label: 'Señal',
+                      value:
+                          'Concesión de ayuda pública vinculada a una nueva línea de producción.',
+                    );
+                    const evidence = _ExampleFact(
+                      icon: Icons.source_outlined,
+                      label: 'Evidencia',
+                      value: 'Fuente oficial · 10 ago 2026',
+                    );
+                    const need = _ExampleFact(
+                      icon: Icons.precision_manufacturing_outlined,
+                      label: 'Necesidad probable',
+                      value:
+                          'Automatización, control de línea y seguridad de máquinas.',
+                    );
+                    const confidence = _ExampleFact(
+                      icon: Icons.verified_outlined,
+                      label: 'Confianza',
+                      value: 'Alta',
+                      accent: _success,
+                    );
+                    const action = _ExampleFact(
+                      icon: Icons.arrow_outward_outlined,
+                      label: 'Siguiente acción',
+                      value:
+                          'Confirmar alcance y fase del proyecto y abordar Ingeniería / Operaciones.',
+                    );
+
+                    if (constraints.maxWidth < 760) {
+                      return const Column(
+                        children: [
+                          signal,
+                          SizedBox(height: 18),
+                          evidence,
+                          SizedBox(height: 18),
+                          need,
+                          SizedBox(height: 18),
+                          confidence,
+                          SizedBox(height: 18),
+                          action,
+                        ],
+                      );
+                    }
+
+                    return const Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            children: [signal, SizedBox(height: 20), evidence],
+                          ),
+                        ),
+                        SizedBox(width: 28),
+                        SizedBox(height: 190, child: VerticalDivider()),
+                        SizedBox(width: 28),
+                        Expanded(
+                          child: Column(
+                            children: [
+                              need,
+                              SizedBox(height: 20),
+                              confidence,
+                              SizedBox(height: 20),
+                              action,
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),
@@ -605,27 +1264,741 @@ class _BenefitItem extends StatelessWidget {
   }
 }
 
+class _ExampleFact extends StatelessWidget {
+  const _ExampleFact({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.accent = _blue,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: accent),
+        const SizedBox(width: 11),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: accent,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: _ink, height: 1.45),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SignalFlow extends StatelessWidget {
+  const _SignalFlow();
+
+  @override
+  Widget build(BuildContext context) {
+    const nodes = [
+      _FlowNode(icon: Icons.radar_outlined, label: 'SEÑAL'),
+      _FlowNode(icon: Icons.account_tree_outlined, label: 'PROYECTO'),
+      _FlowNode(icon: Icons.lightbulb_outline, label: 'NECESIDAD PROBABLE'),
+      _FlowNode(icon: Icons.call_made_outlined, label: 'ACCIÓN'),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 720) {
+          return Column(
+            children: [
+              nodes[0],
+              const _FlowArrow(vertical: true),
+              nodes[1],
+              const _FlowArrow(vertical: true),
+              nodes[2],
+              const _FlowArrow(vertical: true),
+              nodes[3],
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(child: nodes[0]),
+            const _FlowArrow(),
+            Expanded(child: nodes[1]),
+            const _FlowArrow(),
+            Expanded(child: nodes[2]),
+            const _FlowArrow(),
+            Expanded(child: nodes[3]),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _FlowNode extends StatelessWidget {
+  const _FlowNode({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 66),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FBFC),
+        border: Border.all(color: _line),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 20, color: _blue),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: _ink,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FlowArrow extends StatelessWidget {
+  const _FlowArrow({this.vertical = false});
+
+  final bool vertical;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: vertical ? 0 : 9,
+        vertical: vertical ? 7 : 0,
+      ),
+      child: Icon(
+        vertical ? Icons.arrow_downward : Icons.arrow_forward,
+        size: 19,
+        color: _cyan,
+      ),
+    );
+  }
+}
+
+class _HowItWorksSection extends StatelessWidget {
+  const _HowItWorksSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return _LandingBand(
+      color: _surface,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionHeading(
+            title: 'Cómo funciona',
+            text:
+                'Un proceso breve para definir el objetivo, investigar con criterio y entregar resultados accionables.',
+          ),
+          const SizedBox(height: 32),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const steps = [
+                _HowStep(
+                  number: '1',
+                  title: 'Define tu radar',
+                  text:
+                      'Qué vendes, sectores, empresas, territorio y señales que te interesan.',
+                ),
+                _HowStep(
+                  number: '2',
+                  title: 'Investigamos señales y proyectos',
+                  text:
+                      'Contrastamos fuentes corporativas, oficiales y sectoriales para identificar cambios relevantes.',
+                ),
+                _HowStep(
+                  number: '3',
+                  title: 'Recibes oportunidades priorizadas',
+                  text:
+                      'Empresas, proyectos, evidencias, necesidad probable y siguiente acción comercial.',
+                ),
+              ];
+
+              if (constraints.maxWidth < 760) {
+                return Column(
+                  children: [
+                    steps[0],
+                    const SizedBox(height: 28),
+                    steps[1],
+                    const SizedBox(height: 28),
+                    steps[2],
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: steps[0]),
+                  const SizedBox(width: 34),
+                  Expanded(child: steps[1]),
+                  const SizedBox(width: 34),
+                  Expanded(child: steps[2]),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HowStep extends StatelessWidget {
+  const _HowStep({
+    required this.number,
+    required this.title,
+    required this.text,
+  });
+
+  final String number;
+  final String title;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 38,
+          height: 38,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: _blue,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            number,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: _ink,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0,
+                ),
+              ),
+              const SizedBox(height: 7),
+              Text(
+                text,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: _steel, height: 1.5),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TrustSection extends StatelessWidget {
+  const _TrustSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return _LandingBand(
+      color: Colors.white,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionHeading(
+            title: 'Inteligencia comercial, no un feed de noticias',
+            text:
+                'La trazabilidad y la revisión importan tanto como detectar el cambio.',
+          ),
+          const SizedBox(height: 32),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final itemWidth = constraints.maxWidth >= 700
+                  ? (constraints.maxWidth - 26) / 2
+                  : constraints.maxWidth;
+              return Wrap(
+                spacing: 26,
+                runSpacing: 28,
+                children: [
+                  SizedBox(
+                    width: itemWidth,
+                    child: const _TrustItem(
+                      icon: Icons.filter_alt_outlined,
+                      title: 'Señales, no titulares',
+                      text:
+                          'Identificamos el hecho o cambio relevante detrás de la noticia.',
+                    ),
+                  ),
+                  SizedBox(
+                    width: itemWidth,
+                    child: const _TrustItem(
+                      icon: Icons.link_outlined,
+                      title: 'Evidencia trazable',
+                      text:
+                          'Cada oportunidad conserva las fuentes que respaldan la información.',
+                    ),
+                  ),
+                  SizedBox(
+                    width: itemWidth,
+                    child: const _TrustItem(
+                      icon: Icons.compare_arrows_outlined,
+                      title: 'Hechos e inferencias separados',
+                      text:
+                          'Diferenciamos lo confirmado de una necesidad comercial probable.',
+                    ),
+                  ),
+                  SizedBox(
+                    width: itemWidth,
+                    child: const _TrustItem(
+                      icon: Icons.person_search_outlined,
+                      title: 'Revisión humana',
+                      text:
+                          'La información se revisa antes de entregarse al cliente.',
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TrustItem extends StatelessWidget {
+  const _TrustItem({
+    required this.icon,
+    required this.title,
+    required this.text,
+  });
+
+  final IconData icon;
+  final String title;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.only(left: 17),
+      decoration: const BoxDecoration(
+        border: Border(left: BorderSide(color: _cyan, width: 3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: _blue, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: _ink,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  text,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: _steel, height: 1.45),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FinalCallToAction extends StatelessWidget {
+  const _FinalCallToAction({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return _LandingBand(
+      color: const Color(0xFFE5F5F7),
+      topPadding: 54,
+      bottomPadding: 54,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final copy = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Define qué quieres encontrar',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  color: _ink,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Configura tu radar comercial y dinos qué empresas, proyectos y señales son relevantes para tu negocio.',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(color: _steel, height: 1.5),
+              ),
+            ],
+          );
+          final button = FilledButton.icon(
+            key: const ValueKey('final-form-cta'),
+            onPressed: onPressed,
+            icon: const Icon(Icons.arrow_upward),
+            label: const Text('Definir mi radar comercial'),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(250, 52),
+              padding: const EdgeInsets.symmetric(horizontal: 22),
+            ),
+          );
+
+          if (constraints.maxWidth < 760) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [copy, const SizedBox(height: 24), button],
+            );
+          }
+
+          return Row(
+            children: [
+              Expanded(child: copy),
+              const SizedBox(width: 42),
+              button,
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _LandingFooter extends StatelessWidget {
+  const _LandingFooter();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: _line)),
+      ),
+      child: Text(
+        'InduRadar · Industrial Opportunity Intelligence',
+        textAlign: TextAlign.center,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: _steel),
+      ),
+    );
+  }
+}
+
+class _SectionHeading extends StatelessWidget {
+  const _SectionHeading({required this.title, required this.text});
+
+  final String title;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 780),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              color: _ink,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            text,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyLarge?.copyWith(color: _steel, height: 1.5),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FormPricingHeader extends StatelessWidget {
+  const _FormPricingHeader({
+    required this.pricingQuote,
+    required this.researchScopeUnits,
+    required this.pricingLoadFailed,
+    required this.entryPilotPriceEur,
+  });
+
+  final PricingQuote? pricingQuote;
+  final num researchScopeUnits;
+  final bool pricingLoadFailed;
+  final num? entryPilotPriceEur;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final title = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 10,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(
+              'Define tu radar comercial',
+              style: textTheme.headlineSmall?.copyWith(
+                color: _ink,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0,
+              ),
+            ),
+            if (entryPilotPriceEur != null)
+              Container(
+                key: const ValueKey('pricing-entry-price'),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE2F6F8),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  'Desde ${_formatPrice(entryPilotPriceEur!)} €',
+                  style: textTheme.labelLarge?.copyWith(
+                    color: _blue,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Cuéntanos qué vendes, qué empresas quieres encontrar y qué cambios te interesa detectar.',
+          style: textTheme.bodyMedium?.copyWith(color: _steel, height: 1.45),
+        ),
+      ],
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 560;
+        final price = _PricingSummary(
+          quote: pricingQuote,
+          researchScopeUnits: researchScopeUnits,
+          loadFailed: pricingLoadFailed,
+          horizontal: !isWide,
+        );
+        if (!isWide) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [title, const SizedBox(height: 16), price],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: title),
+            const SizedBox(width: 20),
+            SizedBox(width: 190, child: price),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _PricingSummary extends StatelessWidget {
+  const _PricingSummary({
+    required this.quote,
+    required this.researchScopeUnits,
+    required this.loadFailed,
+    required this.horizontal,
+  });
+
+  final PricingQuote? quote;
+  final num researchScopeUnits;
+  final bool loadFailed;
+  final bool horizontal;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final border = horizontal
+        ? const Border(top: BorderSide(color: _line, width: 2))
+        : const Border(left: BorderSide(color: _cyan, width: 3));
+    final padding = horizontal
+        ? const EdgeInsets.only(top: 12)
+        : const EdgeInsets.only(left: 14);
+
+    return Container(
+      key: const ValueKey('pricing-summary'),
+      decoration: BoxDecoration(border: border),
+      padding: padding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            quote == null
+                ? 'ESTIMACIÓN DE PRECIO'
+                : 'ESTIMACIÓN · ${quote!.pilotLabel.toUpperCase()}',
+            style: textTheme.labelSmall?.copyWith(
+              color: _blue,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0,
+            ),
+          ),
+          const SizedBox(height: 6),
+          if (quote == null)
+            Text(
+              loadFailed
+                  ? 'Precio pendiente de revisión'
+                  : 'Calculando precio…',
+              style: textTheme.bodyMedium?.copyWith(
+                color: _ink,
+                fontWeight: FontWeight.w700,
+              ),
+            )
+          else
+            for (var index = 0; index < quote!.lineItems.length; index++) ...[
+              if (index > 0) const SizedBox(height: 8),
+              _PricingLine(item: quote!.lineItems[index]),
+            ],
+          const SizedBox(height: 7),
+          Text(
+            '${_formatPrice(researchScopeUnits)} RU estimadas',
+            key: const ValueKey('pricing-scope-units'),
+            style: textTheme.bodySmall?.copyWith(color: _steel),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PricingLine extends StatelessWidget {
+  const _PricingLine({required this.item});
+
+  final PricingLineItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final suffix = item.isMonthly ? '/mes' : '';
+    final prefix = item.startingAt ? 'Desde ' : '';
+    final billingLabel = item.isMonthly ? 'cuota mensual' : 'pago único';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$prefix${_formatPrice(item.pilotPriceEur)} €$suffix',
+          key: ValueKey('pricing-${item.planCode}'),
+          style: textTheme.titleLarge?.copyWith(
+            color: _ink,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0,
+          ),
+        ),
+        Text(
+          '${item.planLabel} · $billingLabel',
+          style: textTheme.bodySmall?.copyWith(
+            color: _ink,
+            fontWeight: FontWeight.w700,
+            height: 1.35,
+          ),
+        ),
+        Text(
+          'Estándar: $prefix${_formatPrice(item.standardPriceEur)} €$suffix',
+          style: textTheme.bodySmall?.copyWith(color: _steel, height: 1.35),
+        ),
+      ],
+    );
+  }
+}
+
+String _formatPrice(num value) {
+  if (value == value.roundToDouble()) {
+    return value.toInt().toString();
+  }
+  return value.toStringAsFixed(1).replaceAll('.', ',');
+}
+
 class _LeadFormPanel extends StatelessWidget {
   const _LeadFormPanel({
     required this.formKey,
-    required this.firstNameController,
-    required this.lastNameController,
+    required this.fullNameController,
     required this.companyController,
     required this.jobTitleController,
     required this.emailController,
     required this.phoneController,
     required this.websiteController,
-    required this.cityProvinceController,
+    required this.addressController,
     required this.offerDescriptionController,
     required this.otherOfferCategoryController,
     required this.otherProblemController,
     required this.prioritySolutionsController,
     required this.otherSectorController,
     required this.otherTargetCompanyTypeController,
-    required this.geographyCountriesController,
-    required this.geographyRegionsController,
-    required this.geographyProvincesController,
-    required this.geographyFreeZoneController,
     required this.otherMinimumValueController,
     required this.targetCompanyDescriptionController,
     required this.otherNeedController,
@@ -642,6 +2015,8 @@ class _LeadFormPanel extends StatelessWidget {
     required this.problemsSolved,
     required this.targetSectors,
     required this.targetCompanyTypes,
+    required this.geographyCountries,
+    required this.spanishProvinces,
     required this.investmentSignals,
     required this.innovationSignals,
     required this.growthSignals,
@@ -651,39 +2026,50 @@ class _LeadFormPanel extends StatelessWidget {
     required this.targetRevenueRange,
     required this.targetEmployeeRange,
     required this.minimumOpportunityValue,
+    required this.spainCoverage,
+    required this.expandedSectionIndex,
+    required this.completedSections,
     required this.privacyAccepted,
     required this.marketingConsent,
     required this.privacyError,
     required this.successMessage,
+    required this.submissionError,
     required this.isSubmitting,
+    required this.submissionSucceeded,
+    required this.researchScopeUnits,
+    required this.pricingQuote,
+    required this.pricingLoadFailed,
+    required this.entryPilotPriceEur,
     required this.onToggleOption,
     required this.onRevenueChanged,
     required this.onEmployeeRangeChanged,
     required this.onMinimumValueChanged,
+    required this.onGeographyCountriesChanged,
+    required this.onSpainCoverageChanged,
+    required this.onSpanishProvincesChanged,
+    required this.onSetAllSignals,
+    required this.onSetAllCommercialNeeds,
+    required this.onSectionChanged,
     required this.onPrivacyChanged,
     required this.onMarketingChanged,
+    required this.onPrivacyPolicyTap,
     required this.onSubmit,
   });
 
   final GlobalKey<FormState> formKey;
-  final TextEditingController firstNameController;
-  final TextEditingController lastNameController;
+  final TextEditingController fullNameController;
   final TextEditingController companyController;
   final TextEditingController jobTitleController;
   final TextEditingController emailController;
   final TextEditingController phoneController;
   final TextEditingController websiteController;
-  final TextEditingController cityProvinceController;
+  final TextEditingController addressController;
   final TextEditingController offerDescriptionController;
   final TextEditingController otherOfferCategoryController;
   final TextEditingController otherProblemController;
   final TextEditingController prioritySolutionsController;
   final TextEditingController otherSectorController;
   final TextEditingController otherTargetCompanyTypeController;
-  final TextEditingController geographyCountriesController;
-  final TextEditingController geographyRegionsController;
-  final TextEditingController geographyProvincesController;
-  final TextEditingController geographyFreeZoneController;
   final TextEditingController otherMinimumValueController;
   final TextEditingController targetCompanyDescriptionController;
   final TextEditingController otherNeedController;
@@ -700,6 +2086,8 @@ class _LeadFormPanel extends StatelessWidget {
   final Set<String> problemsSolved;
   final Set<String> targetSectors;
   final Set<String> targetCompanyTypes;
+  final Set<String> geographyCountries;
+  final Set<String> spanishProvinces;
   final Set<String> investmentSignals;
   final Set<String> innovationSignals;
   final Set<String> growthSignals;
@@ -709,23 +2097,49 @@ class _LeadFormPanel extends StatelessWidget {
   final String? targetRevenueRange;
   final String? targetEmployeeRange;
   final String? minimumOpportunityValue;
+  final String? spainCoverage;
+  final int expandedSectionIndex;
+  final List<bool> completedSections;
   final bool privacyAccepted;
   final bool marketingConsent;
   final String? privacyError;
   final String? successMessage;
+  final String? submissionError;
   final bool isSubmitting;
+  final bool submissionSucceeded;
+  final num researchScopeUnits;
+  final PricingQuote? pricingQuote;
+  final bool pricingLoadFailed;
+  final num? entryPilotPriceEur;
   final void Function(Set<String> values, String label, bool selected)
   onToggleOption;
   final ValueChanged<String?> onRevenueChanged;
   final ValueChanged<String?> onEmployeeRangeChanged;
   final ValueChanged<String?> onMinimumValueChanged;
+  final ValueChanged<Set<String>> onGeographyCountriesChanged;
+  final ValueChanged<String?> onSpainCoverageChanged;
+  final ValueChanged<Set<String>> onSpanishProvincesChanged;
+  final ValueChanged<bool> onSetAllSignals;
+  final ValueChanged<bool> onSetAllCommercialNeeds;
+  final ValueChanged<int> onSectionChanged;
   final ValueChanged<bool?> onPrivacyChanged;
   final ValueChanged<bool?> onMarketingChanged;
+  final VoidCallback onPrivacyPolicyTap;
   final VoidCallback onSubmit;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final allSignalsSelected =
+        investmentSignals.length == _investmentSignalOptions.length &&
+        innovationSignals.length == _innovationSignalOptions.length &&
+        growthSignals.length == _growthSignalOptions.length &&
+        publicFinanceSignals.length == _publicFinanceSignalOptions.length;
+    final selectedStandardNeeds = commercialNeeds.where(
+      (option) => option != _otherNeedOption,
+    );
+    final allCommercialNeedsSelected =
+        selectedStandardNeeds.length == _commercialNeedOptions.length - 1;
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -748,20 +2162,40 @@ class _LeadFormPanel extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'Define tu radar comercial',
-                style: textTheme.headlineSmall?.copyWith(
-                  color: _ink,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0,
-                ),
+              _FormPricingHeader(
+                pricingQuote: pricingQuote,
+                researchScopeUnits: researchScopeUnits,
+                pricingLoadFailed: pricingLoadFailed,
+                entryPilotPriceEur: entryPilotPriceEur,
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Los campos marcados con * son obligatorios.',
-                style: textTheme.bodyMedium?.copyWith(
-                  color: _steel,
-                  height: 1.45,
+              const SizedBox(height: 10),
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                runSpacing: 4,
+                children: [
+                  Text(
+                    'Paso ${expandedSectionIndex + 1} de 5',
+                    key: const ValueKey('form-progress-label'),
+                    style: textTheme.labelLarge?.copyWith(
+                      color: _blue,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    'Solo algunos campos son obligatorios',
+                    style: textTheme.bodySmall?.copyWith(color: _steel),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 9),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(2),
+                child: LinearProgressIndicator(
+                  key: const ValueKey('form-progress-bar'),
+                  value: (expandedSectionIndex + 1) / 5,
+                  minHeight: 4,
+                  color: _cyan,
+                  backgroundColor: const Color(0xFFE7EFF3),
                 ),
               ),
               const SizedBox(height: 22),
@@ -769,104 +2203,17 @@ class _LeadFormPanel extends StatelessWidget {
                 _SuccessBanner(message: successMessage!),
                 const SizedBox(height: 18),
               ],
+              if (submissionError != null) ...[
+                _ErrorBanner(message: submissionError!),
+                const SizedBox(height: 18),
+              ],
               _FormSection(
-                title: '1 · Tu empresa y tu oferta',
-                initiallyExpanded: true,
+                sectionId: 'company-offer',
+                title: '1 · ¿Qué vendes?',
+                isExpanded: expandedSectionIndex == 0,
+                isComplete: completedSections[0],
+                onToggle: () => onSectionChanged(0),
                 children: [
-                  _ResponsiveFields(
-                    children: [
-                      TextFormField(
-                        controller: firstNameController,
-                        autofillHints: const [AutofillHints.givenName],
-                        decoration: const InputDecoration(
-                          labelText: 'Nombre *',
-                          prefixIcon: Icon(Icons.person_outline),
-                        ),
-                        textInputAction: TextInputAction.next,
-                        validator: _required,
-                      ),
-                      TextFormField(
-                        controller: lastNameController,
-                        autofillHints: const [AutofillHints.familyName],
-                        decoration: const InputDecoration(
-                          labelText: 'Apellidos',
-                          prefixIcon: Icon(Icons.badge_outlined),
-                        ),
-                        textInputAction: TextInputAction.next,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  _ResponsiveFields(
-                    children: [
-                      TextFormField(
-                        controller: companyController,
-                        autofillHints: const [AutofillHints.organizationName],
-                        decoration: const InputDecoration(
-                          labelText: 'Empresa *',
-                          prefixIcon: Icon(Icons.apartment_outlined),
-                        ),
-                        textInputAction: TextInputAction.next,
-                        validator: _required,
-                      ),
-                      TextFormField(
-                        controller: jobTitleController,
-                        decoration: const InputDecoration(
-                          labelText: 'Cargo / función',
-                          prefixIcon: Icon(Icons.work_outline),
-                        ),
-                        textInputAction: TextInputAction.next,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  _ResponsiveFields(
-                    children: [
-                      TextFormField(
-                        controller: emailController,
-                        autofillHints: const [AutofillHints.email],
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(
-                          labelText: 'Email profesional *',
-                          prefixIcon: Icon(Icons.alternate_email_outlined),
-                        ),
-                        textInputAction: TextInputAction.next,
-                        validator: _emailValidator,
-                      ),
-                      TextFormField(
-                        controller: phoneController,
-                        keyboardType: TextInputType.phone,
-                        decoration: const InputDecoration(
-                          labelText: 'Teléfono',
-                          prefixIcon: Icon(Icons.phone_outlined),
-                        ),
-                        textInputAction: TextInputAction.next,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  _ResponsiveFields(
-                    children: [
-                      TextFormField(
-                        controller: websiteController,
-                        keyboardType: TextInputType.url,
-                        decoration: const InputDecoration(
-                          labelText: 'Web de la empresa',
-                          prefixIcon: Icon(Icons.language_outlined),
-                        ),
-                        textInputAction: TextInputAction.next,
-                      ),
-                      TextFormField(
-                        controller: cityProvinceController,
-                        decoration: const InputDecoration(
-                          labelText: 'Ciudad / provincia',
-                          prefixIcon: Icon(Icons.location_city_outlined),
-                        ),
-                        textInputAction: TextInputAction.next,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
                   TextFormField(
                     controller: offerDescriptionController,
                     minLines: 3,
@@ -880,61 +2227,154 @@ class _LeadFormPanel extends StatelessWidget {
                     ),
                     validator: _required,
                   ),
-                  const SizedBox(height: 18),
-                  _MultiSelectChipGroup(
-                    title: 'Categoría principal de tu oferta',
-                    options: _offerCategoryOptions,
-                    selectedValues: offerCategories,
-                    isEnabled: !isSubmitting,
-                    onChanged: (label, selected) {
-                      onToggleOption(offerCategories, label, selected);
-                    },
-                  ),
-                  if (offerCategories.contains(_otherOfferCategoryOption)) ...[
-                    const SizedBox(height: 10),
-                    _OtherField(
-                      controller: otherOfferCategoryController,
-                      label: 'Otra categoría',
-                      isRequired: true,
-                    ),
-                  ],
-                  const SizedBox(height: 18),
-                  _MultiSelectChipGroup(
-                    title: '¿Qué problemas ayudas a resolver?',
-                    options: _problemOptions,
-                    selectedValues: problemsSolved,
-                    isEnabled: !isSubmitting,
-                    onChanged: (label, selected) {
-                      onToggleOption(problemsSolved, label, selected);
-                    },
-                  ),
-                  if (problemsSolved.contains(_otherProblemOption)) ...[
-                    const SizedBox(height: 10),
-                    _OtherField(
-                      controller: otherProblemController,
-                      label: 'Otro problema',
-                      isRequired: true,
-                    ),
-                  ],
                   const SizedBox(height: 14),
                   TextFormField(
-                    controller: prioritySolutionsController,
-                    minLines: 2,
-                    maxLines: 4,
+                    controller: fullNameController,
+                    autofillHints: const [AutofillHints.name],
                     decoration: const InputDecoration(
-                      labelText:
-                          'Productos, soluciones o servicios concretos que quieres priorizar',
-                      hintText:
-                          'Familias concretas, especialidades, marcas, tecnologías, aplicaciones o servicios.',
-                      alignLabelWithHint: true,
-                      prefixIcon: Icon(Icons.tune_outlined),
+                      labelText: 'Nombre y apellidos *',
+                      prefixIcon: Icon(Icons.person_outline),
                     ),
+                    textInputAction: TextInputAction.next,
+                    validator: _required,
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: companyController,
+                    autofillHints: const [AutofillHints.organizationName],
+                    decoration: const InputDecoration(
+                      labelText: 'Empresa *',
+                      prefixIcon: Icon(Icons.apartment_outlined),
+                    ),
+                    textInputAction: TextInputAction.next,
+                    validator: _required,
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: emailController,
+                    autofillHints: const [AutofillHints.email],
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'Email profesional *',
+                      prefixIcon: Icon(Icons.alternate_email_outlined),
+                    ),
+                    textInputAction: TextInputAction.next,
+                    validator: _emailValidator,
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: jobTitleController,
+                    decoration: const InputDecoration(
+                      labelText: 'Cargo / función (opcional)',
+                      prefixIcon: Icon(Icons.work_outline),
+                    ),
+                    textInputAction: TextInputAction.next,
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: phoneController,
+                    autofillHints: const [AutofillHints.telephoneNumber],
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      labelText: 'Teléfono (opcional)',
+                      prefixIcon: Icon(Icons.phone_outlined),
+                    ),
+                    textInputAction: TextInputAction.next,
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: websiteController,
+                    autofillHints: const [AutofillHints.url],
+                    keyboardType: TextInputType.url,
+                    decoration: const InputDecoration(
+                      labelText: 'Web de la empresa (opcional)',
+                      prefixIcon: Icon(Icons.language_outlined),
+                    ),
+                    textInputAction: TextInputAction.next,
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: addressController,
+                    autofillHints: const [AutofillHints.fullStreetAddress],
+                    decoration: const InputDecoration(
+                      labelText: 'Dirección (opcional)',
+                      prefixIcon: Icon(Icons.location_on_outlined),
+                    ),
+                    textInputAction: TextInputAction.next,
+                  ),
+                  const SizedBox(height: 18),
+                  _OptionalFields(
+                    title: 'Afinar tu oferta',
+                    description:
+                        'Categorías, problemas que resuelves y soluciones prioritarias.',
+                    forceExpanded:
+                        (offerCategories.contains(_otherOfferCategoryOption) &&
+                            otherOfferCategoryController.text.trim().isEmpty) ||
+                        (problemsSolved.contains(_otherProblemOption) &&
+                            otherProblemController.text.trim().isEmpty),
+                    children: [
+                      _MultiSelectChipGroup(
+                        title: 'Categoría principal de tu oferta',
+                        options: _offerCategoryOptions,
+                        selectedValues: offerCategories,
+                        isEnabled: !isSubmitting,
+                        onChanged: (label, selected) {
+                          onToggleOption(offerCategories, label, selected);
+                        },
+                      ),
+                      if (offerCategories.contains(
+                        _otherOfferCategoryOption,
+                      )) ...[
+                        const SizedBox(height: 10),
+                        _OtherField(
+                          controller: otherOfferCategoryController,
+                          label: 'Otra categoría',
+                          isRequired: true,
+                        ),
+                      ],
+                      const SizedBox(height: 18),
+                      _MultiSelectChipGroup(
+                        title: '¿Qué problemas ayudas a resolver?',
+                        options: _problemOptions,
+                        selectedValues: problemsSolved,
+                        isEnabled: !isSubmitting,
+                        onChanged: (label, selected) {
+                          onToggleOption(problemsSolved, label, selected);
+                        },
+                      ),
+                      if (problemsSolved.contains(_otherProblemOption)) ...[
+                        const SizedBox(height: 10),
+                        _OtherField(
+                          controller: otherProblemController,
+                          label: 'Otro problema',
+                          isRequired: true,
+                        ),
+                      ],
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: prioritySolutionsController,
+                        minLines: 2,
+                        maxLines: 4,
+                        decoration: const InputDecoration(
+                          labelText:
+                              'Productos, soluciones o servicios que quieres priorizar (opcional)',
+                          hintText:
+                              'Familias concretas, especialidades, marcas, tecnologías, aplicaciones o servicios.',
+                          alignLabelWithHint: true,
+                          prefixIcon: Icon(Icons.tune_outlined),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
               const SizedBox(height: 12),
               _FormSection(
-                title: '2 · Tu empresa objetivo',
+                sectionId: 'target-company',
+                title: '2 · ¿Qué empresas buscas?',
+                isExpanded: expandedSectionIndex == 1,
+                isComplete: completedSections[1],
+                onToggle: () => onSectionChanged(1),
                 children: [
                   _MultiSelectChipGroup(
                     title: 'Sectores objetivo',
@@ -974,108 +2414,92 @@ class _LeadFormPanel extends StatelessWidget {
                     ),
                   ],
                   const SizedBox(height: 18),
-                  Text(
-                    'Geografía',
-                    style: textTheme.titleSmall?.copyWith(
-                      color: _ink,
-                      fontWeight: FontWeight.w800,
-                    ),
+                  _GeographySelector(
+                    countries: geographyCountries,
+                    spainCoverage: spainCoverage,
+                    spanishProvinces: spanishProvinces,
+                    isEnabled: !isSubmitting,
+                    onCountriesChanged: onGeographyCountriesChanged,
+                    onSpainCoverageChanged: onSpainCoverageChanged,
+                    onProvincesChanged: onSpanishProvincesChanged,
                   ),
-                  const SizedBox(height: 10),
-                  TextFormField(
-                    controller: geographyCountriesController,
-                    decoration: const InputDecoration(
-                      labelText: 'País / países *',
-                      prefixIcon: Icon(Icons.public_outlined),
-                    ),
-                    textInputAction: TextInputAction.next,
-                    validator: _required,
-                  ),
-                  const SizedBox(height: 14),
-                  _ResponsiveFields(
+                  const SizedBox(height: 18),
+                  _OptionalFields(
+                    title: 'Criterios avanzados',
+                    description:
+                        'Tamaño, valor mínimo y características de la empresa ideal.',
+                    forceExpanded:
+                        minimumOpportunityValue == _otherMinimumValueOption &&
+                        otherMinimumValueController.text.trim().isEmpty,
                     children: [
-                      TextFormField(
-                        controller: geographyRegionsController,
-                        decoration: const InputDecoration(
-                          labelText: 'Comunidad autónoma / región',
-                          prefixIcon: Icon(Icons.map_outlined),
-                        ),
-                        textInputAction: TextInputAction.next,
+                      _SingleSelectChipGroup(
+                        title: 'Facturación anual aproximada',
+                        options: _revenueRangeOptions,
+                        selectedValue: targetRevenueRange,
+                        isEnabled: !isSubmitting,
+                        onChanged: onRevenueChanged,
                       ),
-                      TextFormField(
-                        controller: geographyProvincesController,
-                        decoration: const InputDecoration(
-                          labelText: 'Provincia / provincias',
-                          prefixIcon: Icon(Icons.place_outlined),
+                      const SizedBox(height: 18),
+                      _SingleSelectChipGroup(
+                        title: 'Empleo / tamaño de la operación industrial',
+                        options: _employeeRangeOptions,
+                        selectedValue: targetEmployeeRange,
+                        isEnabled: !isSubmitting,
+                        onChanged: onEmployeeRangeChanged,
+                      ),
+                      const SizedBox(height: 18),
+                      _SingleSelectChipGroup(
+                        title:
+                            '¿A partir de qué valor aproximado merece la pena investigar una oportunidad?',
+                        helperText:
+                            'No implica que InduRadar conozca el importe real del proyecto; sirve para priorizar.',
+                        options: _minimumOpportunityValueOptions,
+                        selectedValue: minimumOpportunityValue,
+                        isEnabled: !isSubmitting,
+                        onChanged: onMinimumValueChanged,
+                      ),
+                      if (minimumOpportunityValue ==
+                          _otherMinimumValueOption) ...[
+                        const SizedBox(height: 10),
+                        _OtherField(
+                          controller: otherMinimumValueController,
+                          label: 'Otro valor aproximado',
+                          isRequired: true,
                         ),
-                        textInputAction: TextInputAction.next,
+                      ],
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: targetCompanyDescriptionController,
+                        minLines: 3,
+                        maxLines: 6,
+                        decoration: const InputDecoration(
+                          labelText:
+                              'Define tu empresa objetivo ideal (opcional)',
+                          hintText:
+                              'Producción propia, decisión local, varias plantas, exportación, tecnologías concretas, certificaciones, tamaño mínimo...',
+                          alignLabelWithHint: true,
+                          prefixIcon: Icon(Icons.business_center_outlined),
+                        ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: geographyFreeZoneController,
-                    decoration: const InputDecoration(
-                      labelText: 'Ciudad, radio o zona libre',
-                      hintText:
-                          'Ej.: provincia de Valencia; radio de 100 km alrededor de Zaragoza; España y Portugal.',
-                      prefixIcon: Icon(Icons.travel_explore_outlined),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  _SingleSelectChipGroup(
-                    title: 'Facturación anual aproximada',
-                    options: _revenueRangeOptions,
-                    selectedValue: targetRevenueRange,
-                    isEnabled: !isSubmitting,
-                    onChanged: onRevenueChanged,
-                  ),
-                  const SizedBox(height: 18),
-                  _SingleSelectChipGroup(
-                    title: 'Empleo / tamaño de la operación industrial',
-                    options: _employeeRangeOptions,
-                    selectedValue: targetEmployeeRange,
-                    isEnabled: !isSubmitting,
-                    onChanged: onEmployeeRangeChanged,
-                  ),
-                  const SizedBox(height: 18),
-                  _SingleSelectChipGroup(
-                    title:
-                        '¿A partir de qué valor aproximado merece la pena investigar una oportunidad?',
-                    helperText:
-                        'No implica que InduRadar conozca el importe real del proyecto; sirve para priorizar.',
-                    options: _minimumOpportunityValueOptions,
-                    selectedValue: minimumOpportunityValue,
-                    isEnabled: !isSubmitting,
-                    onChanged: onMinimumValueChanged,
-                  ),
-                  if (minimumOpportunityValue == _otherMinimumValueOption) ...[
-                    const SizedBox(height: 10),
-                    _OtherField(
-                      controller: otherMinimumValueController,
-                      label: 'Otro valor aproximado',
-                      isRequired: true,
-                    ),
-                  ],
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: targetCompanyDescriptionController,
-                    minLines: 3,
-                    maxLines: 6,
-                    decoration: const InputDecoration(
-                      labelText: 'Define tu empresa objetivo ideal',
-                      hintText:
-                          'Producción propia, decisión local, varias plantas, exportación, tecnologías concretas, certificaciones, tamaño mínimo...',
-                      alignLabelWithHint: true,
-                      prefixIcon: Icon(Icons.business_center_outlined),
-                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
               _FormSection(
-                title: '3 · Señales que deben activar una alerta',
+                sectionId: 'signals',
+                title: '3 · ¿Qué cambios quieres detectar?',
+                isExpanded: expandedSectionIndex == 2,
+                isComplete: completedSections[2],
+                onToggle: () => onSectionChanged(2),
                 children: [
+                  _SelectAllControl(
+                    label: 'Seleccionar todos los cambios',
+                    isSelected: allSignalsSelected,
+                    isEnabled: !isSubmitting,
+                    onChanged: onSetAllSignals,
+                  ),
+                  const SizedBox(height: 18),
                   _MultiSelectChipGroup(
                     title: 'A. Inversión y capacidad',
                     options: _investmentSignalOptions,
@@ -1119,8 +2543,19 @@ class _LeadFormPanel extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               _FormSection(
-                title: '4 · Necesidades y referencias',
+                sectionId: 'needs',
+                title: '4 · ¿Qué oportunidades te interesan?',
+                isExpanded: expandedSectionIndex == 3,
+                isComplete: completedSections[3],
+                onToggle: () => onSectionChanged(3),
                 children: [
+                  _SelectAllControl(
+                    label: 'Seleccionar todas las necesidades',
+                    isSelected: allCommercialNeedsSelected,
+                    isEnabled: !isSubmitting,
+                    onChanged: onSetAllCommercialNeeds,
+                  ),
+                  const SizedBox(height: 18),
                   _MultiSelectChipGroup(
                     title:
                         '¿Qué necesidades o situaciones comerciales te interesa detectar?',
@@ -1157,90 +2592,107 @@ class _LeadFormPanel extends StatelessWidget {
                     validator: _required,
                   ),
                   const SizedBox(height: 14),
-                  TextFormField(
-                    controller: recentCaseController,
-                    minLines: 3,
-                    maxLines: 6,
-                    decoration: const InputDecoration(
-                      labelText: 'Ayúdanos con un caso real o reciente',
-                      hintText:
-                          'Qué estaba ocurriendo en ese cliente antes de que surgiera la oportunidad.',
-                      alignLabelWithHint: true,
-                      prefixIcon: Icon(Icons.history_outlined),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  Text(
-                    'Empresas de referencia',
-                    style: textTheme.titleSmall?.copyWith(
-                      color: _ink,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  _ResponsiveFields(
+                  _OptionalFields(
+                    title: 'Referencias y exclusiones',
+                    description:
+                        'Casos, clientes, cuentas y límites que nos ayudan a afinar el encaje.',
                     children: [
-                      _MultilineReferenceField(
-                        controller: currentClientsController,
-                        label: 'Clientes actuales',
-                        hint: 'Hasta 5, uno por línea.',
+                      TextFormField(
+                        controller: recentCaseController,
+                        minLines: 3,
+                        maxLines: 6,
+                        decoration: const InputDecoration(
+                          labelText:
+                              'Ayúdanos con un caso real o reciente (opcional)',
+                          hintText:
+                              'Qué estaba ocurriendo en ese cliente antes de que surgiera la oportunidad.',
+                          alignLabelWithHint: true,
+                          prefixIcon: Icon(Icons.history_outlined),
+                        ),
                       ),
-                      _MultilineReferenceField(
-                        controller: idealClientsController,
-                        label:
-                            'Clientes ideales / empresas parecidas a las que quieres encontrar',
-                        hint: 'Hasta 5, uno por línea.',
+                      const SizedBox(height: 18),
+                      Text(
+                        'Empresas de referencia',
+                        style: textTheme.titleSmall?.copyWith(
+                          color: _ink,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      _ResponsiveFields(
+                        children: [
+                          _MultilineReferenceField(
+                            controller: currentClientsController,
+                            label:
+                                'Clientes actuales para buscar perfiles similares (opcional)',
+                            hint:
+                                'Empresas ya clientes cuyo perfil quieres replicar. Hasta 5, una por línea.',
+                          ),
+                          _MultilineReferenceField(
+                            controller: idealClientsController,
+                            label:
+                                'Clientes ideales: clientes de la competencia a seguir (opcional)',
+                            hint:
+                                'Empresas que compran a competidores y quieres investigar. Hasta 5, una por línea.',
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      _ResponsiveFields(
+                        children: [
+                          _MultilineReferenceField(
+                            controller: watchlistAccountsController,
+                            label:
+                                'Cuentas estratégicas para búsqueda especializada (opcional)',
+                            hint:
+                                'Empresas concretas para una investigación más profunda. Hasta 5, una por línea.',
+                          ),
+                          _MultilineReferenceField(
+                            controller: competitorsController,
+                            label: 'Competidores (opcional)',
+                            hint:
+                                'Indica si quieres excluirlos o monitorizarlos.',
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: excludedCompaniesController,
+                        minLines: 2,
+                        maxLines: 4,
+                        decoration: const InputDecoration(
+                          labelText: 'Empresas excluidas (opcional)',
+                          hintText:
+                              'Clientes protegidos, cuentas ya trabajadas, empresas excluidas...',
+                          alignLabelWithHint: true,
+                          prefixIcon: Icon(Icons.block_outlined),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: noBuyReasonController,
+                        minLines: 3,
+                        maxLines: 6,
+                        decoration: const InputDecoration(
+                          labelText:
+                              '¿Por qué una empresa aparentemente ideal no os compraría? (opcional)',
+                          hintText:
+                              'Decisión centralizada en otro país, consumo insuficiente, tecnología incompatible, ticket demasiado pequeño...',
+                          alignLabelWithHint: true,
+                          prefixIcon: Icon(Icons.report_problem_outlined),
+                        ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 14),
-                  _ResponsiveFields(
-                    children: [
-                      _MultilineReferenceField(
-                        controller: watchlistAccountsController,
-                        label: 'Cuentas estratégicas a vigilar',
-                        hint: 'Hasta 5 inicialmente, una por línea.',
-                      ),
-                      _MultilineReferenceField(
-                        controller: competitorsController,
-                        label: 'Competidores',
-                        hint: 'Indica si quieres excluirlos o monitorizarlos.',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: excludedCompaniesController,
-                    minLines: 2,
-                    maxLines: 4,
-                    decoration: const InputDecoration(
-                      labelText:
-                          'Empresas que no quieres recibir como oportunidades',
-                      hintText:
-                          'Clientes protegidos, cuentas ya trabajadas, empresas excluidas...',
-                      alignLabelWithHint: true,
-                      prefixIcon: Icon(Icons.block_outlined),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: noBuyReasonController,
-                    minLines: 3,
-                    maxLines: 6,
-                    decoration: const InputDecoration(
-                      labelText:
-                          '¿Por qué una empresa aparentemente ideal NO os compraría?',
-                      hintText:
-                          'Decisión centralizada en otro país, consumo insuficiente, tecnología incompatible, ticket demasiado pequeño...',
-                      alignLabelWithHint: true,
-                      prefixIcon: Icon(Icons.report_problem_outlined),
-                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
               _FormSection(
-                title: '5 · Tipo de investigación y seguimiento',
+                sectionId: 'service',
+                title: '5 · ¿Cómo quieres recibir los resultados?',
+                isExpanded: expandedSectionIndex == 4,
+                isComplete: completedSections[4],
+                onToggle: () => onSectionChanged(4),
                 children: [
                   _MultiSelectChipGroup(
                     title:
@@ -1259,24 +2711,32 @@ class _LeadFormPanel extends StatelessWidget {
                     maxLines: 5,
                     decoration: const InputDecoration(
                       labelText:
-                          'Comentarios sobre frecuencia, fechas o alcance',
+                          'Comentarios sobre frecuencia, fechas o alcance (opcional)',
                       alignLabelWithHint: true,
                       prefixIcon: Icon(Icons.event_note_outlined),
                     ),
                   ),
+                  const SizedBox(height: 18),
+                  const Divider(color: _line),
+                  const SizedBox(height: 8),
+                  _PrivacyConsent(
+                    privacyAccepted: privacyAccepted,
+                    marketingConsent: marketingConsent,
+                    errorText: privacyError,
+                    onPrivacyChanged: isSubmitting ? null : onPrivacyChanged,
+                    onMarketingChanged: isSubmitting
+                        ? null
+                        : onMarketingChanged,
+                    onPrivacyPolicyTap: onPrivacyPolicyTap,
+                  ),
                 ],
-              ),
-              const SizedBox(height: 16),
-              _PrivacyConsent(
-                privacyAccepted: privacyAccepted,
-                marketingConsent: marketingConsent,
-                errorText: privacyError,
-                onPrivacyChanged: isSubmitting ? null : onPrivacyChanged,
-                onMarketingChanged: isSubmitting ? null : onMarketingChanged,
               ),
               const SizedBox(height: 22),
               FilledButton.icon(
-                onPressed: isSubmitting ? null : onSubmit,
+                key: const ValueKey('primary-form-cta'),
+                onPressed: isSubmitting || submissionSucceeded
+                    ? null
+                    : onSubmit,
                 icon: isSubmitting
                     ? const SizedBox.square(
                         dimension: 18,
@@ -1285,8 +2745,27 @@ class _LeadFormPanel extends StatelessWidget {
                           color: Colors.white,
                         ),
                       )
-                    : const Icon(Icons.send_outlined),
-                label: Text(isSubmitting ? 'Enviando...' : 'Enviar solicitud'),
+                    : Icon(
+                        submissionSucceeded
+                            ? Icons.check_circle_outline
+                            : Icons.send_outlined,
+                      ),
+                label: Text(
+                  isSubmitting
+                      ? 'Enviando solicitud…'
+                      : submissionSucceeded
+                      ? 'Solicitud recibida'
+                      : 'Definir mi radar comercial',
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Revisaremos tu solicitud antes de iniciar la investigación.',
+                textAlign: TextAlign.center,
+                style: textTheme.bodySmall?.copyWith(
+                  color: _steel,
+                  height: 1.4,
+                ),
               ),
             ],
           ),
@@ -1317,39 +2796,271 @@ class _LeadFormPanel extends StatelessWidget {
 
 class _FormSection extends StatelessWidget {
   const _FormSection({
+    required this.sectionId,
     required this.title,
     required this.children,
-    this.initiallyExpanded = false,
+    required this.isExpanded,
+    required this.isComplete,
+    required this.onToggle,
   });
 
+  final String sectionId;
   final String title;
   final List<Widget> children;
-  final bool initiallyExpanded;
+  final bool isExpanded;
+  final bool isComplete;
+  final VoidCallback onToggle;
 
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        border: Border.all(color: _line),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: ExpansionTile(
-        initiallyExpanded: initiallyExpanded,
-        maintainState: true,
-        tilePadding: const EdgeInsets.symmetric(horizontal: 14),
-        childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        collapsedShape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
+        border: const Border(
+          top: BorderSide(color: _line),
+          bottom: BorderSide(color: _line),
         ),
+      ),
+      child: Column(
+        children: [
+          Material(
+            color: isExpanded ? const Color(0xFFF1F8FA) : Colors.white,
+            child: InkWell(
+              key: ValueKey('form-section-header-$sectionId'),
+              onTap: onToggle,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                  title: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: _ink,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 3),
+                    child: _SectionStatus(
+                      isExpanded: isExpanded,
+                      isComplete: isComplete,
+                    ),
+                  ),
+                  trailing: AnimatedRotation(
+                    turns: isExpanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 180),
+                    child: const Icon(Icons.keyboard_arrow_down, color: _blue),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          TweenAnimationBuilder<double>(
+            tween: Tween<double>(end: isExpanded ? 1 : 0),
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, child) {
+              return ClipRect(
+                child: Align(
+                  key: ValueKey('form-section-body-$sectionId'),
+                  alignment: Alignment.topCenter,
+                  heightFactor: value,
+                  child: Opacity(opacity: value, child: child),
+                ),
+              );
+            },
+            child: IgnorePointer(
+              ignoring: !isExpanded,
+              child: ExcludeSemantics(
+                excluding: !isExpanded,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 18, 14, 20),
+                  child: Column(children: children),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionStatus extends StatelessWidget {
+  const _SectionStatus({required this.isExpanded, required this.isComplete});
+
+  final bool isExpanded;
+  final bool isComplete;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = isExpanded
+        ? 'En curso'
+        : isComplete
+        ? 'Completo'
+        : 'Pendiente';
+    final color = isExpanded
+        ? _blue
+        : isComplete
+        ? _success
+        : _steel;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          isComplete && !isExpanded
+              ? Icons.check_circle_outline
+              : Icons.circle_outlined,
+          size: 13,
+          color: color,
+        ),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _OptionalFields extends StatefulWidget {
+  const _OptionalFields({
+    required this.title,
+    required this.description,
+    required this.children,
+    this.forceExpanded = false,
+  });
+
+  final String title;
+  final String description;
+  final List<Widget> children;
+  final bool forceExpanded;
+
+  @override
+  State<_OptionalFields> createState() => _OptionalFieldsState();
+}
+
+class _OptionalFieldsState extends State<_OptionalFields> {
+  late bool _isExpanded = widget.forceExpanded;
+
+  @override
+  void didUpdateWidget(covariant _OptionalFields oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.forceExpanded && !_isExpanded) {
+      _isExpanded = true;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FBFC),
+        border: Border.all(color: _line),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Column(
+        children: [
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: widget.forceExpanded
+                  ? null
+                  : () => setState(() => _isExpanded = !_isExpanded),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+                title: Text(
+                  '${widget.title} (opcional)',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: _ink,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                subtitle: Text(
+                  widget.description,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: _steel, height: 1.35),
+                ),
+                trailing: AnimatedRotation(
+                  turns: _isExpanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 180),
+                  child: const Icon(Icons.keyboard_arrow_down, color: _blue),
+                ),
+              ),
+            ),
+          ),
+          TweenAnimationBuilder<double>(
+            tween: Tween<double>(end: _isExpanded ? 1 : 0),
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, child) {
+              return ClipRect(
+                child: Align(
+                  heightFactor: value,
+                  alignment: Alignment.topCenter,
+                  child: Opacity(opacity: value, child: child),
+                ),
+              );
+            },
+            child: IgnorePointer(
+              ignoring: !_isExpanded,
+              child: ExcludeSemantics(
+                excluding: !_isExpanded,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 8, 14, 16),
+                  child: Column(children: widget.children),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SelectAllControl extends StatelessWidget {
+  const _SelectAllControl({
+    required this.label,
+    required this.isSelected,
+    required this.isEnabled,
+    required this.onChanged,
+  });
+
+  final String label;
+  final bool isSelected;
+  final bool isEnabled;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F8FA),
+        border: Border.all(color: _line),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: CheckboxListTile(
+        key: ValueKey('select-all-$label'),
+        value: isSelected,
+        onChanged: isEnabled ? (value) => onChanged(value ?? false) : null,
+        controlAffinity: ListTileControlAffinity.leading,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+        activeColor: _blue,
+        checkColor: Colors.white,
+        dense: true,
         title: Text(
-          title,
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          isSelected ? 'Desmarcar todos' : label,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             color: _ink,
             fontWeight: FontWeight.w800,
           ),
         ),
-        children: children,
       ),
     );
   }
@@ -1394,37 +3105,41 @@ class _MultiSelectChipGroup extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 10),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final labelMaxWidth =
-                (constraints.maxWidth < 520 ? constraints.maxWidth - 36 : 380.0)
-                    .clamp(180.0, 380.0)
-                    .toDouble();
-
-            return Wrap(
-              spacing: 8,
-              runSpacing: 8,
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: DecoratedBox(
+            decoration: BoxDecoration(border: Border.all(color: _line)),
+            child: Column(
               children: [
-                for (final option in options)
-                  FilterChip(
-                    label: ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: labelMaxWidth),
-                      child: Text(option),
-                    ),
-                    selected: selectedValues.contains(option),
-                    onSelected: isEnabled
-                        ? (selected) => onChanged(option, selected)
+                for (var index = 0; index < options.length; index++) ...[
+                  CheckboxListTile(
+                    value: selectedValues.contains(options[index]),
+                    onChanged: isEnabled
+                        ? (selected) {
+                            onChanged(options[index], selected ?? false);
+                          }
                         : null,
-                    selectedColor: const Color(0xFFDDF7FB),
-                    checkmarkColor: _blue,
-                    side: const BorderSide(color: _line),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                    activeColor: _blue,
+                    checkColor: Colors.white,
+                    selectedTileColor: const Color(0xFFEAF7FA),
+                    selected: selectedValues.contains(options[index]),
+                    dense: true,
+                    title: Text(
+                      options[index],
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: _ink,
+                        height: 1.3,
+                      ),
                     ),
                   ),
+                  if (index < options.length - 1)
+                    const Divider(height: 1, color: _line),
+                ],
               ],
-            );
-          },
+            ),
+          ),
         ),
       ],
     );
@@ -1470,39 +3185,210 @@ class _SingleSelectChipGroup extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 10),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final labelMaxWidth =
-                (constraints.maxWidth < 520 ? constraints.maxWidth - 36 : 380.0)
-                    .clamp(180.0, 380.0)
-                    .toDouble();
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: DecoratedBox(
+            decoration: BoxDecoration(border: Border.all(color: _line)),
+            child: RadioGroup<String>(
+              groupValue: selectedValue,
+              onChanged: (value) {
+                if (isEnabled) {
+                  onChanged(value);
+                }
+              },
+              child: Column(
+                children: [
+                  for (var index = 0; index < options.length; index++) ...[
+                    RadioListTile<String>(
+                      value: options[index],
+                      enabled: isEnabled,
+                      selected: selectedValue == options[index],
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                      ),
+                      activeColor: _blue,
+                      selectedTileColor: const Color(0xFFEAF7FA),
+                      dense: true,
+                      title: Text(
+                        options[index],
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: _ink,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                    if (index < options.length - 1)
+                      const Divider(height: 1, color: _line),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
-            return Wrap(
-              spacing: 8,
-              runSpacing: 8,
+class _GeographySelector extends StatelessWidget {
+  const _GeographySelector({
+    required this.countries,
+    required this.spainCoverage,
+    required this.spanishProvinces,
+    required this.isEnabled,
+    required this.onCountriesChanged,
+    required this.onSpainCoverageChanged,
+    required this.onProvincesChanged,
+  });
+
+  final Set<String> countries;
+  final String? spainCoverage;
+  final Set<String> spanishProvinces;
+  final bool isEnabled;
+  final ValueChanged<Set<String>> onCountriesChanged;
+  final ValueChanged<String?> onSpainCoverageChanged;
+  final ValueChanged<Set<String>> onProvincesChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasSpain = countries.contains(_spainCountry);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Geografía',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            color: _ink,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 10),
+        FormField<Set<String>>(
+          initialValue: Set<String>.from(countries),
+          validator: (_) {
+            if (countries.isEmpty) {
+              return 'Selecciona al menos un país.';
+            }
+            return null;
+          },
+          builder: (field) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final option in options)
-                  ChoiceChip(
-                    label: ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: labelMaxWidth),
-                      child: Text(option),
-                    ),
-                    selected: selectedValue == option,
-                    onSelected: isEnabled
-                        ? (selected) => onChanged(selected ? option : null)
-                        : null,
-                    selectedColor: const Color(0xFFDDF7FB),
-                    checkmarkColor: _blue,
-                    side: const BorderSide(color: _line),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
+                _MultiSelectChipGroup(
+                  title: 'Países *',
+                  helperText: 'Puedes seleccionar España, Portugal o ambos.',
+                  options: _geographyCountryOptions,
+                  selectedValues: countries,
+                  isEnabled: isEnabled,
+                  onChanged: (label, selected) {
+                    final next = Set<String>.from(countries);
+                    if (selected) {
+                      next.add(label);
+                    } else {
+                      next.remove(label);
+                    }
+                    field.didChange(next);
+                    onCountriesChanged(next);
+                  },
+                ),
+                if (field.hasError) _SelectionError(message: field.errorText!),
               ],
             );
           },
         ),
+        if (hasSpain) ...[
+          const SizedBox(height: 18),
+          FormField<String>(
+            key: ValueKey('spain-coverage-$spainCoverage'),
+            initialValue: spainCoverage,
+            validator: (_) {
+              if (spainCoverage == null) {
+                return 'Elige la cobertura para España.';
+              }
+              return null;
+            },
+            builder: (field) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _SingleSelectChipGroup(
+                    title: 'Cobertura en España *',
+                    options: _spainCoverageOptions,
+                    selectedValue: spainCoverage,
+                    isEnabled: isEnabled,
+                    onChanged: (value) {
+                      field.didChange(value);
+                      onSpainCoverageChanged(value);
+                    },
+                  ),
+                  if (field.hasError)
+                    _SelectionError(message: field.errorText!),
+                ],
+              );
+            },
+          ),
+        ],
+        if (hasSpain && spainCoverage == _spainByProvince) ...[
+          const SizedBox(height: 18),
+          FormField<Set<String>>(
+            key: ValueKey('spain-provinces-${spanishProvinces.length}'),
+            initialValue: Set<String>.from(spanishProvinces),
+            validator: (_) {
+              if (spanishProvinces.isEmpty) {
+                return 'Selecciona al menos una provincia.';
+              }
+              return null;
+            },
+            builder: (field) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _MultiSelectChipGroup(
+                    title: 'Provincias *',
+                    options: _spanishProvinceOptions,
+                    selectedValues: spanishProvinces,
+                    isEnabled: isEnabled,
+                    onChanged: (label, selected) {
+                      final next = Set<String>.from(spanishProvinces);
+                      if (selected) {
+                        next.add(label);
+                      } else {
+                        next.remove(label);
+                      }
+                      field.didChange(next);
+                      onProvincesChanged(next);
+                    },
+                  ),
+                  if (field.hasError)
+                    _SelectionError(message: field.errorText!),
+                ],
+              );
+            },
+          ),
+        ],
       ],
+    );
+  }
+}
+
+class _SelectionError extends StatelessWidget {
+  const _SelectionError({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, left: 12),
+      child: Text(
+        message,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: Theme.of(context).colorScheme.error,
+        ),
+      ),
     );
   }
 }
@@ -1608,6 +3494,7 @@ class _PrivacyConsent extends StatelessWidget {
     required this.errorText,
     required this.onPrivacyChanged,
     required this.onMarketingChanged,
+    required this.onPrivacyPolicyTap,
   });
 
   final bool privacyAccepted;
@@ -1615,6 +3502,7 @@ class _PrivacyConsent extends StatelessWidget {
   final String? errorText;
   final ValueChanged<bool?>? onPrivacyChanged;
   final ValueChanged<bool?>? onMarketingChanged;
+  final VoidCallback onPrivacyPolicyTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1629,9 +3517,37 @@ class _PrivacyConsent extends StatelessWidget {
           controlAffinity: ListTileControlAffinity.leading,
           dense: true,
           contentPadding: EdgeInsets.zero,
-          title: Text(
-            'He leído y acepto la política de privacidad. *',
-            style: textTheme.bodySmall?.copyWith(color: _steel, height: 1.45),
+          title: Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                'He leído y acepto la ',
+                style: textTheme.bodySmall?.copyWith(
+                  color: _steel,
+                  height: 1.45,
+                ),
+              ),
+              TextButton(
+                onPressed: onPrivacyPolicyTap,
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  textStyle: textTheme.bodySmall?.copyWith(
+                    decoration: TextDecoration.underline,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                child: const Text('Política de privacidad.'),
+              ),
+              Text(
+                ' *',
+                style: textTheme.bodySmall?.copyWith(
+                  color: _steel,
+                  height: 1.45,
+                ),
+              ),
+            ],
           ),
         ),
         if (errorText != null)
@@ -1651,7 +3567,7 @@ class _PrivacyConsent extends StatelessWidget {
           dense: true,
           contentPadding: EdgeInsets.zero,
           title: Text(
-            'Acepto recibir comunicaciones relacionadas con InduRadar.',
+            'Quiero recibir novedades y comunicaciones de InduRadar.',
             style: textTheme.bodySmall?.copyWith(color: _steel, height: 1.45),
           ),
         ),
@@ -1695,77 +3611,192 @@ class _SuccessBanner extends StatelessWidget {
   }
 }
 
+class _ErrorBanner extends StatelessWidget {
+  const _ErrorBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.errorContainer,
+        border: Border.all(color: colorScheme.error.withValues(alpha: 0.35)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.error_outline, color: colorScheme.error, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onErrorContainer,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+void _logLeadDebug(String message) {
+  if (kDebugMode) {
+    debugPrint(message);
+  }
+}
+
 class LeadSubmissionService {
   const LeadSubmissionService({
     String endpoint = _leadEndpoint,
-    String authToken = _leadEndpointAuthToken,
     http.Client? client,
+    Duration timeout = const Duration(seconds: 20),
   }) : _endpoint = endpoint,
-       _authToken = authToken,
-       _client = client;
+       _client = client,
+       _timeout = timeout;
 
   final String _endpoint;
-  final String _authToken;
   final http.Client? _client;
+  final Duration _timeout;
 
-  Future<void> submit(LeadRequest request) async {
+  Future<LeadSubmissionResult> submit(LeadRequest request) async {
     final endpoint = _endpoint.trim();
     if (endpoint.isEmpty) {
+      _logLeadDebug('LEAD_ENDPOINT is not configured.');
       throw const LeadSubmissionException(
-        'Falta configurar el endpoint de recepción del formulario.',
+        'El formulario no está configurado para enviar solicitudes.',
+        technicalDetail: 'LEAD_ENDPOINT is empty.',
       );
     }
 
     final uri = Uri.tryParse(endpoint);
-    if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+    if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
+      _logLeadDebug('LEAD_ENDPOINT is not a valid HTTPS URL.');
       throw const LeadSubmissionException(
-        'El endpoint configurado para el formulario no es válido.',
+        'El formulario no está configurado correctamente.',
+        technicalDetail: 'LEAD_ENDPOINT must be a valid HTTPS URL.',
       );
     }
 
-    final headers = <String, String>{
+    const headers = <String, String>{
       'Accept': 'application/json',
       'Content-Type': 'application/json',
     };
-    final authToken = _authToken.trim();
-    if (authToken.isNotEmpty) {
-      headers['Authorization'] = 'Bearer $authToken';
+    final body = jsonEncode(request.toJson());
+
+    _logLeadDebug('Submitting lead');
+    late final http.Response response;
+    try {
+      response =
+          await (_client == null
+                  ? http.post(uri, headers: headers, body: body)
+                  : _client.post(uri, headers: headers, body: body))
+              .timeout(_timeout);
+    } on TimeoutException {
+      _logLeadDebug('Lead submission timed out.');
+      throw const LeadSubmissionException(
+        'El envío ha tardado demasiado. Inténtalo de nuevo en unos minutos.',
+        technicalDetail: 'Lead submission timed out.',
+      );
+    } catch (error) {
+      _logLeadDebug('Lead connection error: ${error.runtimeType}');
+      throw LeadSubmissionException(
+        'No hemos podido enviar la solicitud. Inténtalo de nuevo en unos minutos.',
+        technicalDetail: 'Lead connection error: ${error.runtimeType}',
+      );
     }
 
-    final body = jsonEncode(request.toJson());
-    final response =
-        await (_client == null
-                ? http.post(uri, headers: headers, body: body)
-                : _client.post(uri, headers: headers, body: body))
-            .timeout(const Duration(seconds: 20));
+    _logLeadDebug('Lead HTTP status: ${response.statusCode}');
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw LeadSubmissionException(
-        'El servidor ha rechazado la solicitud (${response.statusCode}).',
+        'No hemos podido enviar la solicitud. Inténtalo de nuevo en unos minutos.',
+        technicalDetail: 'Lead endpoint returned HTTP ${response.statusCode}.',
       );
     }
+
+    late final Object? decoded;
+    try {
+      decoded = jsonDecode(response.body);
+    } on FormatException {
+      throw const LeadSubmissionException(
+        'No hemos podido confirmar el envío. Inténtalo de nuevo en unos minutos.',
+        technicalDetail: 'Lead endpoint returned invalid JSON.',
+      );
+    }
+    if (decoded is! Map<String, dynamic>) {
+      throw const LeadSubmissionException(
+        'No hemos podido confirmar el envío. Inténtalo de nuevo en unos minutos.',
+        technicalDetail: 'Lead endpoint returned a non-object JSON response.',
+      );
+    }
+
+    final result = LeadSubmissionResult.fromJson(decoded);
+    _logLeadDebug('Lead success: ${result.success}');
+    _logLeadDebug('Lead submission_id: ${result.submissionId ?? 'null'}');
+    _logLeadDebug('Lead email_sent: ${result.emailSent ?? 'null'}');
+
+    if (!result.success) {
+      throw const LeadSubmissionException(
+        'No hemos podido enviar la solicitud. Inténtalo de nuevo en unos minutos.',
+        technicalDetail: 'Lead endpoint returned success=false.',
+      );
+    }
+
+    return result;
   }
 }
 
 class LeadSubmissionException implements Exception {
-  const LeadSubmissionException(this.message);
+  const LeadSubmissionException(this.message, {this.technicalDetail});
 
   final String message;
+  final String? technicalDetail;
 
   @override
   String toString() => message;
 }
 
+class LeadSubmissionResult {
+  const LeadSubmissionResult({
+    required this.success,
+    this.submissionId,
+    this.emailSent,
+    this.emailError,
+  });
+
+  factory LeadSubmissionResult.fromJson(Map<String, dynamic> json) {
+    return LeadSubmissionResult(
+      success: json['success'] == true,
+      submissionId: json['submission_id']?.toString(),
+      emailSent: json['email_sent'] is bool ? json['email_sent'] as bool : null,
+      emailError: json['email_error']?.toString(),
+    );
+  }
+
+  final bool success;
+  final String? submissionId;
+  final bool? emailSent;
+  final String? emailError;
+}
+
 class LeadRequest {
   const LeadRequest({
-    required this.firstName,
-    required this.lastName,
+    required this.fullName,
     required this.company,
     required this.jobTitle,
     required this.email,
     required this.phone,
     required this.website,
-    required this.cityProvince,
+    required this.address,
     required this.offerDescription,
     required this.offerCategories,
     required this.problemsSolved,
@@ -1773,9 +3804,8 @@ class LeadRequest {
     required this.targetSectors,
     required this.targetCompanyTypes,
     required this.geographyCountries,
-    required this.geographyRegions,
+    required this.spainCoverage,
     required this.geographyProvinces,
-    required this.geographyFreeZone,
     required this.targetRevenueRange,
     required this.targetEmployeeRange,
     required this.minimumOpportunityValue,
@@ -1798,16 +3828,16 @@ class LeadRequest {
     required this.privacyAccepted,
     required this.marketingConsent,
     required this.submittedAt,
+    this.pricingQuote,
   });
 
-  final String firstName;
-  final String lastName;
+  final String fullName;
   final String company;
   final String jobTitle;
   final String email;
   final String phone;
   final String website;
-  final String cityProvince;
+  final String address;
   final String offerDescription;
   final List<String> offerCategories;
   final List<String> problemsSolved;
@@ -1815,9 +3845,8 @@ class LeadRequest {
   final List<String> targetSectors;
   final List<String> targetCompanyTypes;
   final List<String> geographyCountries;
-  final List<String> geographyRegions;
+  final String? spainCoverage;
   final List<String> geographyProvinces;
-  final String geographyFreeZone;
   final String? targetRevenueRange;
   final String? targetEmployeeRange;
   final String? minimumOpportunityValue;
@@ -1840,24 +3869,109 @@ class LeadRequest {
   final bool privacyAccepted;
   final bool marketingConsent;
   final DateTime submittedAt;
+  final PricingQuote? pricingQuote;
 
   Map<String, Object?> toJson() {
-    final fullName = [
-      firstName,
-      lastName,
-    ].where((part) => part.isNotEmpty).join(' ');
+    final nameParts = fullName
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .toList(growable: false);
+    final firstName = nameParts.isEmpty ? '' : nameParts.first;
+    final lastName = nameParts.length < 2 ? '' : nameParts.skip(1).join(' ');
     final signalTypes = [
       ...investmentSignals,
       ...innovationSignals,
       ...growthSignals,
       ...publicFinanceSignals,
     ];
+    final technologies = prioritySolutions
+        .split(RegExp(r'[\n,;]'))
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toList(growable: false);
+    final geographies = _buildGeographies();
+    final frequency = _requestFrequency();
+    final submittedAtIso = submittedAt.toIso8601String();
+    final scopeEstimate = ResearchScopeCalculator.calculate(
+      targetSectors: targetSectors,
+      targetCompanyTypes: targetCompanyTypes,
+      geographyCountries: geographyCountries,
+      spainCoverage: spainCoverage,
+      geographyProvinces: geographyProvinces,
+      investmentSignals: investmentSignals,
+      innovationSignals: innovationSignals,
+      growthSignals: growthSignals,
+      publicFinanceSignals: publicFinanceSignals,
+      commercialNeeds: commercialNeeds,
+      currentClients: currentClients,
+      idealClients: idealClients,
+      watchlistAccounts: watchlistAccounts,
+      competitors: competitors,
+      excludedCompanies: excludedCompanies,
+    );
 
     return {
       'source': 'induradar_landing',
       'form_version': 'cliente_v3',
+      'research_scope_units': scopeEstimate.units,
+      'research_scope_level': scopeEstimate.level,
+      'research_scope_model_version': ResearchScopeCalculator.modelVersion,
       'channel': 'web_form',
-      'submitted_at': submittedAt.toIso8601String(),
+      'submitted_at': submittedAtIso,
+      if (pricingQuote != null) 'pricing': pricingQuote!.toJson(),
+      'contact': {
+        'first_name': firstName,
+        'last_name': lastName,
+        'company_name': company,
+        'job_title': jobTitle,
+        'email': email,
+        'phone': phone,
+        'website': website,
+        'region_city': address,
+        'address': address,
+      },
+      'seller_profile': {
+        'offer': offerDescription,
+        'offer_categories': offerCategories,
+        'problems_solved': problemsSolved,
+        'priority_solutions': prioritySolutions,
+        'technologies': technologies,
+        'competitors_or_installed_base': competitors,
+        'exclusions': excludedCompanies,
+      },
+      'request': {
+        'title': 'Solicitud de radar comercial - $company',
+        'sectors': targetSectors,
+        'target_company_types': targetCompanyTypes,
+        'signal_types': signalTypes,
+        'technologies': technologies,
+        'geographies': geographies,
+        'description': opportunityTriggerDescription,
+        'frequency': frequency,
+        'target_revenue_range': targetRevenueRange,
+        'target_employee_range': targetEmployeeRange,
+        'minimum_opportunity_value': minimumOpportunityValue,
+        'target_company_description': targetCompanyDescription,
+        'commercial_needs': commercialNeeds,
+        'recent_case_description': recentCaseDescription,
+        'current_clients': currentClients,
+        'ideal_clients': idealClients,
+        'watchlist_accounts': watchlistAccounts,
+        'competitors': competitors,
+        'excluded_companies': excludedCompanies,
+        'no_buy_reason': noBuyReason,
+        'service_types': serviceTypes,
+        'service_comments': serviceComments,
+        'research_scope_units': scopeEstimate.units,
+        'research_scope_level': scopeEstimate.level,
+        'research_scope_model_version': ResearchScopeCalculator.modelVersion,
+        if (pricingQuote != null) 'estimated_pricing': pricingQuote!.toJson(),
+      },
+      'privacy': {
+        'privacy_notice_accepted': privacyAccepted,
+        'commercial_contact_consent': marketingConsent,
+        'accepted_at': privacyAccepted ? submittedAtIso : null,
+      },
       'first_name': firstName,
       'last_name': lastName,
       'full_name': fullName,
@@ -1866,7 +3980,8 @@ class LeadRequest {
       'email': email,
       'phone': phone,
       'website': website,
-      'city_province': cityProvince,
+      'address': address,
+      'city_province': address,
       'offer_description': offerDescription,
       'offer': offerDescription,
       'offer_categories': offerCategories,
@@ -1875,9 +3990,10 @@ class LeadRequest {
       'target_sectors': targetSectors,
       'target_company_types': targetCompanyTypes,
       'geography_countries': geographyCountries,
-      'geography_regions': geographyRegions,
+      'geography_spain_scope': spainCoverage,
+      'geography_regions': const <String>[],
       'geography_provinces': geographyProvinces,
-      'geography_free_zone': geographyFreeZone,
+      'geography_free_zone': '',
       'target_revenue_range': targetRevenueRange,
       'target_employee_range': targetEmployeeRange,
       'minimum_opportunity_value': minimumOpportunityValue,
@@ -1903,7 +4019,234 @@ class LeadRequest {
       'marketing_consent': marketingConsent,
     };
   }
+
+  List<Map<String, Object?>> _buildGeographies() {
+    final geographies = <Map<String, Object?>>[];
+
+    if (geographyCountries.contains(_spainCountry)) {
+      if (spainCoverage == _spainByProvince && geographyProvinces.isNotEmpty) {
+        for (final province in geographyProvinces) {
+          geographies.add({
+            'scope': 'province',
+            'country': _spainCountry,
+            'region': _provinceAutonomousCommunity[province],
+            'province': province,
+            'city': null,
+            'radius_km': null,
+            'free_text': null,
+          });
+        }
+      } else {
+        geographies.add({
+          'scope': 'country',
+          'country': _spainCountry,
+          'region': null,
+          'province': null,
+          'city': null,
+          'radius_km': null,
+          'free_text': null,
+        });
+      }
+    }
+
+    if (geographyCountries.contains(_portugalCountry)) {
+      geographies.add({
+        'scope': 'country',
+        'country': _portugalCountry,
+        'region': null,
+        'province': null,
+        'city': null,
+        'radius_km': null,
+        'free_text': null,
+      });
+    }
+
+    return geographies;
+  }
+
+  String _requestFrequency() {
+    if (serviceTypes.contains('Alertas prioritarias ante cambios relevantes') ||
+        serviceTypes.contains('Vigilancia continua de cuentas concretas') ||
+        serviceTypes.contains('Vigilancia de un sector') ||
+        serviceTypes.contains('Vigilancia de una zona geográfica') ||
+        serviceTypes.contains('Monitorización de proyectos concretos')) {
+      return 'continuous';
+    }
+    if (serviceTypes.contains('Resumen / informe semanal')) {
+      return 'weekly';
+    }
+    if (serviceTypes.contains('Informe mensual')) {
+      return 'monthly';
+    }
+    if (serviceTypes.contains('Informe trimestral')) {
+      return 'quarterly';
+    }
+    return 'one_off';
+  }
 }
+
+class ResearchScopeEstimate {
+  const ResearchScopeEstimate({required this.units, required this.level});
+
+  final num units;
+  final String level;
+}
+
+class ResearchScopeCalculator {
+  const ResearchScopeCalculator._();
+
+  static const modelVersion = 'InduRadar_Calculadora_Alcance_RU_v1';
+
+  static ResearchScopeEstimate calculate({
+    required List<String> targetSectors,
+    required List<String> targetCompanyTypes,
+    required List<String> geographyCountries,
+    required String? spainCoverage,
+    required List<String> geographyProvinces,
+    required List<String> investmentSignals,
+    required List<String> innovationSignals,
+    required List<String> growthSignals,
+    required List<String> publicFinanceSignals,
+    required List<String> commercialNeeds,
+    required List<String> currentClients,
+    required List<String> idealClients,
+    required List<String> watchlistAccounts,
+    required List<String> competitors,
+    required List<String> excludedCompanies,
+    int monitoredProjects = 0,
+  }) {
+    final total =
+        60 +
+        _additionalCount(targetSectors) * 10 +
+        _additionalCount(targetCompanyTypes) * 3 +
+        _geographyUnits(geographyCountries, spainCoverage, geographyProvinces) +
+        _uniqueCount(investmentSignals) * 2 +
+        _uniqueCount(innovationSignals) * 4 +
+        _uniqueCount(growthSignals) * 3 +
+        _uniqueCount(publicFinanceSignals) * 3 +
+        _uniqueCount(commercialNeeds) * 6 +
+        _uniqueCount(currentClients) * 0.5 +
+        _uniqueCount(idealClients) * 0.5 +
+        _uniqueCount(watchlistAccounts) * 2 +
+        _uniqueCount(competitors) * 1.5 +
+        _uniqueCount(excludedCompanies) * 0.2 +
+        monitoredProjects * 3;
+    final rounded = (total * 10).round() / 10;
+    final units = rounded == rounded.roundToDouble()
+        ? rounded.toInt()
+        : rounded;
+    final level = units < 100
+        ? 'Ligero'
+        : units <= 175
+        ? 'Medio'
+        : units <= 275
+        ? 'Amplio'
+        : 'Muy amplio';
+
+    return ResearchScopeEstimate(units: units, level: level);
+  }
+
+  static int _uniqueCount(Iterable<String> values) {
+    return values
+        .map((value) => value.trim().toLowerCase())
+        .where((value) => value.isNotEmpty)
+        .toSet()
+        .length;
+  }
+
+  static int _additionalCount(Iterable<String> values) {
+    final count = _uniqueCount(values);
+    return count > 1 ? count - 1 : 0;
+  }
+
+  static int _geographyUnits(
+    List<String> countries,
+    String? spainCoverage,
+    List<String> provinces,
+  ) {
+    final selectedCountries = countries.toSet();
+    final hasSpain = selectedCountries.contains(_spainCountry);
+    final hasPortugal = selectedCountries.contains(_portugalCountry);
+
+    if (hasSpain && hasPortugal) {
+      return 85;
+    }
+    if (hasPortugal) {
+      return 40;
+    }
+    if (!hasSpain) {
+      return 0;
+    }
+    if (spainCoverage == _spainAll) {
+      return 60;
+    }
+    if (spainCoverage != _spainByProvince || provinces.length <= 1) {
+      return 0;
+    }
+
+    final autonomousCommunities = provinces
+        .map(
+          (province) =>
+              _provinceAutonomousCommunity[province] ??
+              'Provincia desconocida: ${province.toLowerCase()}',
+        )
+        .toSet();
+    return autonomousCommunities.length == 1 ? 15 : 35;
+  }
+}
+
+const _provinceAutonomousCommunity = <String, String>{
+  'A Coruña': 'Galicia',
+  'Álava': 'País Vasco',
+  'Albacete': 'Castilla-La Mancha',
+  'Alicante': 'Comunitat Valenciana',
+  'Almería': 'Andalucía',
+  'Asturias': 'Asturias',
+  'Ávila': 'Castilla y León',
+  'Badajoz': 'Extremadura',
+  'Barcelona': 'Cataluña',
+  'Bizkaia': 'País Vasco',
+  'Burgos': 'Castilla y León',
+  'Cáceres': 'Extremadura',
+  'Cádiz': 'Andalucía',
+  'Cantabria': 'Cantabria',
+  'Castellón': 'Comunitat Valenciana',
+  'Ciudad Real': 'Castilla-La Mancha',
+  'Córdoba': 'Andalucía',
+  'Cuenca': 'Castilla-La Mancha',
+  'Girona': 'Cataluña',
+  'Granada': 'Andalucía',
+  'Guadalajara': 'Castilla-La Mancha',
+  'Gipuzkoa': 'País Vasco',
+  'Huelva': 'Andalucía',
+  'Huesca': 'Aragón',
+  'Illes Balears': 'Illes Balears',
+  'Jaén': 'Andalucía',
+  'La Rioja': 'La Rioja',
+  'Las Palmas': 'Canarias',
+  'León': 'Castilla y León',
+  'Lleida': 'Cataluña',
+  'Lugo': 'Galicia',
+  'Madrid': 'Comunidad de Madrid',
+  'Málaga': 'Andalucía',
+  'Murcia': 'Región de Murcia',
+  'Navarra': 'Navarra',
+  'Ourense': 'Galicia',
+  'Palencia': 'Castilla y León',
+  'Pontevedra': 'Galicia',
+  'Salamanca': 'Castilla y León',
+  'Santa Cruz de Tenerife': 'Canarias',
+  'Segovia': 'Castilla y León',
+  'Sevilla': 'Andalucía',
+  'Soria': 'Castilla y León',
+  'Tarragona': 'Cataluña',
+  'Teruel': 'Aragón',
+  'Toledo': 'Castilla-La Mancha',
+  'Valencia': 'Comunitat Valenciana',
+  'Valladolid': 'Castilla y León',
+  'Zamora': 'Castilla y León',
+  'Zaragoza': 'Aragón',
+};
 
 const _otherOfferCategoryOption = 'Otra';
 const _otherProblemOption = 'Otro';
@@ -1911,6 +4254,67 @@ const _otherSectorOption = 'Otros';
 const _otherTargetCompanyTypeOption = 'Otro';
 const _otherMinimumValueOption = 'Otro';
 const _otherNeedOption = 'Otra';
+
+const _spainCountry = 'España';
+const _portugalCountry = 'Portugal';
+const _spainAll = 'Toda España';
+const _spainByProvince = 'Seleccionar provincias';
+
+const _geographyCountryOptions = [_spainCountry, _portugalCountry];
+const _spainCoverageOptions = [_spainAll, _spainByProvince];
+
+const _spanishProvinceOptions = [
+  'A Coruña',
+  'Álava',
+  'Albacete',
+  'Alicante',
+  'Almería',
+  'Asturias',
+  'Ávila',
+  'Badajoz',
+  'Barcelona',
+  'Bizkaia',
+  'Burgos',
+  'Cáceres',
+  'Cádiz',
+  'Cantabria',
+  'Castellón',
+  'Ciudad Real',
+  'Córdoba',
+  'Cuenca',
+  'Girona',
+  'Granada',
+  'Guadalajara',
+  'Gipuzkoa',
+  'Huelva',
+  'Huesca',
+  'Illes Balears',
+  'Jaén',
+  'La Rioja',
+  'Las Palmas',
+  'León',
+  'Lleida',
+  'Lugo',
+  'Madrid',
+  'Málaga',
+  'Murcia',
+  'Navarra',
+  'Ourense',
+  'Palencia',
+  'Pontevedra',
+  'Salamanca',
+  'Santa Cruz de Tenerife',
+  'Segovia',
+  'Sevilla',
+  'Soria',
+  'Tarragona',
+  'Teruel',
+  'Toledo',
+  'Valencia',
+  'Valladolid',
+  'Zamora',
+  'Zaragoza',
+];
 
 const _offerCategoryOptions = [
   'Maquinaria y equipos industriales',

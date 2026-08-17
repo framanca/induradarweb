@@ -1,24 +1,519 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart';
 
 import 'package:induradarweb/main.dart';
+import 'package:induradarweb/pricing.dart';
+
+final _testPricingCatalog = PricingCatalog.fromJsonString(
+  File(PricingCatalog.assetPath).readAsStringSync(),
+);
 
 void main() {
   testWidgets('Landing page renders lead form', (WidgetTester tester) async {
     await tester.pumpWidget(const InduRadarApp());
 
-    expect(find.text('InduRadar'), findsOneWidget);
+    expect(
+      find.text('Convierte cambios industriales en oportunidades comerciales'),
+      findsOneWidget,
+    );
     expect(find.text('Define tu radar comercial'), findsOneWidget);
-    expect(find.text('1 · Tu empresa y tu oferta'), findsOneWidget);
-    expect(find.text('2 · Tu empresa objetivo'), findsOneWidget);
+    expect(find.text('1 · ¿Qué vendes?'), findsOneWidget);
+    expect(find.text('2 · ¿Qué empresas buscas?'), findsOneWidget);
+    expect(find.text('3 · ¿Qué cambios quieres detectar?'), findsOneWidget);
+    expect(find.text('4 · ¿Qué oportunidades te interesan?'), findsOneWidget);
     expect(
-      find.text('3 · Señales que deben activar una alerta'),
+      find.text('5 · ¿Cómo quieres recibir los resultados?'),
       findsOneWidget,
     );
-    expect(find.text('4 · Necesidades y referencias'), findsOneWidget);
+    expect(find.text('Definir mi radar comercial'), findsNWidgets(2));
     expect(
-      find.text('5 · Tipo de investigación y seguimiento'),
+      find.text('Así convierte InduRadar una señal en una oportunidad'),
       findsOneWidget,
     );
-    expect(find.text('Enviar solicitud'), findsOneWidget);
   });
+
+  testWidgets('Form sections behave as an exclusive accordion', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const InduRadarApp());
+    await tester.pumpAndSettle();
+
+    double sectionHeightFactor(String id) {
+      return tester
+          .widget<Align>(find.byKey(ValueKey('form-section-body-$id')))
+          .heightFactor!;
+    }
+
+    expect(sectionHeightFactor('company-offer'), 1);
+    expect(sectionHeightFactor('target-company'), 0);
+    expect(sectionHeightFactor('signals'), 0);
+    expect(sectionHeightFactor('needs'), 0);
+    expect(sectionHeightFactor('service'), 0);
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('form-section-header-target-company')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('form-section-header-target-company')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(sectionHeightFactor('company-offer'), 0);
+    expect(sectionHeightFactor('target-company'), 1);
+    expect(sectionHeightFactor('signals'), 0);
+  });
+
+  testWidgets('Company section starts with offer and required contact fields', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const InduRadarApp());
+    await tester.pumpAndSettle();
+
+    final offer = find.text('¿Qué ofrece tu empresa? *');
+    final fullName = find.text('Nombre y apellidos *');
+    final company = find.text('Empresa *');
+    final email = find.text('Email profesional *');
+
+    expect(offer, findsOneWidget);
+    expect(fullName, findsOneWidget);
+    expect(company, findsOneWidget);
+    expect(email, findsOneWidget);
+    expect(
+      tester.getTopLeft(offer).dy,
+      lessThan(tester.getTopLeft(fullName).dy),
+    );
+    expect(
+      tester.getTopLeft(fullName).dy,
+      lessThan(tester.getTopLeft(company).dy),
+    );
+    expect(
+      tester.getTopLeft(company).dy,
+      lessThan(tester.getTopLeft(email).dy),
+    );
+  });
+
+  testWidgets('Price reacts to RU and distinguishes monthly services', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(home: LandingPage(pricingCatalog: _testPricingCatalog)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Desde 59 €'), findsOneWidget);
+    expect(find.text('59 €'), findsOneWidget);
+    expect(find.text('Estudio puntual · pago único'), findsOneWidget);
+    expect(find.text('60 RU estimadas'), findsOneWidget);
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('form-section-header-target-company')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('form-section-header-target-company')),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.widgetWithText(CheckboxListTile, 'España'));
+    await tester.tap(find.widgetWithText(CheckboxListTile, 'España'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('89 €'), findsOneWidget);
+    expect(find.text('120 RU estimadas'), findsOneWidget);
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('form-section-header-service')),
+    );
+    await tester.tap(find.byKey(const ValueKey('form-section-header-service')));
+    await tester.pumpAndSettle();
+    final weekly = find.widgetWithText(
+      CheckboxListTile,
+      'Resumen / informe semanal',
+    );
+    await tester.ensureVisible(weekly);
+    await tester.tap(weekly);
+    await tester.pumpAndSettle();
+
+    expect(find.text('125 €/mes'), findsOneWidget);
+    expect(find.text('Seguimiento mensual · cuota mensual'), findsOneWidget);
+    expect(find.text('Estudio puntual · pago único'), findsNothing);
+
+    final oneOff = find.widgetWithText(CheckboxListTile, 'Estudio puntual');
+    await tester.ensureVisible(oneOff);
+    await tester.tap(oneOff);
+    await tester.pumpAndSettle();
+
+    expect(find.text('89 €'), findsOneWidget);
+    expect(find.text('125 €/mes'), findsOneWidget);
+    expect(find.text('Estudio puntual · pago único'), findsOneWidget);
+    expect(find.text('Seguimiento mensual · cuota mensual'), findsOneWidget);
+  });
+
+  testWidgets('Landing page fits a mobile viewport without layout errors', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(home: LandingPage(pricingCatalog: _testPricingCatalog)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    for (final finder in [
+      find.text('Define tu radar comercial'),
+      find.byKey(const ValueKey('pricing-entry-price')),
+      find.byKey(const ValueKey('pricing-summary')),
+    ]) {
+      final rect = tester.getRect(finder);
+      expect(rect.left, greaterThanOrEqualTo(20));
+      expect(rect.right, lessThanOrEqualTo(370));
+    }
+  });
+
+  testWidgets('Completed sections expose their status', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const InduRadarApp());
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, '¿Qué ofrece tu empresa? *'),
+      'Automatización industrial',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Nombre y apellidos *'),
+      'Ana Pérez',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Empresa *'),
+      'Industria Ejemplo',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Email profesional *'),
+      'ana@example.com',
+    );
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('form-section-header-target-company')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('form-section-header-target-company')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('form-section-header-company-offer')),
+        matching: find.text('Completo'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Paso 2 de 5'), findsOneWidget);
+  });
+
+  testWidgets('Selecting Spain defaults to all of Spain', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const InduRadarApp());
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('form-section-header-target-company')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('form-section-header-target-company')),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.widgetWithText(CheckboxListTile, 'España'));
+    await tester.tap(find.widgetWithText(CheckboxListTile, 'España'));
+    await tester.pumpAndSettle();
+
+    final coverageGroup = tester.widget<RadioGroup<String>>(
+      find
+          .descendant(
+            of: find.byKey(const ValueKey('form-section-body-target-company')),
+            matching: find.byType(RadioGroup<String>),
+          )
+          .first,
+    );
+    expect(coverageGroup.groupValue, 'Toda España');
+  });
+
+  testWidgets('Sections three and four can select every standard option', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const InduRadarApp());
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('form-section-header-signals')),
+    );
+    await tester.tap(find.byKey(const ValueKey('form-section-header-signals')));
+    await tester.pumpAndSettle();
+    const allSignalsKey = ValueKey('select-all-Seleccionar todos los cambios');
+    await tester.ensureVisible(find.byKey(allSignalsKey));
+    await tester.tap(find.byKey(allSignalsKey));
+    await tester.pump();
+
+    expect(
+      tester
+          .widget<CheckboxListTile>(
+            find.widgetWithText(
+              CheckboxListTile,
+              'Nueva fábrica, planta, nave o centro',
+            ),
+          )
+          .value,
+      isTrue,
+    );
+    expect(
+      tester
+          .widget<CheckboxListTile>(
+            find.widgetWithText(
+              CheckboxListTile,
+              'Subvención o ayuda concedida',
+            ),
+          )
+          .value,
+      isTrue,
+    );
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('form-section-header-needs')),
+    );
+    await tester.tap(find.byKey(const ValueKey('form-section-header-needs')));
+    await tester.pumpAndSettle();
+    const allNeedsKey = ValueKey(
+      'select-all-Seleccionar todas las necesidades',
+    );
+    await tester.ensureVisible(find.byKey(allNeedsKey));
+    await tester.tap(find.byKey(allNeedsKey));
+    await tester.pump();
+
+    expect(
+      tester
+          .widget<CheckboxListTile>(
+            find.widgetWithText(
+              CheckboxListTile,
+              'Problemas de calidad, rechazo o mermas',
+            ),
+          )
+          .value,
+      isTrue,
+    );
+    expect(
+      tester
+          .widget<CheckboxListTile>(
+            find.descendant(
+              of: find.byKey(const ValueKey('form-section-body-needs')),
+              matching: find.widgetWithText(CheckboxListTile, 'Otra'),
+            ),
+          )
+          .value,
+      isFalse,
+    );
+  });
+
+  testWidgets('Reference account fields explain their research purpose', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const InduRadarApp());
+
+    expect(
+      find.text('Clientes actuales para buscar perfiles similares (opcional)'),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'Clientes ideales: clientes de la competencia a seguir (opcional)',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Cuentas estratégicas para búsqueda especializada (opcional)'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Privacy choices are inside step five', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const InduRadarApp());
+    await tester.pumpAndSettle();
+
+    final serviceBody = find.byKey(const ValueKey('form-section-body-service'));
+    expect(
+      find.descendant(
+        of: serviceBody,
+        matching: find.text('Política de privacidad.'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: serviceBody,
+        matching: find.text(
+          'Quiero recibir novedades y comunicaciones de InduRadar.',
+        ),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Required privacy keeps marketing consent optional', (
+    WidgetTester tester,
+  ) async {
+    final submissionService = _RecordingSubmissionService();
+    await tester.binding.setSurfaceSize(const Size(1400, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(home: LandingPage(submissionService: submissionService)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, '¿Qué ofrece tu empresa? *'),
+      'Automatización industrial',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Nombre y apellidos *'),
+      'Ana Pérez',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Empresa *'),
+      'Industria Ejemplo',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Email profesional *'),
+      'ana@example.com',
+    );
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('form-section-header-target-company')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('form-section-header-target-company')),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.widgetWithText(CheckboxListTile, 'Portugal'),
+    );
+    await tester.tap(find.widgetWithText(CheckboxListTile, 'Portugal'));
+    await tester.pump();
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('form-section-header-needs')),
+    );
+    await tester.tap(find.byKey(const ValueKey('form-section-header-needs')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(
+        TextFormField,
+        'Describe una oportunidad comercial que justificaría una acción de tu equipo de ventas *',
+      ),
+      'Una nueva línea de producción.',
+    );
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('form-section-header-service')),
+    );
+    await tester.tap(find.byKey(const ValueKey('form-section-header-service')));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.byKey(const ValueKey('primary-form-cta')));
+    await tester.tap(find.byKey(const ValueKey('primary-form-cta')));
+    await tester.pumpAndSettle();
+    expect(submissionService.request, isNull);
+    expect(
+      find.text('Necesitamos tu consentimiento para responderte.'),
+      findsOneWidget,
+    );
+
+    final privacyCheckbox = find.ancestor(
+      of: find.text('He leído y acepto la '),
+      matching: find.byType(CheckboxListTile),
+    );
+    await tester.ensureVisible(privacyCheckbox);
+    await tester.tap(privacyCheckbox);
+    await tester.pump();
+
+    await tester.ensureVisible(find.byKey(const ValueKey('primary-form-cta')));
+    await tester.tap(find.byKey(const ValueKey('primary-form-cta')));
+    await tester.pumpAndSettle();
+
+    expect(submissionService.request, isNotNull);
+    expect(submissionService.request!.privacyAccepted, isTrue);
+    expect(submissionService.request!.marketingConsent, isFalse);
+    expect(submissionService.submissionCount, 1);
+    expect(
+      find.textContaining('Solicitud recibida correctamente.'),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.widgetWithText(TextFormField, 'Empresa *'),
+          )
+          .controller!
+          .text,
+      isEmpty,
+    );
+
+    final submitButton = tester.widget<FilledButton>(
+      find.byKey(const ValueKey('primary-form-cta')),
+    );
+    expect(submitButton.onPressed, isNull);
+  });
+
+  testWidgets('Final CTA scrolls back to the lead form', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const InduRadarApp());
+    await tester.pumpAndSettle();
+
+    final finalCta = find.byKey(const ValueKey('final-form-cta'));
+    await tester.ensureVisible(finalCta);
+    await tester.tap(finalCta);
+    await tester.pumpAndSettle();
+
+    final formTitlePosition = tester.getTopLeft(
+      find.text('Define tu radar comercial'),
+    );
+    expect(formTitlePosition.dy, greaterThanOrEqualTo(0));
+    expect(formTitlePosition.dy, lessThan(200));
+  });
+}
+
+class _RecordingSubmissionService extends LeadSubmissionService {
+  LeadRequest? request;
+  int submissionCount = 0;
+
+  @override
+  Future<LeadSubmissionResult> submit(LeadRequest request) async {
+    this.request = request;
+    submissionCount += 1;
+    return const LeadSubmissionResult(
+      success: true,
+      submissionId: 'test-submission-id',
+      emailSent: false,
+      emailError: 'Email intentionally disabled in widget tests.',
+    );
+  }
 }

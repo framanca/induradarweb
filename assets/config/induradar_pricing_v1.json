@@ -1,0 +1,130 @@
+{
+  "catalog_version": "1.0.0",
+  "currency": "EUR",
+  "pilot_label": "Piloto -50 %",
+  "default_plan_code": "one_off",
+  "recurring_plan_code": "monthly_monitoring",
+  "one_off_service_type": "Estudio puntual",
+  "recurring_service_types": [
+    "Resumen / informe semanal",
+    "Informe mensual",
+    "Informe trimestral",
+    "Vigilancia continua de cuentas concretas",
+    "Vigilancia de un sector",
+    "Vigilancia de una zona geográfica",
+    "Monitorización de proyectos concretos",
+    "Alertas prioritarias ante cambios relevantes"
+  ],
+  "plans": [
+    {
+      "code": "one_off",
+      "label": "Estudio puntual",
+      "billing_period": "one_time",
+      "tiers": [
+        {
+          "minimum_ru": 60,
+          "maximum_ru": 100,
+          "example": "1 sector + 1 provincia, pocas señales",
+          "standard_price_eur": 119,
+          "pilot_price_eur": 59,
+          "starting_at": false
+        },
+        {
+          "minimum_ru": 101,
+          "maximum_ru": 175,
+          "example": "Provincia/CCAA, más señales o tipos de empresa",
+          "standard_price_eur": 179,
+          "pilot_price_eur": 89,
+          "starting_at": false
+        },
+        {
+          "minimum_ru": 176,
+          "maximum_ru": 250,
+          "example": "CCAA amplia, 2–3 sectores, investigación más profunda",
+          "standard_price_eur": 249,
+          "pilot_price_eur": 125,
+          "starting_at": false
+        },
+        {
+          "minimum_ru": 251,
+          "maximum_ru": 350,
+          "example": "España, 1–2 sectores o alcance regional multisector",
+          "standard_price_eur": 349,
+          "pilot_price_eur": 175,
+          "starting_at": false
+        },
+        {
+          "minimum_ru": 351,
+          "maximum_ru": 500,
+          "example": "España, varios sectores/señales/deep dives",
+          "standard_price_eur": 499,
+          "pilot_price_eur": 249,
+          "starting_at": false
+        },
+        {
+          "minimum_ru": 501,
+          "maximum_ru": null,
+          "example": "Investigación muy amplia o multinacional",
+          "standard_price_eur": 699,
+          "pilot_price_eur": 349,
+          "starting_at": true
+        }
+      ]
+    },
+    {
+      "code": "monthly_monitoring",
+      "label": "Seguimiento mensual",
+      "billing_period": "month",
+      "tiers": [
+        {
+          "minimum_ru": 60,
+          "maximum_ru": 100,
+          "example": "Radar local muy concreto",
+          "standard_price_eur": 149,
+          "pilot_price_eur": 75,
+          "starting_at": false
+        },
+        {
+          "minimum_ru": 101,
+          "maximum_ru": 175,
+          "example": "Provincia/CCAA, alcance moderado",
+          "standard_price_eur": 249,
+          "pilot_price_eur": 125,
+          "starting_at": false
+        },
+        {
+          "minimum_ru": 176,
+          "maximum_ru": 275,
+          "example": "CCAA/multisector o España muy focalizado",
+          "standard_price_eur": 399,
+          "pilot_price_eur": 199,
+          "starting_at": false
+        },
+        {
+          "minimum_ru": 276,
+          "maximum_ru": 375,
+          "example": "España + varios sectores/señales",
+          "standard_price_eur": 599,
+          "pilot_price_eur": 299,
+          "starting_at": false
+        },
+        {
+          "minimum_ru": 376,
+          "maximum_ru": 500,
+          "example": "España, radar amplio + watchlists",
+          "standard_price_eur": 799,
+          "pilot_price_eur": 399,
+          "starting_at": false
+        },
+        {
+          "minimum_ru": 501,
+          "maximum_ru": null,
+          "example": "Iberia, múltiples sectores/proyectos",
+          "standard_price_eur": 999,
+          "pilot_price_eur": 499,
+          "starting_at": true
+        }
+      ]
+    }
+  ]
+}
