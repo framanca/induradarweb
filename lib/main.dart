@@ -332,6 +332,16 @@ class _LandingPageState extends State<LandingPage> {
       return;
     }
 
+    final pricingQuote = _currentPricingQuote();
+    if (pricingQuote == null) {
+      setState(() {
+        _submissionState = LeadSubmissionState.error;
+        _submissionError =
+            'No hemos podido calcular el coste de la solicitud. Recarga la página e inténtalo de nuevo.';
+      });
+      return;
+    }
+
     setState(() {
       _submissionState = LeadSubmissionState.submitting;
     });
@@ -400,7 +410,7 @@ class _LandingPageState extends State<LandingPage> {
       privacyAccepted: _privacyAccepted,
       marketingConsent: _marketingConsent,
       submittedAt: DateTime.now().toUtc(),
-      pricingQuote: _currentPricingQuote(),
+      pricingQuote: pricingQuote,
     );
 
     try {
@@ -408,7 +418,7 @@ class _LandingPageState extends State<LandingPage> {
       if (!mounted) {
         return;
       }
-      _clearFormAfterSuccess();
+      _markSubmissionSuccessful();
     } on LeadSubmissionException catch (error) {
       if (!mounted) {
         return;
@@ -431,7 +441,17 @@ class _LandingPageState extends State<LandingPage> {
     }
   }
 
-  void _clearFormAfterSuccess() {
+  void _markSubmissionSuccessful() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      _submissionError = null;
+      _successMessage =
+          'Solicitud recibida correctamente. Hemos recibido tu solicitud y comenzaremos a revisarla.';
+      _submissionState = LeadSubmissionState.success;
+    });
+  }
+
+  void _startNewRequest() {
     _isResettingForm = true;
     _formKey.currentState?.reset();
     for (final controller in [
@@ -490,9 +510,8 @@ class _LandingPageState extends State<LandingPage> {
       _marketingConsent = false;
       _privacyError = null;
       _submissionError = null;
-      _successMessage =
-          'Solicitud recibida correctamente. Hemos recibido tu solicitud y comenzaremos a revisarla.';
-      _submissionState = LeadSubmissionState.success;
+      _successMessage = null;
+      _submissionState = LeadSubmissionState.idle;
     });
     _isResettingForm = false;
   }
@@ -619,41 +638,51 @@ class _LandingPageState extends State<LandingPage> {
                 color: _surface,
                 topPadding: 24,
                 bottomPadding: 72,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const _BrandHeader(),
-                    const SizedBox(height: 46),
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        final isWide = constraints.maxWidth >= 940;
-                        final form = KeyedSubtree(
-                          key: _formAnchorKey,
-                          child: _buildFormPanel(),
-                        );
+                child: SizedBox(
+                  width: double.infinity,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isWide = constraints.maxWidth >= 940;
+                      final form = KeyedSubtree(
+                        key: _formAnchorKey,
+                        child: _buildFormPanel(),
+                      );
 
-                        if (!isWide) {
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              const _LandingIntro(),
-                              const SizedBox(height: 36),
-                              form,
-                            ],
-                          );
-                        }
-
-                        return Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      if (!isWide) {
+                        return Column(
+                          key: const ValueKey('landing-hero-narrow'),
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            const Expanded(flex: 7, child: _LandingIntro()),
-                            const SizedBox(width: 48),
-                            Expanded(flex: 9, child: form),
+                            const _BrandHeader(),
+                            const SizedBox(height: 46),
+                            const _LandingIntro(),
+                            const SizedBox(height: 36),
+                            form,
                           ],
                         );
-                      },
-                    ),
-                  ],
+                      }
+
+                      return Row(
+                        key: const ValueKey('landing-hero-wide'),
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Expanded(
+                            flex: 7,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _BrandHeader(),
+                                SizedBox(height: 46),
+                                _LandingIntro(),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 48),
+                          Expanded(flex: 9, child: form),
+                        ],
+                      );
+                    },
+                  ),
                 ),
               ),
               const _OpportunityExampleSection(),
@@ -722,7 +751,6 @@ class _LandingPageState extends State<LandingPage> {
       submissionError: _submissionError,
       isSubmitting: _isSubmitting,
       submissionSucceeded: _submissionSucceeded,
-      researchScopeUnits: scopeEstimate.units,
       pricingQuote: _currentPricingQuote(scopeEstimate),
       pricingLoadFailed: _pricingLoadFailed,
       entryPilotPriceEur: _pricingCatalog?.entryPilotPriceEur,
@@ -763,6 +791,7 @@ class _LandingPageState extends State<LandingPage> {
       },
       onPrivacyPolicyTap: _openPrivacyPolicy,
       onSubmit: _submit,
+      onStartNewRequest: _startNewRequest,
     );
   }
 
@@ -905,6 +934,7 @@ class _BrandHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
+      key: const ValueKey('brand-header'),
       header: true,
       label: 'InduRadar, Industrial Opportunity Intelligence',
       child: Column(
@@ -1785,13 +1815,11 @@ class _SectionHeading extends StatelessWidget {
 class _FormPricingHeader extends StatelessWidget {
   const _FormPricingHeader({
     required this.pricingQuote,
-    required this.researchScopeUnits,
     required this.pricingLoadFailed,
     required this.entryPilotPriceEur,
   });
 
   final PricingQuote? pricingQuote;
-  final num researchScopeUnits;
   final bool pricingLoadFailed;
   final num? entryPilotPriceEur;
 
@@ -1845,7 +1873,6 @@ class _FormPricingHeader extends StatelessWidget {
         final isWide = constraints.maxWidth >= 560;
         final price = _PricingSummary(
           quote: pricingQuote,
-          researchScopeUnits: researchScopeUnits,
           loadFailed: pricingLoadFailed,
           horizontal: !isWide,
         );
@@ -1871,13 +1898,11 @@ class _FormPricingHeader extends StatelessWidget {
 class _PricingSummary extends StatelessWidget {
   const _PricingSummary({
     required this.quote,
-    required this.researchScopeUnits,
     required this.loadFailed,
     required this.horizontal,
   });
 
   final PricingQuote? quote;
-  final num researchScopeUnits;
   final bool loadFailed;
   final bool horizontal;
 
@@ -1924,12 +1949,6 @@ class _PricingSummary extends StatelessWidget {
               if (index > 0) const SizedBox(height: 8),
               _PricingLine(item: quote!.lineItems[index]),
             ],
-          const SizedBox(height: 7),
-          Text(
-            '${_formatPrice(researchScopeUnits)} RU estimadas',
-            key: const ValueKey('pricing-scope-units'),
-            style: textTheme.bodySmall?.copyWith(color: _steel),
-          ),
         ],
       ),
     );
@@ -2036,7 +2055,6 @@ class _LeadFormPanel extends StatelessWidget {
     required this.submissionError,
     required this.isSubmitting,
     required this.submissionSucceeded,
-    required this.researchScopeUnits,
     required this.pricingQuote,
     required this.pricingLoadFailed,
     required this.entryPilotPriceEur,
@@ -2054,6 +2072,7 @@ class _LeadFormPanel extends StatelessWidget {
     required this.onMarketingChanged,
     required this.onPrivacyPolicyTap,
     required this.onSubmit,
+    required this.onStartNewRequest,
   });
 
   final GlobalKey<FormState> formKey;
@@ -2107,7 +2126,6 @@ class _LeadFormPanel extends StatelessWidget {
   final String? submissionError;
   final bool isSubmitting;
   final bool submissionSucceeded;
-  final num researchScopeUnits;
   final PricingQuote? pricingQuote;
   final bool pricingLoadFailed;
   final num? entryPilotPriceEur;
@@ -2126,6 +2144,7 @@ class _LeadFormPanel extends StatelessWidget {
   final ValueChanged<bool?> onMarketingChanged;
   final VoidCallback onPrivacyPolicyTap;
   final VoidCallback onSubmit;
+  final VoidCallback onStartNewRequest;
 
   @override
   Widget build(BuildContext context) {
@@ -2142,6 +2161,7 @@ class _LeadFormPanel extends StatelessWidget {
         selectedStandardNeeds.length == _commercialNeedOptions.length - 1;
 
     return DecoratedBox(
+      key: const ValueKey('lead-form-panel'),
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border.all(color: _line),
@@ -2164,7 +2184,6 @@ class _LeadFormPanel extends StatelessWidget {
             children: [
               _FormPricingHeader(
                 pricingQuote: pricingQuote,
-                researchScopeUnits: researchScopeUnits,
                 pricingLoadFailed: pricingLoadFailed,
                 entryPilotPriceEur: entryPilotPriceEur,
               ),
@@ -2200,7 +2219,10 @@ class _LeadFormPanel extends StatelessWidget {
               ),
               const SizedBox(height: 22),
               if (successMessage != null) ...[
-                _SuccessBanner(message: successMessage!),
+                _SuccessBanner(
+                  message: successMessage!,
+                  onStartNewRequest: onStartNewRequest,
+                ),
                 const SizedBox(height: 18),
               ],
               if (submissionError != null) ...[
@@ -2209,7 +2231,8 @@ class _LeadFormPanel extends StatelessWidget {
               ],
               _FormSection(
                 sectionId: 'company-offer',
-                title: '1 · ¿Qué vendes?',
+                title: '1. ¿Qué vendes?',
+                isLocked: submissionSucceeded,
                 isExpanded: expandedSectionIndex == 0,
                 isComplete: completedSections[0],
                 onToggle: () => onSectionChanged(0),
@@ -2371,7 +2394,8 @@ class _LeadFormPanel extends StatelessWidget {
               const SizedBox(height: 12),
               _FormSection(
                 sectionId: 'target-company',
-                title: '2 · ¿Qué empresas buscas?',
+                title: '2. ¿Qué empresas buscas?',
+                isLocked: submissionSucceeded,
                 isExpanded: expandedSectionIndex == 1,
                 isComplete: completedSections[1],
                 onToggle: () => onSectionChanged(1),
@@ -2488,7 +2512,8 @@ class _LeadFormPanel extends StatelessWidget {
               const SizedBox(height: 12),
               _FormSection(
                 sectionId: 'signals',
-                title: '3 · ¿Qué cambios quieres detectar?',
+                title: '3. ¿Qué cambios quieres detectar?',
+                isLocked: submissionSucceeded,
                 isExpanded: expandedSectionIndex == 2,
                 isComplete: completedSections[2],
                 onToggle: () => onSectionChanged(2),
@@ -2544,7 +2569,8 @@ class _LeadFormPanel extends StatelessWidget {
               const SizedBox(height: 12),
               _FormSection(
                 sectionId: 'needs',
-                title: '4 · ¿Qué oportunidades te interesan?',
+                title: '4. ¿Qué oportunidades te interesan?',
+                isLocked: submissionSucceeded,
                 isExpanded: expandedSectionIndex == 3,
                 isComplete: completedSections[3],
                 onToggle: () => onSectionChanged(3),
@@ -2689,7 +2715,8 @@ class _LeadFormPanel extends StatelessWidget {
               const SizedBox(height: 12),
               _FormSection(
                 sectionId: 'service',
-                title: '5 · ¿Cómo quieres recibir los resultados?',
+                title: '5. ¿Cómo quieres recibir los resultados?',
+                isLocked: submissionSucceeded,
                 isExpanded: expandedSectionIndex == 4,
                 isComplete: completedSections[4],
                 onToggle: () => onSectionChanged(4),
@@ -2799,6 +2826,7 @@ class _FormSection extends StatelessWidget {
     required this.sectionId,
     required this.title,
     required this.children,
+    required this.isLocked,
     required this.isExpanded,
     required this.isComplete,
     required this.onToggle,
@@ -2807,6 +2835,7 @@ class _FormSection extends StatelessWidget {
   final String sectionId;
   final String title;
   final List<Widget> children;
+  final bool isLocked;
   final bool isExpanded;
   final bool isComplete;
   final VoidCallback onToggle;
@@ -2823,19 +2852,25 @@ class _FormSection extends StatelessWidget {
       child: Column(
         children: [
           Material(
-            color: isExpanded ? const Color(0xFFF1F8FA) : Colors.white,
+            color: isLocked
+                ? const Color(0xFFF6F8F9)
+                : isExpanded
+                ? const Color(0xFFF1F8FA)
+                : Colors.white,
             child: InkWell(
               key: ValueKey('form-section-header-$sectionId'),
-              onTap: onToggle,
+              onTap: isLocked ? null : onToggle,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
                 child: ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 10),
                   title: Text(
                     title,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: _ink,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: isLocked ? _steel : _ink,
                       fontWeight: FontWeight.w800,
+                      height: 1.25,
+                      letterSpacing: 0,
                     ),
                   ),
                   subtitle: Padding(
@@ -2848,7 +2883,10 @@ class _FormSection extends StatelessWidget {
                   trailing: AnimatedRotation(
                     turns: isExpanded ? 0.5 : 0,
                     duration: const Duration(milliseconds: 180),
-                    child: const Icon(Icons.keyboard_arrow_down, color: _blue),
+                    child: Icon(
+                      Icons.keyboard_arrow_down,
+                      color: isLocked ? _steel : _blue,
+                    ),
                   ),
                 ),
               ),
@@ -2872,9 +2910,23 @@ class _FormSection extends StatelessWidget {
               ignoring: !isExpanded,
               child: ExcludeSemantics(
                 excluding: !isExpanded,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 18, 14, 20),
-                  child: Column(children: children),
+                child: FocusScope(
+                  canRequestFocus: !isLocked,
+                  descendantsAreFocusable: !isLocked,
+                  descendantsAreTraversable: !isLocked,
+                  child: AbsorbPointer(
+                    key: sectionId == 'company-offer'
+                        ? const ValueKey('submitted-form-lock')
+                        : null,
+                    absorbing: isLocked,
+                    child: Opacity(
+                      opacity: isLocked ? 0.58 : 1,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 18, 14, 20),
+                        child: Column(children: children),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -3577,9 +3629,13 @@ class _PrivacyConsent extends StatelessWidget {
 }
 
 class _SuccessBanner extends StatelessWidget {
-  const _SuccessBanner({required this.message});
+  const _SuccessBanner({
+    required this.message,
+    required this.onStartNewRequest,
+  });
 
   final String message;
+  final VoidCallback onStartNewRequest;
 
   @override
   Widget build(BuildContext context) {
@@ -3597,11 +3653,23 @@ class _SuccessBanner extends StatelessWidget {
             const Icon(Icons.check_circle_outline, color: _success, size: 20),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                message,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: _ink, height: 1.4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    message,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: _ink, height: 1.4),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    key: const ValueKey('new-request-cta'),
+                    onPressed: onStartNewRequest,
+                    icon: const Icon(Icons.add_circle_outline),
+                    label: const Text('Generar nueva solicitud'),
+                  ),
+                ],
               ),
             ),
           ],

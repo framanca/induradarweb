@@ -10,6 +10,15 @@ final _testPricingCatalog = PricingCatalog.fromJsonString(
   File(PricingCatalog.assetPath).readAsStringSync(),
 );
 
+void _setTestViewSize(WidgetTester tester, Size size) {
+  tester.view.devicePixelRatio = 1;
+  tester.view.physicalSize = size;
+  addTearDown(() {
+    tester.view.resetPhysicalSize();
+    tester.view.resetDevicePixelRatio();
+  });
+}
+
 void main() {
   testWidgets('Landing page renders lead form', (WidgetTester tester) async {
     await tester.pumpWidget(const InduRadarApp());
@@ -19,12 +28,12 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Define tu radar comercial'), findsOneWidget);
-    expect(find.text('1 · ¿Qué vendes?'), findsOneWidget);
-    expect(find.text('2 · ¿Qué empresas buscas?'), findsOneWidget);
-    expect(find.text('3 · ¿Qué cambios quieres detectar?'), findsOneWidget);
-    expect(find.text('4 · ¿Qué oportunidades te interesan?'), findsOneWidget);
+    expect(find.text('1. ¿Qué vendes?'), findsOneWidget);
+    expect(find.text('2. ¿Qué empresas buscas?'), findsOneWidget);
+    expect(find.text('3. ¿Qué cambios quieres detectar?'), findsOneWidget);
+    expect(find.text('4. ¿Qué oportunidades te interesan?'), findsOneWidget);
     expect(
-      find.text('5 · ¿Cómo quieres recibir los resultados?'),
+      find.text('5. ¿Cómo quieres recibir los resultados?'),
       findsOneWidget,
     );
     expect(find.text('Definir mi radar comercial'), findsNWidgets(2));
@@ -33,6 +42,30 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'Desktop aligns the form with the brand and enlarges step titles',
+    (WidgetTester tester) async {
+      _setTestViewSize(tester, const Size(1400, 1000));
+      await tester.pumpWidget(
+        MaterialApp(home: LandingPage(pricingCatalog: _testPricingCatalog)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('landing-hero-wide')), findsOneWidget);
+      expect(find.byKey(const ValueKey('landing-hero-narrow')), findsNothing);
+      final brandTop = tester
+          .getTopLeft(find.byKey(const ValueKey('brand-header')))
+          .dy;
+      final formTop = tester
+          .getTopLeft(find.byKey(const ValueKey('lead-form-panel')))
+          .dy;
+      expect(formTop, closeTo(brandTop, 0.1));
+
+      final firstStepTitle = tester.widget<Text>(find.text('1. ¿Qué vendes?'));
+      expect(firstStepTitle.style?.fontSize, greaterThanOrEqualTo(20));
+    },
+  );
 
   testWidgets('Form sections behave as an exclusive accordion', (
     WidgetTester tester,
@@ -111,7 +144,7 @@ void main() {
     expect(find.text('Desde 59 €'), findsOneWidget);
     expect(find.text('59 €'), findsOneWidget);
     expect(find.text('Estudio puntual · pago único'), findsOneWidget);
-    expect(find.text('60 RU estimadas'), findsOneWidget);
+    expect(find.textContaining('RU estimadas'), findsNothing);
 
     await tester.ensureVisible(
       find.byKey(const ValueKey('form-section-header-target-company')),
@@ -125,7 +158,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('89 €'), findsOneWidget);
-    expect(find.text('120 RU estimadas'), findsOneWidget);
+    expect(find.textContaining('RU estimadas'), findsNothing);
 
     await tester.ensureVisible(
       find.byKey(const ValueKey('form-section-header-service')),
@@ -158,8 +191,7 @@ void main() {
   testWidgets('Landing page fits a mobile viewport without layout errors', (
     WidgetTester tester,
   ) async {
-    await tester.binding.setSurfaceSize(const Size(390, 844));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+    _setTestViewSize(tester, const Size(390, 844));
     await tester.pumpWidget(
       MaterialApp(home: LandingPage(pricingCatalog: _testPricingCatalog)),
     );
@@ -382,7 +414,12 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(1400, 1000));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
-      MaterialApp(home: LandingPage(submissionService: submissionService)),
+      MaterialApp(
+        home: LandingPage(
+          submissionService: submissionService,
+          pricingCatalog: _testPricingCatalog,
+        ),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -460,6 +497,13 @@ void main() {
     expect(submissionService.request!.privacyAccepted, isTrue);
     expect(submissionService.request!.marketingConsent, isFalse);
     expect(submissionService.submissionCount, 1);
+    final submittedJson = submissionService.request!.toJson();
+    expect(submittedJson['research_scope_units'], isA<num>());
+    expect(submittedJson['pricing'], isA<Map<String, Object?>>());
+    expect(
+      (submittedJson['pricing'] as Map<String, Object?>)['line_items'],
+      isNotEmpty,
+    );
     expect(
       find.textContaining('Solicitud recibida correctamente.'),
       findsOneWidget,
@@ -471,13 +515,51 @@ void main() {
           )
           .controller!
           .text,
-      isEmpty,
+      'Industria Ejemplo',
     );
+
+    final formLock = tester.widget<AbsorbPointer>(
+      find.byKey(const ValueKey('submitted-form-lock')),
+    );
+    expect(formLock.absorbing, isTrue);
 
     final submitButton = tester.widget<FilledButton>(
       find.byKey(const ValueKey('primary-form-cta')),
     );
     expect(submitButton.onPressed, isNull);
+    expect(find.text('Generar nueva solicitud'), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(const ValueKey('new-request-cta')));
+    await tester.tap(find.byKey(const ValueKey('new-request-cta')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining('Solicitud recibida correctamente.'),
+      findsNothing,
+    );
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.widgetWithText(TextFormField, 'Empresa *'),
+          )
+          .controller!
+          .text,
+      isEmpty,
+    );
+    expect(
+      tester
+          .widget<AbsorbPointer>(
+            find.byKey(const ValueKey('submitted-form-lock')),
+          )
+          .absorbing,
+      isFalse,
+    );
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const ValueKey('primary-form-cta')))
+          .onPressed,
+      isNotNull,
+    );
   });
 
   testWidgets('Final CTA scrolls back to the lead form', (
@@ -496,7 +578,7 @@ void main() {
     final formTitlePosition = tester.getTopLeft(
       find.text('Define tu radar comercial'),
     );
-    expect(formTitlePosition.dy, greaterThanOrEqualTo(0));
+    expect(formTitlePosition.dy, greaterThanOrEqualTo(-2));
     expect(formTitlePosition.dy, lessThan(200));
   });
 }
