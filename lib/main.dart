@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:web/web.dart' as web;
 
 import 'pricing.dart';
 
@@ -16,6 +17,10 @@ const _privacyPolicyUrl = String.fromEnvironment(
 );
 
 const _logoAsset = 'assets/InduRadarLogoVertical.png';
+const _demoReportAsset =
+    'assets/assets/InduRadar_Informe_Demo_Anonimizado_Flexografia.pdf';
+const _demoReportFileName =
+    'InduRadar_Informe_Demo_Anonimizado_Flexografia.pdf';
 const _ink = Color(0xFF102335);
 const _blue = Color(0xFF075A8F);
 const _cyan = Color(0xFF18BFD7);
@@ -143,18 +148,26 @@ class _LandingPageState extends State<LandingPage> {
   final Set<String> _targetCompanyTypes = <String>{};
   final Set<String> _geographyCountries = <String>{};
   final Set<String> _spanishProvinces = <String>{};
-  final Set<String> _investmentSignals = <String>{};
-  final Set<String> _innovationSignals = <String>{};
-  final Set<String> _growthSignals = <String>{};
-  final Set<String> _publicFinanceSignals = <String>{};
-  final Set<String> _commercialNeeds = <String>{};
+  final Set<String> _investmentSignals = <String>{..._investmentSignalOptions};
+  final Set<String> _innovationSignals = <String>{..._innovationSignalOptions};
+  final Set<String> _growthSignals = <String>{..._growthSignalOptions};
+  final Set<String> _publicFinanceSignals = <String>{
+    ..._publicFinanceSignalOptions,
+  };
+  final Set<String> _commercialNeeds = _commercialNeedOptions
+      .where((option) => option != _otherNeedOption)
+      .toSet();
   final Set<String> _serviceTypes = <String>{};
+  final List<GlobalKey> _sectionHeaderKeys = List<GlobalKey>.generate(
+    5,
+    (_) => GlobalKey(),
+  );
 
   String? _targetRevenueRange;
   String? _targetEmployeeRange;
   String? _minimumOpportunityValue;
   String? _spainCoverage;
-  int _expandedSectionIndex = 0;
+  int _expandedSectionIndex = -1;
   bool _privacyAccepted = false;
   bool _marketingConsent = false;
   bool _isResettingForm = false;
@@ -164,6 +177,8 @@ class _LandingPageState extends State<LandingPage> {
   String? _privacyError;
   String? _successMessage;
   String? _submissionError;
+  int _sectionScrollRequest = 0;
+  bool _showTargetSelectionErrors = false;
 
   bool get _isSubmitting => _submissionState == LeadSubmissionState.submitting;
 
@@ -314,6 +329,7 @@ class _LandingPageState extends State<LandingPage> {
     }
 
     setState(() {
+      _showTargetSelectionErrors = true;
       _privacyError = _privacyAccepted
           ? null
           : 'Necesitamos tu consentimiento para responderte.';
@@ -323,12 +339,14 @@ class _LandingPageState extends State<LandingPage> {
     });
 
     final isFormValid = _formKey.currentState?.validate() ?? false;
-    if (!isFormValid || _privacyError != null) {
+    final hasRequiredTargetSelections =
+        _targetSectors.isNotEmpty && _targetCompanyTypes.isNotEmpty;
+    if (!isFormValid || !hasRequiredTargetSelections || _privacyError != null) {
       setState(() {
         _expandedSectionIndex = _firstInvalidSectionIndex();
       });
     }
-    if (!isFormValid || _privacyError != null) {
+    if (!isFormValid || !hasRequiredTargetSelections || _privacyError != null) {
       return;
     }
 
@@ -501,17 +519,25 @@ class _LandingPageState extends State<LandingPage> {
       ]) {
         values.clear();
       }
+      _investmentSignals.addAll(_investmentSignalOptions);
+      _innovationSignals.addAll(_innovationSignalOptions);
+      _growthSignals.addAll(_growthSignalOptions);
+      _publicFinanceSignals.addAll(_publicFinanceSignalOptions);
+      _commercialNeeds.addAll(
+        _commercialNeedOptions.where((option) => option != _otherNeedOption),
+      );
       _targetRevenueRange = null;
       _targetEmployeeRange = null;
       _minimumOpportunityValue = null;
       _spainCoverage = null;
-      _expandedSectionIndex = 0;
+      _expandedSectionIndex = -1;
       _privacyAccepted = false;
       _marketingConsent = false;
       _privacyError = null;
       _submissionError = null;
       _successMessage = null;
       _submissionState = LeadSubmissionState.idle;
+      _showTargetSelectionErrors = false;
     });
     _isResettingForm = false;
   }
@@ -535,7 +561,9 @@ class _LandingPageState extends State<LandingPage> {
       return 0;
     }
 
-    if (_geographyCountries.isEmpty ||
+    if (_targetSectors.isEmpty ||
+        _targetCompanyTypes.isEmpty ||
+        _geographyCountries.isEmpty ||
         (_geographyCountries.contains(_spainCountry) &&
             _spainCoverage == null) ||
         (_spainCoverage == _spainByProvince && _spanishProvinces.isEmpty) ||
@@ -575,7 +603,9 @@ class _LandingPageState extends State<LandingPage> {
             (!_problemsSolved.contains(_otherProblemOption) ||
                 _otherProblemController.text.trim().isNotEmpty);
       case 1:
-        return _geographyCountries.isNotEmpty &&
+        return _targetSectors.isNotEmpty &&
+            _targetCompanyTypes.isNotEmpty &&
+            _geographyCountries.isNotEmpty &&
             (!_geographyCountries.contains(_spainCountry) ||
                 _spainCoverage != null) &&
             (_spainCoverage != _spainByProvince ||
@@ -625,6 +655,19 @@ class _LandingPageState extends State<LandingPage> {
     }
   }
 
+  void _downloadDemoReport() {
+    final anchor =
+        web.HTMLAnchorElement()
+          ..href = _demoReportAsset
+          ..download = _demoReportFileName
+          ..target = '_self'
+          ..style.display = 'none';
+
+    web.document.body?.append(anchor);
+    anchor.click();
+    anchor.remove();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -655,7 +698,9 @@ class _LandingPageState extends State<LandingPage> {
                           children: [
                             const _BrandHeader(),
                             const SizedBox(height: 46),
-                            const _LandingIntro(),
+                            _LandingIntro(
+                              onDemoReportPressed: _downloadDemoReport,
+                            ),
                             const SizedBox(height: 36),
                             form,
                           ],
@@ -666,14 +711,16 @@ class _LandingPageState extends State<LandingPage> {
                         key: const ValueKey('landing-hero-wide'),
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Expanded(
+                          Expanded(
                             flex: 7,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                _BrandHeader(),
-                                SizedBox(height: 46),
-                                _LandingIntro(),
+                                const _BrandHeader(),
+                                const SizedBox(height: 46),
+                                _LandingIntro(
+                                  onDemoReportPressed: _downloadDemoReport,
+                                ),
                               ],
                             ),
                           ),
@@ -743,6 +790,8 @@ class _LandingPageState extends State<LandingPage> {
       minimumOpportunityValue: _minimumOpportunityValue,
       spainCoverage: _spainCoverage,
       expandedSectionIndex: _expandedSectionIndex,
+      sectionHeaderKeys: _sectionHeaderKeys,
+      showTargetSelectionErrors: _showTargetSelectionErrors,
       completedSections: List<bool>.generate(5, _isSectionComplete),
       privacyAccepted: _privacyAccepted,
       marketingConsent: _marketingConsent,
@@ -780,11 +829,7 @@ class _LandingPageState extends State<LandingPage> {
       },
       onSetAllSignals: _setAllSignals,
       onSetAllCommercialNeeds: _setAllCommercialNeeds,
-      onSectionChanged: (index) {
-        setState(() {
-          _expandedSectionIndex = index;
-        });
-      },
+      onSectionChanged: _openFormSection,
       onPrivacyChanged: _setPrivacyAccepted,
       onMarketingChanged: (value) {
         setState(() => _marketingConsent = value ?? false);
@@ -792,6 +837,51 @@ class _LandingPageState extends State<LandingPage> {
       onPrivacyPolicyTap: _openPrivacyPolicy,
       onSubmit: _submit,
       onStartNewRequest: _startNewRequest,
+    );
+  }
+
+  void _openFormSection(int index) {
+    final scrollRequest = ++_sectionScrollRequest;
+    if (_expandedSectionIndex != index) {
+      setState(() {
+        _expandedSectionIndex = index;
+      });
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && scrollRequest == _sectionScrollRequest) {
+        unawaited(_scrollToSectionHeader(index, scrollRequest));
+      }
+    });
+  }
+
+  Future<void> _scrollToSectionHeader(int index, int scrollRequest) async {
+    await Future<void>.delayed(const Duration(milliseconds: 240));
+    if (!mounted || scrollRequest != _sectionScrollRequest) {
+      return;
+    }
+
+    final sectionContext = _sectionHeaderKeys[index].currentContext;
+    if (sectionContext == null || !sectionContext.mounted) {
+      return;
+    }
+
+    final renderObject = sectionContext.findRenderObject();
+    if (renderObject is! RenderBox || !_scrollController.hasClients) {
+      return;
+    }
+
+    final viewportTop = MediaQuery.paddingOf(context).top + 16;
+    final offsetDelta =
+        renderObject.localToGlobal(Offset.zero).dy - viewportTop;
+    final targetOffset = (_scrollController.offset + offsetDelta).clamp(
+      0.0,
+      _scrollController.position.maxScrollExtent,
+    );
+
+    await _scrollController.animateTo(
+      targetOffset,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
     );
   }
 
@@ -937,32 +1027,39 @@ class _BrandHeader extends StatelessWidget {
       key: const ValueKey('brand-header'),
       header: true,
       label: 'InduRadar, Industrial Opportunity Intelligence',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Image.asset(
-            _logoAsset,
-            width: 205,
-            fit: BoxFit.contain,
-            excludeFromSemantics: true,
-          ),
-          const SizedBox(height: 7),
-          Text(
-            'Industrial Opportunity Intelligence',
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: _steel,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0,
+      child: SizedBox(
+        width: double.infinity,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Image.asset(
+              _logoAsset,
+              key: const ValueKey('brand-logo'),
+              width: 205,
+              fit: BoxFit.contain,
+              excludeFromSemantics: true,
             ),
-          ),
-        ],
+            const SizedBox(height: 7),
+            Text(
+              'Industrial Opportunity Intelligence',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: _steel,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
 class _LandingIntro extends StatelessWidget {
-  const _LandingIntro();
+  const _LandingIntro({required this.onDemoReportPressed});
+
+  final VoidCallback onDemoReportPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -997,6 +1094,8 @@ class _LandingIntro extends StatelessWidget {
           'Define qué vendes, qué empresas buscas y qué señales te interesan. InduRadar prioriza los resultados y conserva la evidencia que los respalda.',
           style: textTheme.bodyLarge?.copyWith(color: _steel, height: 1.55),
         ),
+        const SizedBox(height: 24),
+        _DemoReportCallout(onPressed: onDemoReportPressed),
         const SizedBox(height: 30),
         const _BenefitItem(
           icon: Icons.fact_check_outlined,
@@ -1042,6 +1141,122 @@ class _LandingIntro extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+
+class _DemoReportCallout extends StatelessWidget {
+  const _DemoReportCallout({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Semantics(
+      button: true,
+      label: 'Descargar informe demo anonimizado de InduRadar en PDF',
+      child: Container(
+        key: const ValueKey('demo-report-callout'),
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: const Color(0xFFB8DDE7)),
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x0D102335),
+              blurRadius: 18,
+              offset: Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE2F6F8),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'INFORME DEMO · PDF',
+                    style: textTheme.labelSmall?.copyWith(
+                      color: _blue,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ),
+                Text(
+                  'Ejemplo real anonimizado',
+                  style: textTheme.labelMedium?.copyWith(
+                    color: _steel,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Mira qué recibirías antes de configurar tu radar',
+              style: textTheme.titleLarge?.copyWith(
+                color: _ink,
+                fontWeight: FontWeight.w800,
+                height: 1.2,
+                letterSpacing: 0,
+              ),
+            ),
+            const SizedBox(height: 7),
+            Text(
+              'Descarga un informe de ejemplo con oportunidades, señales, evidencias, priorización y siguientes acciones. Basado en un informe real. Los nombres, fechas y fuentes se han anonimizado o modificado con fines demostrativos.',
+              style: textTheme.bodyMedium?.copyWith(
+                color: _steel,
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 15),
+            OutlinedButton.icon(
+              key: const ValueKey('download-demo-report-cta'),
+              onPressed: onPressed,
+              icon: const Icon(Icons.download_outlined),
+              label: const Text('Descargar informe demo'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _blue,
+                side: const BorderSide(color: _blue, width: 1.4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 14,
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Sin registro · PDF de muestra',
+              style: textTheme.bodySmall?.copyWith(
+                color: _steel,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1110,14 +1325,12 @@ class _OpportunityExampleSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _SectionHeading(
-            title: 'Así convierte InduRadar una señal en una oportunidad',
+            title: 'Así convierte InduRadar varias señales en una oportunidad',
             text:
-                'Una señal documentada se conecta con un proyecto, una necesidad comercial probable y una acción concreta.',
+                'Una sola noticia rara vez basta. InduRadar cruza señales de fuentes oficiales, corporativas y sectoriales para identificar proyectos reales y traducirlos en una acción comercial concreta.',
           ),
           SizedBox(height: 30),
           _OpportunityExampleCard(),
-          SizedBox(height: 34),
-          _SignalFlow(),
         ],
       ),
     );
@@ -1132,6 +1345,7 @@ class _OpportunityExampleCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return DecoratedBox(
+      key: const ValueKey('opportunity-example-card'),
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border.all(color: _line),
@@ -1201,7 +1415,7 @@ class _OpportunityExampleCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 7),
                 Text(
-                  'Ampliación de capacidad productiva',
+                  'Nueva línea automatizada y ampliación de capacidad',
                   style: textTheme.headlineSmall?.copyWith(
                     color: _ink,
                     fontWeight: FontWeight.w800,
@@ -1213,77 +1427,59 @@ class _OpportunityExampleCard extends StatelessWidget {
                 const SizedBox(height: 20),
                 LayoutBuilder(
                   builder: (context, constraints) {
-                    const signal = _ExampleFact(
-                      icon: Icons.radar_outlined,
-                      label: 'Señal',
-                      value:
-                          'Concesión de ayuda pública vinculada a una nueva línea de producción.',
-                    );
-                    const evidence = _ExampleFact(
-                      icon: Icons.source_outlined,
-                      label: 'Evidencia',
-                      value: 'Fuente oficial · 10 ago 2026',
-                    );
-                    const need = _ExampleFact(
-                      icon: Icons.precision_manufacturing_outlined,
-                      label: 'Necesidad probable',
-                      value:
-                          'Automatización, control de línea y seguridad de máquinas.',
-                    );
-                    const confidence = _ExampleFact(
-                      icon: Icons.verified_outlined,
-                      label: 'Confianza',
-                      value: 'Alta',
-                      accent: _success,
-                    );
-                    const action = _ExampleFact(
-                      icon: Icons.arrow_outward_outlined,
-                      label: 'Siguiente acción',
-                      value:
-                          'Confirmar alcance y fase del proyecto y abordar Ingeniería / Operaciones.',
-                    );
-
-                    if (constraints.maxWidth < 760) {
+                    if (constraints.maxWidth < 820) {
                       return const Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          signal,
-                          SizedBox(height: 18),
-                          evidence,
-                          SizedBox(height: 18),
-                          need,
-                          SizedBox(height: 18),
-                          confidence,
-                          SizedBox(height: 18),
-                          action,
+                          _ExampleSignalsColumn(),
+                          SizedBox(height: 24),
+                          Divider(color: _line),
+                          SizedBox(height: 24),
+                          _ExampleOpportunityColumn(),
                         ],
                       );
                     }
 
-                    return const Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            children: [signal, SizedBox(height: 20), evidence],
+                    return const IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(flex: 11, child: _ExampleSignalsColumn()),
+                          SizedBox(width: 26),
+                          VerticalDivider(width: 1, color: _line),
+                          SizedBox(width: 26),
+                          Expanded(
+                            flex: 10,
+                            child: _ExampleOpportunityColumn(),
                           ),
-                        ),
-                        SizedBox(width: 28),
-                        SizedBox(height: 190, child: VerticalDivider()),
-                        SizedBox(width: 28),
-                        Expanded(
-                          child: Column(
-                            children: [
-                              need,
-                              SizedBox(height: 20),
-                              confidence,
-                              SizedBox(height: 20),
-                              action,
-                            ],
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     );
                   },
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF8FBFC),
+              border: Border(top: BorderSide(color: _line)),
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(7)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.shield_outlined, size: 20, color: _blue),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'InduRadar distingue entre hecho confirmado, inferencia razonada y estimación de fase para evitar falsas oportunidades.',
+                    style: textTheme.bodySmall?.copyWith(
+                      color: _steel,
+                      height: 1.4,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -1294,8 +1490,260 @@ class _OpportunityExampleCard extends StatelessWidget {
   }
 }
 
-class _ExampleFact extends StatelessWidget {
-  const _ExampleFact({
+class _ExampleSignalsColumn extends StatelessWidget {
+  const _ExampleSignalsColumn();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _ExampleColumnTitle(
+          icon: Icons.hub_outlined,
+          title: 'Señales analizadas',
+        ),
+        SizedBox(height: 10),
+        _ExampleSignalItem(
+          icon: Icons.account_balance_outlined,
+          title: 'Ayuda pública',
+          description:
+              'Concesión de subvención para modernización productiva y puesta en marcha de una nueva línea.',
+          source: 'Fuente oficial',
+        ),
+        Divider(height: 1, color: _line),
+        _ExampleSignalItem(
+          icon: Icons.description_outlined,
+          title: 'Permiso / licencia',
+          description:
+              'Tramitación de ampliación de nave e instalaciones auxiliares vinculadas al proyecto.',
+          source: 'Boletín oficial',
+        ),
+        Divider(height: 1, color: _line),
+        _ExampleSignalItem(
+          icon: Icons.work_outline,
+          title: 'Contratación',
+          description:
+              'Oferta para responsable de automatización y técnicos de mantenimiento industrial.',
+          source: 'Empleo',
+        ),
+        Divider(height: 1, color: _line),
+        _ExampleSignalItem(
+          icon: Icons.campaign_outlined,
+          title: 'Comunicación corporativa',
+          description:
+              'La empresa anuncia crecimiento de capacidad y nuevos pedidos en su planta principal.',
+          source: 'Fuente corporativa / prensa sectorial',
+        ),
+        SizedBox(height: 14),
+        _InduRadarReading(),
+      ],
+    );
+  }
+}
+
+class _ExampleOpportunityColumn extends StatelessWidget {
+  const _ExampleOpportunityColumn();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _ExampleColumnTitle(
+          icon: Icons.track_changes_outlined,
+          title: 'Oportunidad comercial',
+        ),
+        SizedBox(height: 12),
+        _ExampleOpportunityDetail(
+          icon: Icons.precision_manufacturing_outlined,
+          label: 'Necesidad probable',
+          value:
+              'Automatización, control de línea, sensórica, seguridad de máquinas e integración de datos.',
+        ),
+        Divider(height: 24, color: _line),
+        _ExampleOpportunityDetail(
+          icon: Icons.verified_user_outlined,
+          label: 'Confianza',
+          value: 'Alta',
+          accent: _success,
+        ),
+        Divider(height: 24, color: _line),
+        _ExampleOpportunityDetail(
+          icon: Icons.bar_chart_outlined,
+          label: 'Fuentes analizadas',
+          value: '4',
+        ),
+        Divider(height: 24, color: _line),
+        _ExampleOpportunityDetail(
+          icon: Icons.calendar_month_outlined,
+          label: 'Ventana probable',
+          value: '3–9 meses',
+        ),
+        Divider(height: 24, color: _line),
+        _ExampleOpportunityDetail(
+          icon: Icons.arrow_outward_outlined,
+          label: 'Siguiente acción',
+          value:
+              'Confirmar alcance y fase del proyecto, identificar al interlocutor de Operaciones / Ingeniería y priorizar contacto técnico-comercial.',
+        ),
+      ],
+    );
+  }
+}
+
+class _ExampleColumnTitle extends StatelessWidget {
+  const _ExampleColumnTitle({required this.icon, required this.title});
+
+  final IconData icon;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 22, color: _blue),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: _ink,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ExampleSignalItem extends StatelessWidget {
+  const _ExampleSignalItem({
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.source,
+  });
+
+  final IconData icon;
+  final String title;
+  final String description;
+  final String source;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F7FC),
+              border: Border.all(color: const Color(0xFFCCE0EF)),
+              borderRadius: BorderRadius.circular(7),
+            ),
+            child: Icon(icon, size: 24, color: _blue),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: textTheme.titleSmall?.copyWith(
+                    color: _ink,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  description,
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: _ink,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 7),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F7FC),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    source,
+                    style: textTheme.labelSmall?.copyWith(
+                      color: _blue,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InduRadarReading extends StatelessWidget {
+  const _InduRadarReading();
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1FAF7),
+        border: Border.all(color: const Color(0xFF9ACFC2)),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.track_changes_outlined, color: _success, size: 26),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Lectura InduRadar',
+                  style: textTheme.titleSmall?.copyWith(
+                    color: _success,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  'La convergencia de señales apunta a un proyecto real de ampliación en fase activa. La oportunidad no nace de una única noticia, sino de evidencias que refuerzan la misma hipótesis de inversión.',
+                  style: textTheme.bodySmall?.copyWith(
+                    color: _ink,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExampleOpportunityDetail extends StatelessWidget {
+  const _ExampleOpportunityDetail({
     required this.icon,
     required this.label,
     required this.value,
@@ -1309,136 +1757,45 @@ class _ExampleFact extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 20, color: accent),
-        const SizedBox(width: 11),
+        Container(
+          width: 46,
+          height: 46,
+          alignment: Alignment.center,
+          decoration: const BoxDecoration(
+            color: Color(0xFFF1F7FC),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 24, color: accent),
+        ),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 label,
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: accent,
+                style: textTheme.titleSmall?.copyWith(
+                  color: accent == _success ? _success : _ink,
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               Text(
                 value,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: _ink, height: 1.45),
+                style: textTheme.bodyMedium?.copyWith(
+                  color: accent == _success ? _success : _ink,
+                  height: 1.4,
+                  fontWeight: accent == _success ? FontWeight.w700 : null,
+                ),
               ),
             ],
           ),
         ),
       ],
-    );
-  }
-}
-
-class _SignalFlow extends StatelessWidget {
-  const _SignalFlow();
-
-  @override
-  Widget build(BuildContext context) {
-    const nodes = [
-      _FlowNode(icon: Icons.radar_outlined, label: 'SEÑAL'),
-      _FlowNode(icon: Icons.account_tree_outlined, label: 'PROYECTO'),
-      _FlowNode(icon: Icons.lightbulb_outline, label: 'NECESIDAD PROBABLE'),
-      _FlowNode(icon: Icons.call_made_outlined, label: 'ACCIÓN'),
-    ];
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth < 720) {
-          return Column(
-            children: [
-              nodes[0],
-              const _FlowArrow(vertical: true),
-              nodes[1],
-              const _FlowArrow(vertical: true),
-              nodes[2],
-              const _FlowArrow(vertical: true),
-              nodes[3],
-            ],
-          );
-        }
-
-        return Row(
-          children: [
-            Expanded(child: nodes[0]),
-            const _FlowArrow(),
-            Expanded(child: nodes[1]),
-            const _FlowArrow(),
-            Expanded(child: nodes[2]),
-            const _FlowArrow(),
-            Expanded(child: nodes[3]),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _FlowNode extends StatelessWidget {
-  const _FlowNode({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 66),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FBFC),
-        border: Border.all(color: _line),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 20, color: _blue),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: _ink,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FlowArrow extends StatelessWidget {
-  const _FlowArrow({this.vertical = false});
-
-  final bool vertical;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: vertical ? 0 : 9,
-        vertical: vertical ? 7 : 0,
-      ),
-      child: Icon(
-        vertical ? Icons.arrow_downward : Icons.arrow_forward,
-        size: 19,
-        color: _cyan,
-      ),
     );
   }
 }
@@ -2047,6 +2404,8 @@ class _LeadFormPanel extends StatelessWidget {
     required this.minimumOpportunityValue,
     required this.spainCoverage,
     required this.expandedSectionIndex,
+    required this.sectionHeaderKeys,
+    required this.showTargetSelectionErrors,
     required this.completedSections,
     required this.privacyAccepted,
     required this.marketingConsent,
@@ -2118,6 +2477,8 @@ class _LeadFormPanel extends StatelessWidget {
   final String? minimumOpportunityValue;
   final String? spainCoverage;
   final int expandedSectionIndex;
+  final List<GlobalKey> sectionHeaderKeys;
+  final bool showTargetSelectionErrors;
   final List<bool> completedSections;
   final bool privacyAccepted;
   final bool marketingConsent;
@@ -2231,6 +2592,7 @@ class _LeadFormPanel extends StatelessWidget {
               ],
               _FormSection(
                 sectionId: 'company-offer',
+                headerAnchorKey: sectionHeaderKeys[0],
                 title: '1. ¿Qué vendes?',
                 isLocked: submissionSucceeded,
                 isExpanded: expandedSectionIndex == 0,
@@ -2394,6 +2756,7 @@ class _LeadFormPanel extends StatelessWidget {
               const SizedBox(height: 12),
               _FormSection(
                 sectionId: 'target-company',
+                headerAnchorKey: sectionHeaderKeys[1],
                 title: '2. ¿Qué empresas buscas?',
                 isLocked: submissionSucceeded,
                 isExpanded: expandedSectionIndex == 1,
@@ -2402,6 +2765,10 @@ class _LeadFormPanel extends StatelessWidget {
                 children: [
                   _MultiSelectChipGroup(
                     title: 'Sectores objetivo',
+                    errorText:
+                        showTargetSelectionErrors && targetSectors.isEmpty
+                        ? 'Selecciona al menos un sector objetivo.'
+                        : null,
                     options: _targetSectorOptions,
                     selectedValues: targetSectors,
                     isEnabled: !isSubmitting,
@@ -2420,6 +2787,10 @@ class _LeadFormPanel extends StatelessWidget {
                   const SizedBox(height: 18),
                   _MultiSelectChipGroup(
                     title: 'Tipo de empresa objetivo',
+                    errorText:
+                        showTargetSelectionErrors && targetCompanyTypes.isEmpty
+                        ? 'Selecciona al menos un tipo de empresa objetivo.'
+                        : null,
                     options: _targetCompanyTypeOptions,
                     selectedValues: targetCompanyTypes,
                     isEnabled: !isSubmitting,
@@ -2512,6 +2883,7 @@ class _LeadFormPanel extends StatelessWidget {
               const SizedBox(height: 12),
               _FormSection(
                 sectionId: 'signals',
+                headerAnchorKey: sectionHeaderKeys[2],
                 title: '3. ¿Qué cambios quieres detectar?',
                 isLocked: submissionSucceeded,
                 isExpanded: expandedSectionIndex == 2,
@@ -2569,6 +2941,7 @@ class _LeadFormPanel extends StatelessWidget {
               const SizedBox(height: 12),
               _FormSection(
                 sectionId: 'needs',
+                headerAnchorKey: sectionHeaderKeys[3],
                 title: '4. ¿Qué oportunidades te interesan?',
                 isLocked: submissionSucceeded,
                 isExpanded: expandedSectionIndex == 3,
@@ -2715,6 +3088,7 @@ class _LeadFormPanel extends StatelessWidget {
               const SizedBox(height: 12),
               _FormSection(
                 sectionId: 'service',
+                headerAnchorKey: sectionHeaderKeys[4],
                 title: '5. ¿Cómo quieres recibir los resultados?',
                 isLocked: submissionSucceeded,
                 isExpanded: expandedSectionIndex == 4,
@@ -2738,7 +3112,7 @@ class _LeadFormPanel extends StatelessWidget {
                     maxLines: 5,
                     decoration: const InputDecoration(
                       labelText:
-                          'Comentarios sobre frecuencia, fechas o alcance (opcional)',
+                          'Comentarios sobre cuentas concretas a monitorizar, frecuencia, fechas o alcance (opcional)',
                       alignLabelWithHint: true,
                       prefixIcon: Icon(Icons.event_note_outlined),
                     ),
@@ -2824,6 +3198,7 @@ class _LeadFormPanel extends StatelessWidget {
 class _FormSection extends StatelessWidget {
   const _FormSection({
     required this.sectionId,
+    required this.headerAnchorKey,
     required this.title,
     required this.children,
     required this.isLocked,
@@ -2833,6 +3208,7 @@ class _FormSection extends StatelessWidget {
   });
 
   final String sectionId;
+  final GlobalKey headerAnchorKey;
   final String title;
   final List<Widget> children;
   final bool isLocked;
@@ -2852,6 +3228,7 @@ class _FormSection extends StatelessWidget {
       child: Column(
         children: [
           Material(
+            key: headerAnchorKey,
             color: isLocked
                 ? const Color(0xFFF6F8F9)
                 : isExpanded
@@ -3126,10 +3503,12 @@ class _MultiSelectChipGroup extends StatelessWidget {
     required this.isEnabled,
     required this.onChanged,
     this.helperText,
+    this.errorText,
   });
 
   final String title;
   final String? helperText;
+  final String? errorText;
   final List<String> options;
   final Set<String> selectedValues;
   final bool isEnabled;
@@ -3160,7 +3539,13 @@ class _MultiSelectChipGroup extends StatelessWidget {
         ClipRRect(
           borderRadius: BorderRadius.circular(6),
           child: DecoratedBox(
-            decoration: BoxDecoration(border: Border.all(color: _line)),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: errorText == null
+                    ? _line
+                    : Theme.of(context).colorScheme.error,
+              ),
+            ),
             child: Column(
               children: [
                 for (var index = 0; index < options.length; index++) ...[
@@ -3193,6 +3578,28 @@ class _MultiSelectChipGroup extends StatelessWidget {
             ),
           ),
         ),
+        if (errorText != null) ...[
+          const SizedBox(height: 7),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 16,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  errorText!,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }

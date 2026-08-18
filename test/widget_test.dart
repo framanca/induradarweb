@@ -38,7 +38,7 @@ void main() {
     );
     expect(find.text('Definir mi radar comercial'), findsNWidgets(2));
     expect(
-      find.text('Así convierte InduRadar una señal en una oportunidad'),
+      find.text('Así convierte InduRadar varias señales en una oportunidad'),
       findsOneWidget,
     );
   });
@@ -62,10 +62,51 @@ void main() {
           .dy;
       expect(formTop, closeTo(brandTop, 0.1));
 
+      final brandBounds = tester.getRect(
+        find.byKey(const ValueKey('brand-header')),
+      );
+      final logoBounds = tester.getRect(
+        find.byKey(const ValueKey('brand-logo')),
+      );
+      expect(logoBounds.center.dx, closeTo(brandBounds.center.dx, 0.1));
+
       final firstStepTitle = tester.widget<Text>(find.text('1. ¿Qué vendes?'));
       expect(firstStepTitle.style?.fontSize, greaterThanOrEqualTo(20));
     },
   );
+
+  testWidgets('Illustrative example combines signals into an opportunity', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const InduRadarApp());
+    final example = find.byKey(const ValueKey('opportunity-example-card'));
+
+    for (final text in [
+      'Nueva línea automatizada y ampliación de capacidad',
+      'Ayuda pública',
+      'Permiso / licencia',
+      'Contratación',
+      'Comunicación corporativa',
+      'Lectura InduRadar',
+      'Necesidad probable',
+      'Confianza',
+      'Ventana probable',
+      'Siguiente acción',
+    ]) {
+      expect(
+        find.descendant(of: example, matching: find.text(text)),
+        findsOneWidget,
+      );
+    }
+    expect(
+      find.descendant(of: example, matching: find.text('4')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: example, matching: find.text('3–9 meses')),
+      findsOneWidget,
+    );
+  });
 
   testWidgets('Form sections behave as an exclusive accordion', (
     WidgetTester tester,
@@ -98,6 +139,16 @@ void main() {
     expect(sectionHeightFactor('company-offer'), 0);
     expect(sectionHeightFactor('target-company'), 1);
     expect(sectionHeightFactor('signals'), 0);
+
+    final targetHeaderTop = tester
+        .getTopLeft(
+          find.byKey(const ValueKey('form-section-header-target-company')),
+        )
+        .dy;
+    final firstLineTop = tester.getTopLeft(find.text('Sectores objetivo')).dy;
+    expect(targetHeaderTop, inInclusiveRange(0, 60));
+    expect(firstLineTop, greaterThan(targetHeaderTop));
+    expect(firstLineTop, lessThan(260));
   });
 
   testWidgets('Company section starts with offer and required contact fields', (
@@ -142,7 +193,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Desde 59 €'), findsOneWidget);
-    expect(find.text('59 €'), findsOneWidget);
+    expect(find.text('125 €'), findsOneWidget);
     expect(find.text('Estudio puntual · pago único'), findsOneWidget);
     expect(find.textContaining('RU estimadas'), findsNothing);
 
@@ -157,7 +208,7 @@ void main() {
     await tester.tap(find.widgetWithText(CheckboxListTile, 'España'));
     await tester.pumpAndSettle();
 
-    expect(find.text('89 €'), findsOneWidget);
+    expect(find.text('175 €'), findsOneWidget);
     expect(find.textContaining('RU estimadas'), findsNothing);
 
     await tester.ensureVisible(
@@ -173,7 +224,7 @@ void main() {
     await tester.tap(weekly);
     await tester.pumpAndSettle();
 
-    expect(find.text('125 €/mes'), findsOneWidget);
+    expect(find.text('299 €/mes'), findsOneWidget);
     expect(find.text('Seguimiento mensual · cuota mensual'), findsOneWidget);
     expect(find.text('Estudio puntual · pago único'), findsNothing);
 
@@ -182,8 +233,8 @@ void main() {
     await tester.tap(oneOff);
     await tester.pumpAndSettle();
 
-    expect(find.text('89 €'), findsOneWidget);
-    expect(find.text('125 €/mes'), findsOneWidget);
+    expect(find.text('175 €'), findsOneWidget);
+    expect(find.text('299 €/mes'), findsOneWidget);
     expect(find.text('Estudio puntual · pago único'), findsOneWidget);
     expect(find.text('Seguimiento mensual · cuota mensual'), findsOneWidget);
   });
@@ -282,7 +333,53 @@ void main() {
     expect(coverageGroup.groupValue, 'Toda España');
   });
 
-  testWidgets('Sections three and four can select every standard option', (
+  testWidgets('Section two requires a sector and a company type', (
+    WidgetTester tester,
+  ) async {
+    _setTestViewSize(tester, const Size(1400, 1000));
+    await tester.pumpWidget(
+      MaterialApp(home: LandingPage(pricingCatalog: _testPricingCatalog)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, '¿Qué ofrece tu empresa? *'),
+      'Automatización industrial',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Nombre y apellidos *'),
+      'Ana Pérez',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Empresa *'),
+      'Industria Ejemplo',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Email profesional *'),
+      'ana@example.com',
+    );
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('form-section-header-service')),
+    );
+    await tester.tap(find.byKey(const ValueKey('form-section-header-service')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('primary-form-cta')));
+    await tester.tap(find.byKey(const ValueKey('primary-form-cta')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Paso 2 de 5'), findsOneWidget);
+    expect(
+      find.text('Selecciona al menos un sector objetivo.'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Selecciona al menos un tipo de empresa objetivo.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Sections three and four select standard options by default', (
     WidgetTester tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1400, 1000));
@@ -295,11 +392,19 @@ void main() {
     );
     await tester.tap(find.byKey(const ValueKey('form-section-header-signals')));
     await tester.pumpAndSettle();
-    const allSignalsKey = ValueKey('select-all-Seleccionar todos los cambios');
-    await tester.ensureVisible(find.byKey(allSignalsKey));
-    await tester.tap(find.byKey(allSignalsKey));
-    await tester.pump();
-
+    final signalCheckboxes = tester
+        .widgetList<CheckboxListTile>(
+          find.descendant(
+            of: find.byKey(const ValueKey('form-section-body-signals')),
+            matching: find.byType(CheckboxListTile),
+          ),
+        )
+        .toList(growable: false);
+    expect(signalCheckboxes, isNotEmpty);
+    expect(
+      signalCheckboxes.every((checkbox) => checkbox.value == true),
+      isTrue,
+    );
     expect(
       tester
           .widget<CheckboxListTile>(
@@ -328,13 +433,18 @@ void main() {
     );
     await tester.tap(find.byKey(const ValueKey('form-section-header-needs')));
     await tester.pumpAndSettle();
-    const allNeedsKey = ValueKey(
-      'select-all-Seleccionar todas las necesidades',
+    final needCheckboxes = tester
+        .widgetList<CheckboxListTile>(
+          find.descendant(
+            of: find.byKey(const ValueKey('form-section-body-needs')),
+            matching: find.byType(CheckboxListTile),
+          ),
+        )
+        .toList(growable: false);
+    expect(
+      needCheckboxes.where((checkbox) => checkbox.value == false),
+      hasLength(1),
     );
-    await tester.ensureVisible(find.byKey(allNeedsKey));
-    await tester.tap(find.byKey(allNeedsKey));
-    await tester.pump();
-
     expect(
       tester
           .widget<CheckboxListTile>(
@@ -452,6 +562,20 @@ void main() {
     );
     await tester.tap(find.widgetWithText(CheckboxListTile, 'Portugal'));
     await tester.pump();
+    final sector = find.widgetWithText(
+      CheckboxListTile,
+      'Alimentación y bebidas',
+    );
+    await tester.ensureVisible(sector);
+    await tester.tap(sector);
+    await tester.pump();
+    final companyType = find.widgetWithText(
+      CheckboxListTile,
+      'Fabricante industrial o planta productiva',
+    );
+    await tester.ensureVisible(companyType);
+    await tester.tap(companyType);
+    await tester.pump();
 
     await tester.ensureVisible(
       find.byKey(const ValueKey('form-section-header-needs')),
@@ -559,6 +683,39 @@ void main() {
           .widget<FilledButton>(find.byKey(const ValueKey('primary-form-cta')))
           .onPressed,
       isNotNull,
+    );
+    expect(
+      tester
+          .widget<CheckboxListTile>(
+            find.widgetWithText(
+              CheckboxListTile,
+              'Nueva fábrica, planta, nave o centro',
+            ),
+          )
+          .value,
+      isTrue,
+    );
+    expect(
+      tester
+          .widget<CheckboxListTile>(
+            find.widgetWithText(
+              CheckboxListTile,
+              'Problemas de calidad, rechazo o mermas',
+            ),
+          )
+          .value,
+      isTrue,
+    );
+    expect(
+      tester
+          .widget<CheckboxListTile>(
+            find.descendant(
+              of: find.byKey(const ValueKey('form-section-body-needs')),
+              matching: find.widgetWithText(CheckboxListTile, 'Otra'),
+            ),
+          )
+          .value,
+      isFalse,
     );
   });
 
