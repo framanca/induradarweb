@@ -11,95 +11,127 @@ void main() {
     catalog = PricingCatalog.fromJsonString(source);
   });
 
-  test('one-off pilot prices follow every RU boundary', () {
-    const expectedPrices = <num, num>{
-      60: 59,
-      100: 59,
-      101: 89,
-      175: 89,
-      176: 125,
-      250: 125,
-      251: 175,
-      350: 175,
-      351: 249,
-      500: 249,
-      501: 349,
-    };
-
-    for (final entry in expectedPrices.entries) {
-      final item = catalog
-          .quote(researchUnits: entry.key, serviceTypes: const {})
-          .lineItems
-          .single;
-      expect(item.pilotPriceEur, entry.value, reason: '${entry.key} RU');
-    }
+  test('catalog exposes the transparent pilot entry price', () {
+    expect(catalog.version, '2.0.0');
+    expect(catalog.model, 'transparent_scope_v2');
+    expect(catalog.entryPilotPriceEur, 49.5);
+    expect(catalog.spainProvinceCount, 50);
   });
 
-  test('monthly pilot prices follow every RU boundary', () {
-    const expectedPrices = <num, num>{
-      60: 75,
-      100: 75,
-      101: 125,
-      175: 125,
-      176: 199,
-      275: 199,
-      276: 299,
-      375: 299,
-      376: 399,
-      500: 399,
-      501: 499,
+  test('scope supplement follows both price bands', () {
+    const expected = <int, num>{
+      0: 0,
+      3: 0,
+      4: 5,
+      7: 20,
+      8: 22.5,
+      10: 27.5,
+      12: 32.5,
     };
 
-    for (final entry in expectedPrices.entries) {
-      final item = catalog
-          .quote(
-            researchUnits: entry.key,
-            serviceTypes: const {'Informe mensual'},
-          )
-          .lineItems
-          .single;
-      expect(item.pilotPriceEur, entry.value, reason: '${entry.key} RU');
-      expect(item.isMonthly, isTrue);
+    for (final entry in expected.entries) {
+      expect(
+        catalog.scopeSupplement(entry.key, 3),
+        entry.value,
+        reason: '${entry.key} selected items',
+      );
     }
   });
 
   test(
-    'recurring services use a monthly fee and can include an initial study',
+    'one-off, monthly and weekly plans reproduce every supplied example',
     () {
-      final monthlyOnly = catalog.quote(
-        researchUnits: 276,
-        serviceTypes: const {'Resumen / informe semanal'},
-      );
-      expect(monthlyOnly.lineItems, hasLength(1));
-      expect(monthlyOnly.lineItems.single.pilotPriceEur, 299);
-      expect(monthlyOnly.lineItems.single.standardPriceEur, 599);
-      expect(monthlyOnly.lineItems.single.billingPeriod, 'month');
+      const examples = <(int, int, num, num, num)>[
+        (3, 3, 99, 30, 50),
+        (5, 4, 114, 37.5, 57.5),
+        (8, 8, 144, 52.5, 72.5),
+        (10, 12, 159, 60, 80),
+      ];
 
-      final combined = catalog.quote(
-        researchUnits: 276,
-        serviceTypes: const {'Estudio puntual', 'Informe mensual'},
-      );
-      expect(combined.lineItems, hasLength(2));
-      expect(combined.lineItems.map((item) => item.billingPeriod), [
-        'one_time',
-        'month',
-      ]);
+      for (final example in examples) {
+        final quote = catalog.quote(
+          sectorCount: example.$1,
+          provinceCount: example.$2,
+          serviceTypes: const {
+            'Estudio puntual',
+            'Revisión mensual',
+            'Revisión semanal',
+          },
+        );
+        final lines = {for (final line in quote.lineItems) line.planCode: line};
+
+        expect(lines['one_off']!.standardPriceEur, example.$3);
+        expect(lines['monthly_review']!.standardPriceEur, example.$4);
+        expect(lines['weekly_review']!.standardPriceEur, example.$5);
+        expect(lines['one_off']!.pilotPriceEur, example.$3 * 0.5);
+        expect(lines['monthly_review']!.pilotPriceEur, example.$4 * 0.5);
+        expect(lines['weekly_review']!.pilotPriceEur, example.$5 * 0.5);
+      }
     },
   );
 
-  test('fractional RU values round up for pricing and open tiers say from', () {
-    final fractional = catalog.quote(
-      researchUnits: 100.5,
-      serviceTypes: const {},
+  test('review plans are recurring and require an active prior study', () {
+    final quote = catalog.quote(
+      sectorCount: 5,
+      provinceCount: 4,
+      serviceTypes: const {'Revisión semanal', 'Revisión mensual'},
     );
-    expect(fractional.billableResearchUnits, 101);
-    expect(fractional.lineItems.single.pilotPriceEur, 89);
 
-    final openTier = catalog.quote(
-      researchUnits: 501,
+    expect(quote.lineItems, hasLength(2));
+    for (final item in quote.lineItems) {
+      expect(item.billingPeriod, 'month');
+      expect(item.requiresActivePriorStudy, isTrue);
+    }
+  });
+
+  test('alerts and watch services use the monthly review price', () {
+    final quote = catalog.quote(
+      sectorCount: 3,
+      provinceCount: 3,
       serviceTypes: const {'Alertas prioritarias ante cambios relevantes'},
     );
-    expect(openTier.lineItems.single.pilotPriceEur, 499);
-    expect(openTier.lineItems.single.startingAt, isTrue);
+
+    expect(quote.lineItems.single.planCode, 'monthly_review');
+    expect(quote.lineItems.single.standardPriceEur, 30);
+    expect(quote.lineItems.single.pilotPriceEur, 15);
+    expect(quote.lineItems.single.isMonthly, isTrue);
   });
+
+  test('empty service selection defaults to a one-off study', () {
+    final quote = catalog.quote(
+      sectorCount: 0,
+      provinceCount: 0,
+      serviceTypes: const {},
+    );
+
+    expect(quote.lineItems.single.planCode, 'one_off');
+    expect(quote.lineItems.single.standardPriceEur, 99);
+    expect(quote.lineItems.single.pilotPriceEur, 49.5);
+  });
+
+  test(
+    'serialized quote keeps formula inputs and excludes RU pricing fields',
+    () {
+      final json = catalog
+          .quote(
+            sectorCount: 8,
+            provinceCount: 8,
+            serviceTypes: const {'Estudio puntual'},
+          )
+          .toJson();
+
+      expect(json['pricing_model'], 'transparent_scope_v2');
+      expect(json, isNot(contains('research_scope_units')));
+      expect(json, isNot(contains('billable_research_scope_units')));
+      expect(json['scope'], {
+        'sector_count': 8,
+        'province_count': 8,
+        'included_sectors': 3,
+        'included_provinces': 3,
+        'included_company_types': 2,
+        'sector_supplement_eur': 22.5,
+        'province_supplement_eur': 22.5,
+      });
+    },
+  );
 }

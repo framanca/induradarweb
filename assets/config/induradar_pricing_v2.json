@@ -1,0 +1,65 @@
+{
+  "catalog_version": "2.0.0",
+  "pricing_model": "transparent_scope_v2",
+  "currency": "EUR",
+  "pilot_label": "Piloto -50 %",
+  "pilot_discount_rate": 0.5,
+  "default_plan_code": "one_off",
+  "scope": {
+    "included_sectors": 3,
+    "included_provinces": 3,
+    "included_company_types": 2,
+    "included_signal_types": "all",
+    "included_opportunity_areas": "all",
+    "first_extra_band": {
+      "units": 4,
+      "unit_price_eur": 5
+    },
+    "subsequent_extra_unit_price_eur": 2.5,
+    "country_scopes": {
+      "spain_all_provinces": 50,
+      "portugal_province_equivalent": 0,
+      "portugal_note": "Portugal se conserva como alcance nacional, pero no añade provincias españolas a P."
+    }
+  },
+  "service_plan_mappings": {
+    "Estudio puntual": "one_off",
+    "Revisión semanal": "weekly_review",
+    "Revisión mensual": "monthly_review",
+    "Vigilancia continua de cuentas concretas": "monthly_review",
+    "Vigilancia de un sector": "monthly_review",
+    "Vigilancia de una zona geográfica": "monthly_review",
+    "Monitorización de proyectos concretos": "monthly_review",
+    "Alertas prioritarias ante cambios relevantes": "monthly_review"
+  },
+  "plans": [
+    {
+      "code": "one_off",
+      "label": "Estudio puntual",
+      "billing_period": "one_time",
+      "base_price_eur": 99,
+      "supplement_factor": 1,
+      "requires_active_prior_study": false
+    },
+    {
+      "code": "monthly_review",
+      "label": "Revisión mensual",
+      "billing_period": "month",
+      "base_price_eur": 30,
+      "supplement_factor": 0.5,
+      "requires_active_prior_study": true
+    },
+    {
+      "code": "weekly_review",
+      "label": "Revisión semanal",
+      "billing_period": "month",
+      "base_price_eur": 50,
+      "supplement_factor": 0.5,
+      "requires_active_prior_study": true
+    }
+  ],
+  "contract_rules": {
+    "review_eligibility": "Existe un estudio puntual previo activo del mismo alcance.",
+    "scope_expansion": "A(S_nuevo)-A(S_anterior)+A(P_nuevo)-A(P_anterior); después se recalcula la cuota con el nuevo alcance."
+  }
+}

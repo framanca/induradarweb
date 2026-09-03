@@ -122,7 +122,7 @@ void main() {
           .heightFactor!;
     }
 
-    expect(sectionHeightFactor('company-offer'), 1);
+    expect(sectionHeightFactor('company-offer'), 0);
     expect(sectionHeightFactor('target-company'), 0);
     expect(sectionHeightFactor('signals'), 0);
     expect(sectionHeightFactor('needs'), 0);
@@ -182,7 +182,7 @@ void main() {
     );
   });
 
-  testWidgets('Price reacts to RU and distinguishes monthly services', (
+  testWidgets('Price reacts to sectors and provinces by service type', (
     WidgetTester tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1400, 1000));
@@ -192,8 +192,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Desde 59 €'), findsOneWidget);
-    expect(find.text('125 €'), findsOneWidget);
+    expect(find.text('Desde 49,5 €'), findsOneWidget);
+    expect(find.text('49,5 €'), findsOneWidget);
     expect(find.text('Estudio puntual · pago único'), findsOneWidget);
     expect(find.textContaining('RU estimadas'), findsNothing);
 
@@ -208,7 +208,7 @@ void main() {
     await tester.tap(find.widgetWithText(CheckboxListTile, 'España'));
     await tester.pumpAndSettle();
 
-    expect(find.text('175 €'), findsOneWidget);
+    expect(find.text('113,25 €'), findsOneWidget);
     expect(find.textContaining('RU estimadas'), findsNothing);
 
     await tester.ensureVisible(
@@ -216,16 +216,13 @@ void main() {
     );
     await tester.tap(find.byKey(const ValueKey('form-section-header-service')));
     await tester.pumpAndSettle();
-    final weekly = find.widgetWithText(
-      CheckboxListTile,
-      'Resumen / informe semanal',
-    );
+    final weekly = find.widgetWithText(CheckboxListTile, 'Revisión semanal');
     await tester.ensureVisible(weekly);
     await tester.tap(weekly);
     await tester.pumpAndSettle();
 
-    expect(find.text('299 €/mes'), findsOneWidget);
-    expect(find.text('Seguimiento mensual · cuota mensual'), findsOneWidget);
+    expect(find.text('56,88 €/mes'), findsOneWidget);
+    expect(find.text('Revisión semanal · cuota mensual'), findsOneWidget);
     expect(find.text('Estudio puntual · pago único'), findsNothing);
 
     final oneOff = find.widgetWithText(CheckboxListTile, 'Estudio puntual');
@@ -233,10 +230,10 @@ void main() {
     await tester.tap(oneOff);
     await tester.pumpAndSettle();
 
-    expect(find.text('175 €'), findsOneWidget);
-    expect(find.text('299 €/mes'), findsOneWidget);
+    expect(find.text('113,25 €'), findsOneWidget);
+    expect(find.text('56,88 €/mes'), findsOneWidget);
     expect(find.text('Estudio puntual · pago único'), findsOneWidget);
-    expect(find.text('Seguimiento mensual · cuota mensual'), findsOneWidget);
+    expect(find.text('Revisión semanal · cuota mensual'), findsOneWidget);
   });
 
   testWidgets('Landing page fits a mobile viewport without layout errors', (
@@ -450,7 +447,7 @@ void main() {
           .widget<CheckboxListTile>(
             find.widgetWithText(
               CheckboxListTile,
-              'Problemas de calidad, rechazo o mermas',
+              'Maquinaria y automatización',
             ),
           )
           .value,
@@ -624,6 +621,12 @@ void main() {
     final submittedJson = submissionService.request!.toJson();
     expect(submittedJson['research_scope_units'], isA<num>());
     expect(submittedJson['pricing'], isA<Map<String, Object?>>());
+    expect(submittedJson['form_version'], '3.13.1');
+    expect(submittedJson['contract_version'], '1.3.2');
+    expect(
+      (submittedJson['pricing'] as Map<String, Object?>)['pricing_model'],
+      'transparent_scope_v2',
+    );
     expect(
       (submittedJson['pricing'] as Map<String, Object?>)['line_items'],
       isNotEmpty,
@@ -700,7 +703,7 @@ void main() {
           .widget<CheckboxListTile>(
             find.widgetWithText(
               CheckboxListTile,
-              'Problemas de calidad, rechazo o mermas',
+              'Maquinaria y automatización',
             ),
           )
           .value,

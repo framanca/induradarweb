@@ -6,8 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
-import 'package:web/web.dart' as web;
 
+import 'demo_report_downloader.dart';
 import 'pricing.dart';
 
 const _leadEndpoint = String.fromEnvironment('LEAD_ENDPOINT');
@@ -21,6 +21,38 @@ const _demoReportAsset =
     'assets/assets/InduRadar_Informe_Demo_Anonimizado_Flexografia.pdf';
 const _demoReportFileName =
     'InduRadar_Informe_Demo_Anonimizado_Flexografia.pdf';
+const _webFormVersion = '3.13.1';
+const _dataContractVersion = '1.3.2';
+const _executionContractVersion = '1.12.3';
+const _stackConfiguration = <String, Object>{
+  'config_name': 'InduRadar Q0-STACK and runtime defaults',
+  'config_version': '3.13.1',
+  'effective_date': '2026-09-02',
+  'expected_versions': <String, String>{
+    'workflow_version': '3.13.1',
+    'contract_version': '1.3.2',
+    'execution_contract_version': '1.12.3',
+    'heuristics_version': '1.11.3',
+    'tool_registry_version': '1.10.3',
+    'golden_test_version': '1.12.3',
+    'data_dictionary_version': '1.10.3',
+    'document_manifest_version': '1.11.3',
+    'report_template_version': '1.10.3',
+    'example_request_version': '1.3.2',
+    'source_catalog_version': '2.6.1',
+  },
+  'runtime_defaults': <String, Object>{
+    'baseline_mode': 'canonical_fresh',
+    'canonical_output': 'report_json_lossless',
+    'client_default_output': 'light_report',
+    'artifact_default': <String>[],
+    'artifacts_explicit_only': <String>['docx', 'xlsx', 'pdf'],
+    'docx_render_mode': 'complete_inventory_with_controlled_synthesis',
+    'docx_render_manifest_required': true,
+    'renderer_may_omit_inventory_items': false,
+    'client_completeness_review_allowed': false,
+  },
+};
 const _ink = Color(0xFF102335);
 const _blue = Color(0xFF075A8F);
 const _cyan = Color(0xFF18BFD7);
@@ -278,49 +310,33 @@ class _LandingPageState extends State<LandingPage> {
     }
   }
 
-  ResearchScopeEstimate _currentScopeEstimate() {
-    return ResearchScopeCalculator.calculate(
-      targetSectors: _selectedValuesWithOther(
-        _targetSectors,
-        _otherSectorController.text,
-        otherOption: _otherSectorOption,
-      ),
-      targetCompanyTypes: _selectedValuesWithOther(
-        _targetCompanyTypes,
-        _otherTargetCompanyTypeController.text,
-        otherOption: _otherTargetCompanyTypeOption,
-      ),
-      geographyCountries: _geographyCountries.toList(growable: false),
-      spainCoverage: _spainCoverage,
-      geographyProvinces: _spainCoverage == _spainByProvince
-          ? _spanishProvinces.toList(growable: false)
-          : const <String>[],
-      investmentSignals: _investmentSignals.toList(growable: false),
-      innovationSignals: _innovationSignals.toList(growable: false),
-      growthSignals: _growthSignals.toList(growable: false),
-      publicFinanceSignals: _publicFinanceSignals.toList(growable: false),
-      commercialNeeds: _selectedValuesWithOther(
-        _commercialNeeds,
-        _otherNeedController.text,
-        otherOption: _otherNeedOption,
-      ),
-      currentClients: _splitLineValues(_currentClientsController.text),
-      idealClients: _splitLineValues(_idealClientsController.text),
-      watchlistAccounts: _splitLineValues(_watchlistAccountsController.text),
-      competitors: _splitLineValues(_competitorsController.text),
-      excludedCompanies: _splitLineValues(_excludedCompaniesController.text),
-    );
-  }
-
-  PricingQuote? _currentPricingQuote([ResearchScopeEstimate? scopeEstimate]) {
+  PricingQuote? _currentPricingQuote() {
     final catalog = _pricingCatalog;
     if (catalog == null) {
       return null;
     }
     return catalog.quote(
-      researchUnits: (scopeEstimate ?? _currentScopeEstimate()).units,
+      sectorCount: _selectedValuesWithOther(
+        _targetSectors,
+        _otherSectorController.text,
+        otherOption: _otherSectorOption,
+      ).toSet().length,
+      provinceCount: _pricingProvinceCount(catalog),
       serviceTypes: _serviceTypes,
     );
+  }
+
+  int _pricingProvinceCount(PricingCatalog catalog) {
+    if (!_geographyCountries.contains(_spainCountry)) {
+      return 0;
+    }
+    if (_spainCoverage == _spainAll) {
+      return catalog.spainProvinceCount;
+    }
+    if (_spainCoverage == _spainByProvince) {
+      return _spanishProvinces.length;
+    }
+    return 0;
   }
 
   Future<void> _submit() async {
@@ -656,16 +672,12 @@ class _LandingPageState extends State<LandingPage> {
   }
 
   void _downloadDemoReport() {
-    final anchor =
-        web.HTMLAnchorElement()
-          ..href = _demoReportAsset
-          ..download = _demoReportFileName
-          ..target = '_self'
-          ..style.display = 'none';
-
-    web.document.body?.append(anchor);
-    anchor.click();
-    anchor.remove();
+    final started = downloadDemoReport(_demoReportAsset, _demoReportFileName);
+    if (!started && mounted) {
+      _showError(
+        'La descarga del informe demo solo está disponible en la web.',
+      );
+    }
   }
 
   @override
@@ -745,7 +757,6 @@ class _LandingPageState extends State<LandingPage> {
   }
 
   Widget _buildFormPanel() {
-    final scopeEstimate = _currentScopeEstimate();
     return _LeadFormPanel(
       formKey: _formKey,
       fullNameController: _fullNameController,
@@ -800,7 +811,7 @@ class _LandingPageState extends State<LandingPage> {
       submissionError: _submissionError,
       isSubmitting: _isSubmitting,
       submissionSucceeded: _submissionSucceeded,
-      pricingQuote: _currentPricingQuote(scopeEstimate),
+      pricingQuote: _currentPricingQuote(),
       pricingLoadFailed: _pricingLoadFailed,
       entryPilotPriceEur: _pricingCatalog?.entryPilotPriceEur,
       onToggleOption: _toggleOption,
@@ -1144,7 +1155,6 @@ class _LandingIntro extends StatelessWidget {
     );
   }
 }
-
 
 class _DemoReportCallout extends StatelessWidget {
   const _DemoReportCallout({required this.onPressed});
@@ -2306,6 +2316,16 @@ class _PricingSummary extends StatelessWidget {
               if (index > 0) const SizedBox(height: 8),
               _PricingLine(item: quote!.lineItems[index]),
             ],
+          if (quote != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Incluye hasta ${quote!.includedSectors} sectores, '
+              '${quote!.includedProvinces} provincias y '
+              '${quote!.includedCompanyTypes} tipos de empresa. '
+              'Señales y áreas incluidas.',
+              style: textTheme.bodySmall?.copyWith(color: _steel, height: 1.35),
+            ),
+          ],
         ],
       ),
     );
@@ -2321,13 +2341,12 @@ class _PricingLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final suffix = item.isMonthly ? '/mes' : '';
-    final prefix = item.startingAt ? 'Desde ' : '';
     final billingLabel = item.isMonthly ? 'cuota mensual' : 'pago único';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '$prefix${_formatPrice(item.pilotPriceEur)} €$suffix',
+          '${_formatPrice(item.pilotPriceEur)} €$suffix',
           key: ValueKey('pricing-${item.planCode}'),
           style: textTheme.titleLarge?.copyWith(
             color: _ink,
@@ -2344,9 +2363,18 @@ class _PricingLine extends StatelessWidget {
           ),
         ),
         Text(
-          'Estándar: $prefix${_formatPrice(item.standardPriceEur)} €$suffix',
+          'Estándar: ${_formatPrice(item.standardPriceEur)} €$suffix',
           style: textTheme.bodySmall?.copyWith(color: _steel, height: 1.35),
         ),
+        if (item.requiresActivePriorStudy)
+          Text(
+            'Requiere un estudio puntual previo activo del mismo alcance.',
+            style: textTheme.bodySmall?.copyWith(
+              color: _blue,
+              fontWeight: FontWeight.w700,
+              height: 1.35,
+            ),
+          ),
       ],
     );
   }
@@ -2356,7 +2384,10 @@ String _formatPrice(num value) {
   if (value == value.roundToDouble()) {
     return value.toInt().toString();
   }
-  return value.toStringAsFixed(1).replaceAll('.', ',');
+  return value
+      .toStringAsFixed(2)
+      .replaceFirst(RegExp(r'0+$'), '')
+      .replaceAll('.', ',');
 }
 
 class _LeadFormPanel extends StatelessWidget {
@@ -2949,17 +2980,16 @@ class _LeadFormPanel extends StatelessWidget {
                 onToggle: () => onSectionChanged(3),
                 children: [
                   _SelectAllControl(
-                    label: 'Seleccionar todas las necesidades',
+                    label: 'Seleccionar todas las áreas',
                     isSelected: allCommercialNeedsSelected,
                     isEnabled: !isSubmitting,
                     onChanged: onSetAllCommercialNeeds,
                   ),
                   const SizedBox(height: 18),
                   _MultiSelectChipGroup(
-                    title:
-                        '¿Qué necesidades o situaciones comerciales te interesa detectar?',
+                    title: '¿En qué áreas buscas oportunidades de negocio?',
                     helperText:
-                        'Pueden ser explícitas o inferirse razonadamente; no se tratarán como compras confirmadas sin evidencia.',
+                        'Todas están incluidas en la tarifa; selecciona las que encajen con tu oferta.',
                     options: _commercialNeedOptions,
                     selectedValues: commercialNeeds,
                     isEnabled: !isSubmitting,
@@ -2971,7 +3001,7 @@ class _LeadFormPanel extends StatelessWidget {
                     const SizedBox(height: 10),
                     _OtherField(
                       controller: otherNeedController,
-                      label: 'Otra necesidad',
+                      label: 'Otra área de oportunidad',
                       isRequired: true,
                     ),
                   ],
@@ -3104,6 +3134,14 @@ class _LeadFormPanel extends StatelessWidget {
                     onChanged: (label, selected) {
                       onToggleOption(serviceTypes, label, selected);
                     },
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Las revisiones requieren un estudio puntual previo activo del mismo alcance. Si amplías sectores o provincias, primero se presupuesta la ampliación puntual.',
+                    style: textTheme.bodySmall?.copyWith(
+                      color: _steel,
+                      height: 1.45,
+                    ),
                   ),
                   const SizedBox(height: 14),
                   TextFormField(
@@ -4351,19 +4389,43 @@ class LeadRequest {
         .split(RegExp(r'\s+'))
         .where((part) => part.isNotEmpty)
         .toList(growable: false);
-    final firstName = nameParts.isEmpty ? '' : nameParts.first;
-    final lastName = nameParts.length < 2 ? '' : nameParts.skip(1).join(' ');
-    final signalTypes = [
+    final firstName = nameParts.isEmpty ? null : nameParts.first;
+    final lastName = nameParts.length < 2 ? null : nameParts.skip(1).join(' ');
+    final rawSignalTypes = [
       ...investmentSignals,
       ...innovationSignals,
       ...growthSignals,
       ...publicFinanceSignals,
     ];
-    final technologies = prioritySolutions
+    final rawTechnologies = prioritySolutions
         .split(RegExp(r'[\n,;]'))
         .map((value) => value.trim())
         .where((value) => value.isNotEmpty)
         .toList(growable: false);
+    final sectorCodes = _canonicalCodes(
+      targetSectors,
+      _sectorCodeByLabel,
+      fallbackCode: 'other_sector',
+    );
+    final targetCompanyTypeCodes = _canonicalCodes(
+      targetCompanyTypes,
+      _companyTypeCodeByLabel,
+      fallbackCode: 'other_company_type',
+    );
+    final signalTypeCodes = _canonicalCodes(
+      rawSignalTypes,
+      _signalTypeCodeByLabel,
+      fallbackCode: 'other_signal',
+    );
+    final opportunityAreaCodes = _canonicalCodes(
+      commercialNeeds,
+      _opportunityAreaCodeByNeed,
+    );
+    final technologyCodes = _canonicalCodes(
+      rawTechnologies,
+      _technologyCodeByLabel,
+      fallbackCode: rawTechnologies.isEmpty ? null : 'other_technology',
+    );
     final geographies = _buildGeographies();
     final frequency = _requestFrequency();
     final submittedAtIso = submittedAt.toIso8601String();
@@ -4384,10 +4446,47 @@ class LeadRequest {
       competitors: competitors,
       excludedCompanies: excludedCompanies,
     );
+    final requestExtensions = <String, Object?>{
+      'target_revenue_range': targetRevenueRange,
+      'target_employee_range': targetEmployeeRange,
+      'minimum_opportunity_value': minimumOpportunityValue,
+      'target_company_description': targetCompanyDescription,
+      'commercial_needs': commercialNeeds,
+      'recent_case_description': recentCaseDescription,
+      'current_clients': currentClients,
+      'ideal_clients': idealClients,
+      'watchlist_accounts': watchlistAccounts,
+      'competitors': competitors,
+      'excluded_companies': excludedCompanies,
+      'no_buy_reason': noBuyReason,
+      'service_types': serviceTypes,
+      'service_comments': serviceComments,
+      'taxonomy_labels': {
+        'sectors': targetSectors,
+        'target_company_types': targetCompanyTypes,
+        'signal_types': rawSignalTypes,
+        'opportunity_areas': commercialNeeds,
+        'technologies': rawTechnologies,
+      },
+      'research_scope_units': scopeEstimate.units,
+      'research_scope_level': scopeEstimate.level,
+      'research_scope_model_version': ResearchScopeCalculator.modelVersion,
+      if (pricingQuote != null) 'estimated_pricing': pricingQuote!.toJson(),
+    };
 
     return {
       'source': 'induradar_landing',
-      'form_version': 'cliente_v3',
+      'form_version': _webFormVersion,
+      'contract_version': _dataContractVersion,
+      'execution_contract_version': _executionContractVersion,
+      'stack_configuration': _stackConfiguration,
+      'intake_metadata': const {
+        'normalization_target': _dataContractVersion,
+        'submission_id_owner': 'supabase_edge_function_submit_lead',
+        'baseline_mode': 'canonical_fresh',
+        'canonical_output': 'report_json_lossless',
+        'client_default_output': 'light_report',
+      },
       'research_scope_units': scopeEstimate.units,
       'research_scope_level': scopeEstimate.level,
       'research_scope_model_version': ResearchScopeCalculator.modelVersion,
@@ -4398,50 +4497,58 @@ class LeadRequest {
         'first_name': firstName,
         'last_name': lastName,
         'company_name': company,
-        'job_title': jobTitle,
+        'job_title': _nullIfBlank(jobTitle),
         'email': email,
-        'phone': phone,
-        'website': website,
-        'region_city': address,
-        'address': address,
+        'phone': _nullIfBlank(phone),
+        'country': null,
+        'region_city': _nullIfBlank(address),
+        'website': _nullIfBlank(website),
+        'linkedin': null,
+      },
+      'organization_profile': const {
+        'company_type': null,
+        'employee_range': 'unknown',
+        'team_name': null,
       },
       'seller_profile': {
+        'generic_supplier_label': offerDescription,
         'offer': offerDescription,
-        'offer_categories': offerCategories,
+        'value_proposition': null,
         'problems_solved': problemsSolved,
-        'priority_solutions': prioritySolutions,
-        'technologies': technologies,
-        'competitors_or_installed_base': competitors,
+        'industrial_processes': const <String>[],
+        'target_buyer_roles': const <String>[],
+        'technologies': technologyCodes,
+        'minimum_ticket_eur': null,
+        'must_have': targetCompanyDescription.trim().isEmpty
+            ? const <String>[]
+            : <String>[targetCompanyDescription.trim()],
         'exclusions': excludedCompanies,
+        'negative_signals': noBuyReason.trim().isEmpty
+            ? const <String>[]
+            : <String>[noBuyReason.trim()],
+        'competitors_or_installed_base': competitors,
+        'offer_categories': offerCategories,
+        'priority_solutions': prioritySolutions,
+        'technologies_free_text': rawTechnologies,
       },
       'request': {
         'title': 'Solicitud de radar comercial - $company',
-        'sectors': targetSectors,
-        'target_company_types': targetCompanyTypes,
-        'signal_types': signalTypes,
-        'technologies': technologies,
+        'sectors': sectorCodes,
+        'target_company_types': targetCompanyTypeCodes,
+        'opportunity_areas': opportunityAreaCodes,
+        'signal_types': signalTypeCodes,
+        'technologies': technologyCodes,
         'geographies': geographies,
         'description': opportunityTriggerDescription,
+        'cutoff_date': null,
+        'delivery_format': const <String>[],
         'frequency': frequency,
-        'target_revenue_range': targetRevenueRange,
-        'target_employee_range': targetEmployeeRange,
-        'minimum_opportunity_value': minimumOpportunityValue,
-        'target_company_description': targetCompanyDescription,
-        'commercial_needs': commercialNeeds,
-        'recent_case_description': recentCaseDescription,
-        'current_clients': currentClients,
-        'ideal_clients': idealClients,
-        'watchlist_accounts': watchlistAccounts,
-        'competitors': competitors,
-        'excluded_companies': excludedCompanies,
-        'no_buy_reason': noBuyReason,
-        'service_types': serviceTypes,
-        'service_comments': serviceComments,
-        'research_scope_units': scopeEstimate.units,
-        'research_scope_level': scopeEstimate.level,
-        'research_scope_model_version': ResearchScopeCalculator.modelVersion,
-        if (pricingQuote != null) 'estimated_pricing': pricingQuote!.toJson(),
+        'neutral_output': true,
+        'internal_output_authorized': false,
+        'subsectors': const <String>[],
+        'capabilities': const <String>[],
       },
+      'request_extensions': requestExtensions,
       'privacy': {
         'privacy_notice_accepted': privacyAccepted,
         'commercial_contact_consent': marketingConsent,
@@ -4477,7 +4584,12 @@ class LeadRequest {
       'innovation_product_signals': innovationSignals,
       'organization_growth_signals': growthSignals,
       'public_finance_signals': publicFinanceSignals,
-      'signal_types': signalTypes,
+      'signal_types': rawSignalTypes,
+      'canonical_sector_codes': sectorCodes,
+      'canonical_target_company_type_codes': targetCompanyTypeCodes,
+      'canonical_signal_type_codes': signalTypeCodes,
+      'canonical_opportunity_area_codes': opportunityAreaCodes,
+      'canonical_technology_codes': technologyCodes,
       'commercial_needs': commercialNeeds,
       'probable_needs': commercialNeeds,
       'opportunity_trigger_description': opportunityTriggerDescription,
@@ -4540,24 +4652,34 @@ class LeadRequest {
   }
 
   String _requestFrequency() {
-    if (serviceTypes.contains('Alertas prioritarias ante cambios relevantes') ||
-        serviceTypes.contains('Vigilancia continua de cuentas concretas') ||
-        serviceTypes.contains('Vigilancia de un sector') ||
-        serviceTypes.contains('Vigilancia de una zona geográfica') ||
-        serviceTypes.contains('Monitorización de proyectos concretos')) {
-      return 'continuous';
-    }
-    if (serviceTypes.contains('Resumen / informe semanal')) {
+    if (serviceTypes.contains('Revisión semanal')) {
       return 'weekly';
     }
-    if (serviceTypes.contains('Informe mensual')) {
+    if (serviceTypes.any(_monthlyServiceTypes.contains)) {
       return 'monthly';
-    }
-    if (serviceTypes.contains('Informe trimestral')) {
-      return 'quarterly';
     }
     return 'one_off';
   }
+}
+
+String? _nullIfBlank(String value) {
+  final trimmed = value.trim();
+  return trimmed.isEmpty ? null : trimmed;
+}
+
+List<String> _canonicalCodes(
+  Iterable<String> labels,
+  Map<String, String> codesByLabel, {
+  String? fallbackCode,
+}) {
+  final codes = <String>{};
+  for (final label in labels) {
+    final code = codesByLabel[label] ?? fallbackCode;
+    if (code != null) {
+      codes.add(code);
+    }
+  }
+  return codes.toList(growable: false);
 }
 
 class ResearchScopeEstimate {
@@ -4737,6 +4859,123 @@ const _spainByProvince = 'Seleccionar provincias';
 
 const _geographyCountryOptions = [_spainCountry, _portugalCountry];
 const _spainCoverageOptions = [_spainAll, _spainByProvince];
+
+const _sectorCodeByLabel = <String, String>{
+  'Alimentación y bebidas': 'food_beverage',
+  'Química y petroquímica': 'chemicals_petrochemicals',
+  'Farmacéutica, biotecnología y cosmética': 'pharma_biotech_cosmetics',
+  'Cerámica, vidrio y materiales de construcción':
+      'ceramics_glass_building_materials',
+  'Automoción y movilidad': 'automotive_mobility',
+  'Metal, mecanizado y transformación metálica': 'metal_machining',
+  'Maquinaria y bienes de equipo': 'machinery_capital_goods',
+  'Plástico, caucho y materiales compuestos': 'plastics_rubber_composites',
+  'Papel, cartón, impresión y packaging': 'paper_cardboard_printing_packaging',
+  'Textil, calzado y cuero': 'textile_footwear_leather',
+  'Madera y mueble': 'wood_furniture',
+  'Electrónica y material eléctrico': 'electronics_electrical_equipment',
+  'Energía y utilities': 'energy_utilities',
+  'Agua, medioambiente y residuos': 'water_environment_waste',
+  'Logística, almacenamiento y distribución':
+      'logistics_warehousing_distribution',
+  'Minería, cemento y minerales': 'mining_cement_minerals',
+  'Aeroespacial, ferroviario y naval': 'aerospace_rail_naval',
+  'Construcción e infraestructuras': 'construction_infrastructure',
+};
+
+const _companyTypeCodeByLabel = <String, String>{
+  'Fabricante industrial o planta productiva': 'industrial_manufacturer',
+  'Fabricante de maquinaria / OEM': 'machine_builder_oem',
+  'Ingeniería, integrador o EPC': 'engineering_integrator_epc',
+  'Fabricante de componentes': 'component_manufacturer',
+  'Proveedor tecnológico': 'technology_provider',
+  'Distribuidor o suministrador industrial': 'industrial_distributor',
+  'Mantenimiento o servicios industriales': 'industrial_services_maintenance',
+  'Operador logístico': 'logistics_operator',
+  'Constructora / infraestructuras': 'construction_infrastructure_company',
+  'Consultora': 'consultant',
+  'Inversor, fondo o grupo empresarial': 'investor_corporate_group',
+  'Administración u organismo público': 'public_administration',
+  'Centro tecnológico o de investigación': 'technology_research_center',
+};
+
+const _signalTypeCodeByLabel = <String, String>{
+  'Nueva fábrica, planta, nave o centro': 'new_factory',
+  'Ampliación de instalaciones': 'facility_expansion',
+  'Nueva línea de producción': 'new_production_line',
+  'Aumento de capacidad': 'capacity_increase',
+  'Compra o renovación de maquinaria/equipos': 'machinery_purchase_renewal',
+  'Modernización de instalaciones': 'maintenance_modernization',
+  'Nueva instalación logística o almacén': 'industrial_real_estate_move',
+  'Nuevo producto o gama': 'product_machine_redesign',
+  'Nuevo diseño, formato o aplicación': 'product_machine_redesign',
+  'Presentación o lanzamiento en feria': 'fair_product_launch',
+  'Contratación de perfiles de I+D / ingeniería': 'key_hiring',
+  'Nuevo directivo o responsable': 'new_executive',
+  'Crecimiento significativo de plantilla': 'key_hiring',
+  'Expansión geográfica / internacional': 'international_expansion',
+  'Fusión': 'merger_acquisition_ownership_change',
+  'Adquisición': 'merger_acquisition_ownership_change',
+  'Cambio de propiedad': 'merger_acquisition_ownership_change',
+  'Nueva alianza o acuerdo estratégico': 'strategic_partnership',
+  'Subvención o ayuda concedida': 'grant_public_aid',
+  'Licitación o concurso': 'tender_procurement',
+  'Adjudicación': 'tender_procurement',
+  'Contrato público': 'tender_procurement',
+  'Incentivo fiscal o financiación pública relevante': 'grant_public_aid',
+};
+
+const _opportunityAreaCodeByNeed = <String, String>{
+  'Maquinaria y automatización': 'machinery_automation',
+  'Energía y descarbonización': 'energy_decarbonization',
+  'Instalaciones industriales': 'industrial_facilities',
+  'Construcción e infraestructuras': 'construction_infrastructure',
+  'Logística e intralogística': 'logistics_intralogistics',
+  'Mantenimiento industrial': 'industrial_maintenance',
+  'Digitalización e Industria 4.0': 'digitalization_industry_4',
+  'Calidad, inspección y laboratorio': 'quality_inspection_laboratory',
+  'Medioambiente y residuos': 'environment_waste',
+  'Seguridad industrial': 'industrial_safety',
+  'Packaging y final de línea': 'packaging_end_of_line',
+  'Componentes y suministros': 'components_supplies',
+  'Ingeniería e integración': 'engineering_integration',
+  'Servicios ligados a inversión industrial': 'industrial_investment_services',
+  'Inmobiliario industrial': 'industrial_real_estate',
+  'Telecomunicaciones e IT industrial': 'industrial_it_telecom',
+  'Movilidad industrial y flotas': 'industrial_mobility_fleets',
+  'Recursos humanos industriales': 'industrial_human_resources',
+  'Limpieza, higiene y servicios auxiliares': 'cleaning_hygiene_auxiliary',
+  'Materias primas y consumibles': 'raw_materials_consumables',
+};
+
+const _technologyCodeByLabel = <String, String>{
+  'Automatización y control': 'automation_control',
+  'Automatización industrial': 'automation_control',
+  'PLC, HMI y SCADA': 'plc_hmi_scada',
+  'Robótica y cobots': 'robotics_cobots',
+  'Robótica': 'robotics_cobots',
+  'Motion, servos y variadores': 'motion_servos_drives',
+  'Visión e inspección': 'machine_vision_inspection',
+  'Visión artificial': 'machine_vision_inspection',
+  'Seguridad de máquinas y procesos': 'machine_process_safety',
+  'Sensórica e instrumentación': 'sensors_instrumentation',
+  'Identificación y trazabilidad': 'identification_traceability',
+  'IIoT, conectividad y Edge': 'iiot_connectivity_edge',
+  'Datos, IA y analítica': 'industrial_data_ai_analytics',
+  'Mantenimiento predictivo': 'predictive_maintenance',
+  'Gestión energética': 'energy_management',
+  'Electrificación y descarbonización': 'electrification_decarbonization',
+  'Hidrógeno y nuevas energías': 'hydrogen_new_energy',
+  'Intralogística, AGV y AMR': 'agv_amr_intralogistics',
+  'Almacenamiento automático': 'automated_storage',
+  'Ciberseguridad industrial': 'industrial_cybersecurity',
+  'Control de procesos, temperatura y combustión':
+      'process_temperature_combustion',
+  'Neumática, hidráulica y mecánica': 'pneumatics_hydraulics_mechanics',
+  'Componentes eléctricos/electrónicos': 'electrical_electronic_components',
+  'Software industrial': 'industrial_software',
+  'Ingeniería e integración': 'engineering_integration',
+};
 
 const _spanishProvinceOptions = [
   'A Coruña',
@@ -4931,32 +5170,45 @@ const _publicFinanceSignalOptions = [
 ];
 
 const _commercialNeedOptions = [
-  'Problemas de calidad, rechazo o mermas',
-  'Problemas de capacidad o productividad',
-  'Paradas, averías o problemas de fiabilidad',
-  'Obsolescencia de maquinaria, productos o procesos',
-  'Cambio o búsqueda de proveedor',
-  'Problemas o falta de suministro',
-  'Cambio de materias primas, materiales o formulaciones',
-  'Necesidad de reducir costes',
-  'Necesidad de reducir consumo energético',
-  'Necesidad de reducir agua, residuos o emisiones',
-  'Nuevas exigencias normativas',
-  'Nuevas exigencias de clientes o certificaciones',
-  'Necesidad de mejorar seguridad',
-  'Necesidad de digitalización o trazabilidad',
-  'Necesidad de aumentar capacidad',
+  'Maquinaria y automatización',
+  'Energía y descarbonización',
+  'Instalaciones industriales',
+  'Construcción e infraestructuras',
+  'Logística e intralogística',
+  'Mantenimiento industrial',
+  'Digitalización e Industria 4.0',
+  'Calidad, inspección y laboratorio',
+  'Medioambiente y residuos',
+  'Seguridad industrial',
+  'Packaging y final de línea',
+  'Componentes y suministros',
+  'Ingeniería e integración',
+  'Servicios ligados a inversión industrial',
+  'Inmobiliario industrial',
+  'Telecomunicaciones e IT industrial',
+  'Movilidad industrial y flotas',
+  'Recursos humanos industriales',
+  'Limpieza, higiene y servicios auxiliares',
+  'Materias primas y consumibles',
   _otherNeedOption,
 ];
 
 const _serviceTypeOptions = [
   'Estudio puntual',
-  'Resumen / informe semanal',
-  'Informe mensual',
-  'Informe trimestral',
+  'Revisión semanal',
+  'Revisión mensual',
   'Vigilancia continua de cuentas concretas',
   'Vigilancia de un sector',
   'Vigilancia de una zona geográfica',
   'Monitorización de proyectos concretos',
   'Alertas prioritarias ante cambios relevantes',
 ];
+
+const _monthlyServiceTypes = <String>{
+  'Revisión mensual',
+  'Vigilancia continua de cuentas concretas',
+  'Vigilancia de un sector',
+  'Vigilancia de una zona geográfica',
+  'Monitorización de proyectos concretos',
+  'Alertas prioritarias ante cambios relevantes',
+};

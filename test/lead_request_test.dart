@@ -3,7 +3,7 @@ import 'package:induradarweb/main.dart';
 import 'package:induradarweb/pricing.dart';
 
 void main() {
-  test('LeadRequest preserves compatible name and geography fields', () {
+  test('LeadRequest emits contract 1.3.2 and preserves form extensions', () {
     final request = LeadRequest(
       fullName: 'Ana Pérez Gómez',
       company: 'Industria Ejemplo',
@@ -24,42 +24,49 @@ void main() {
       targetRevenueRange: '10-50 M€',
       targetEmployeeRange: '101-500 empleados',
       minimumOpportunityValue: '> 25.000 €',
-      targetCompanyDescription: '',
-      investmentSignals: const [],
+      targetCompanyDescription: 'Decisión local',
+      investmentSignals: const ['Nueva línea de producción'],
       innovationSignals: const [],
       growthSignals: const [],
       publicFinanceSignals: const [],
-      commercialNeeds: const [],
+      commercialNeeds: const ['Digitalización e Industria 4.0'],
       opportunityTriggerDescription: 'Una nueva línea de producción.',
-      recentCaseDescription: '',
-      currentClients: const [],
-      idealClients: const [],
-      watchlistAccounts: const [],
-      competitors: const [],
-      excludedCompanies: const [],
-      noBuyReason: '',
-      serviceTypes: const [],
-      serviceComments: '',
+      recentCaseDescription: 'Caso de ampliación reciente.',
+      currentClients: const ['Cliente actual'],
+      idealClients: const ['Cliente competidor'],
+      watchlistAccounts: const ['Cuenta estratégica'],
+      competitors: const ['Competidor'],
+      excludedCompanies: const ['Empresa excluida'],
+      noBuyReason: 'Tecnología incompatible',
+      serviceTypes: const ['Estudio puntual'],
+      serviceComments: 'Entrega prioritaria.',
       privacyAccepted: true,
       marketingConsent: false,
-      submittedAt: DateTime.utc(2026, 8, 17),
+      submittedAt: DateTime.utc(2026, 9, 3),
       pricingQuote: const PricingQuote(
-        catalogVersion: '1.0.0',
+        catalogVersion: '2.0.0',
+        pricingModel: 'transparent_scope_v2',
         currency: 'EUR',
         pilotLabel: 'Piloto -50 %',
-        researchUnits: 145,
-        billableResearchUnits: 145,
+        pilotDiscountRate: 0.5,
+        sectorCount: 1,
+        provinceCount: 2,
+        includedSectors: 3,
+        includedProvinces: 3,
+        includedCompanyTypes: 2,
+        sectorSupplementEur: 0,
+        provinceSupplementEur: 0,
+        expansionRule: 'Regla de ampliación',
         lineItems: [
           PricingLineItem(
             planCode: 'one_off',
             planLabel: 'Estudio puntual',
             billingPeriod: 'one_time',
-            standardPriceEur: 179,
-            pilotPriceEur: 89,
-            startingAt: false,
-            tierMinimumRu: 101,
-            tierMaximumRu: 175,
-            example: 'Provincia/CCAA, más señales o tipos de empresa',
+            basePriceEur: 99,
+            scopeSupplementEur: 0,
+            standardPriceEur: 99,
+            pilotPriceEur: 49.5,
+            requiresActivePriorStudy: false,
           ),
         ],
       ),
@@ -67,52 +74,75 @@ void main() {
 
     final json = request.toJson();
 
+    expect(json['form_version'], '3.13.1');
+    expect(json['contract_version'], '1.3.2');
+    expect(json['execution_contract_version'], '1.12.3');
+    expect(json, isNot(contains('submission_id')));
+    expect(
+      json['intake_metadata'],
+      containsPair('submission_id_owner', 'supabase_edge_function_submit_lead'),
+    );
+
     expect(json['full_name'], 'Ana Pérez Gómez');
     expect(json['first_name'], 'Ana');
     expect(json['last_name'], 'Pérez Gómez');
     expect(json['address'], 'Calle Mayor 1, Castellón');
-    expect(json['city_province'], 'Calle Mayor 1, Castellón');
     expect(json['geography_countries'], ['España', 'Portugal']);
     expect(json['geography_spain_scope'], 'Seleccionar provincias');
     expect(json['geography_provinces'], ['Castellón', 'Valencia']);
-    expect(json['geography_regions'], isEmpty);
-    expect(json['geography_free_zone'], '');
-    expect(json['research_scope_units'], 145);
-    expect(json['research_scope_level'], 'Medio');
     expect(
       json['research_scope_model_version'],
       'InduRadar_Calculadora_Alcance_RU_v1',
     );
 
-    expect(json, isNot(contains('submission_id')));
     expect(json['contact'], {
       'first_name': 'Ana',
       'last_name': 'Pérez Gómez',
       'company_name': 'Industria Ejemplo',
       'job_title': 'Dirección comercial',
       'email': 'ana@example.com',
-      'phone': '',
-      'website': 'https://example.com',
+      'phone': null,
+      'country': null,
       'region_city': 'Calle Mayor 1, Castellón',
-      'address': 'Calle Mayor 1, Castellón',
+      'website': 'https://example.com',
+      'linkedin': null,
+    });
+    expect(json['organization_profile'], {
+      'company_type': null,
+      'employee_range': 'unknown',
+      'team_name': null,
     });
 
     final sellerProfile = json['seller_profile'] as Map<String, Object?>;
+    expect(
+      sellerProfile['generic_supplier_label'],
+      'Automatización industrial',
+    );
     expect(sellerProfile['offer'], 'Automatización industrial');
-    expect(sellerProfile['technologies'], ['Robótica', 'Visión artificial']);
+    expect(sellerProfile['technologies'], [
+      'robotics_cobots',
+      'machine_vision_inspection',
+    ]);
+    expect(sellerProfile['must_have'], ['Decisión local']);
+    expect(sellerProfile['negative_signals'], ['Tecnología incompatible']);
 
     final nestedRequest = json['request'] as Map<String, Object?>;
     expect(
       nestedRequest['title'],
       'Solicitud de radar comercial - Industria Ejemplo',
     );
-    expect(nestedRequest['sectors'], ['Maquinaria y bienes de equipo']);
-    expect(nestedRequest['target_company_types'], [
-      'Fabricante de maquinaria / OEM',
+    expect(nestedRequest['sectors'], ['machinery_capital_goods']);
+    expect(nestedRequest['target_company_types'], ['machine_builder_oem']);
+    expect(nestedRequest['opportunity_areas'], ['digitalization_industry_4']);
+    expect(nestedRequest['signal_types'], ['new_production_line']);
+    expect(nestedRequest['technologies'], [
+      'robotics_cobots',
+      'machine_vision_inspection',
     ]);
-    expect(nestedRequest['signal_types'], isEmpty);
-    expect(nestedRequest['technologies'], ['Robótica', 'Visión artificial']);
     expect(nestedRequest['frequency'], 'one_off');
+    expect(nestedRequest['delivery_format'], isEmpty);
+    expect(nestedRequest['neutral_output'], isTrue);
+    expect(nestedRequest['internal_output_authorized'], isFalse);
     expect(nestedRequest['description'], 'Una nueva línea de producción.');
     expect(nestedRequest['geographies'], [
       {
@@ -144,36 +174,46 @@ void main() {
       },
     ]);
 
+    final extensions = json['request_extensions'] as Map<String, Object?>;
+    expect(extensions['target_revenue_range'], '10-50 M€');
+    expect(extensions['target_employee_range'], '101-500 empleados');
+    expect(extensions['current_clients'], ['Cliente actual']);
+    expect(extensions['service_comments'], 'Entrega prioritaria.');
+    expect(extensions['estimated_pricing'], json['pricing']);
+
     expect(json['privacy'], {
       'privacy_notice_accepted': true,
       'commercial_contact_consent': false,
-      'accepted_at': '2026-08-17T00:00:00.000Z',
+      'accepted_at': '2026-09-03T00:00:00.000Z',
     });
-    expect(json['pricing'], {
-      'catalog_version': '1.0.0',
-      'currency': 'EUR',
-      'price_type': 'pilot',
-      'price_label': 'Piloto -50 %',
-      'research_scope_units': 145,
-      'billable_research_scope_units': 145,
-      'line_items': [
-        {
-          'plan_code': 'one_off',
-          'plan_label': 'Estudio puntual',
-          'billing_period': 'one_time',
-          'standard_price_eur': 179,
-          'pilot_price_eur': 89,
-          'starting_at': false,
-          'tier_minimum_ru': 101,
-          'tier_maximum_ru': 175,
-          'example': 'Provincia/CCAA, más señales o tipos de empresa',
-        },
-      ],
-    });
+    final pricing = json['pricing'] as Map<String, Object?>;
+    expect(pricing['pricing_model'], 'transparent_scope_v2');
+    expect(pricing, isNot(contains('research_scope_units')));
     expect(
-      (json['request'] as Map<String, Object?>)['estimated_pricing'],
-      json['pricing'],
+      (pricing['line_items'] as List).single,
+      containsPair('pilot_price_eur', 49.5),
     );
+  });
+
+  test('unknown custom taxonomy values use canonical fallback codes', () {
+    final request = _minimalRequest(
+      targetSectors: const ['Sector muy específico'],
+      targetCompanyTypes: const ['Organización especial'],
+      investmentSignals: const ['Señal personalizada'],
+      prioritySolutions: 'Solución propietaria',
+    );
+
+    final json = request.toJson();
+    final nestedRequest = json['request'] as Map<String, Object?>;
+    expect(nestedRequest['sectors'], ['other_sector']);
+    expect(nestedRequest['target_company_types'], ['other_company_type']);
+    expect(nestedRequest['signal_types'], ['other_signal']);
+    expect(nestedRequest['technologies'], ['other_technology']);
+
+    final extensions = json['request_extensions'] as Map<String, Object?>;
+    final labels = extensions['taxonomy_labels'] as Map<String, Object?>;
+    expect(labels['sectors'], ['Sector muy específico']);
+    expect(labels['signal_types'], ['Señal personalizada']);
   });
 
   test('ResearchScopeCalculator reproduces the 128 RU workbook example', () {
@@ -222,6 +262,54 @@ void main() {
     );
     expect(_scopeForGeography(const ['Portugal'], null, const []).units, 100);
   });
+}
+
+LeadRequest _minimalRequest({
+  List<String> targetSectors = const ['Maquinaria y bienes de equipo'],
+  List<String> targetCompanyTypes = const ['Fabricante de maquinaria / OEM'],
+  List<String> investmentSignals = const [],
+  String prioritySolutions = '',
+}) {
+  return LeadRequest(
+    fullName: 'Ana Pérez',
+    company: 'Empresa',
+    jobTitle: '',
+    email: 'ana@example.com',
+    phone: '',
+    website: '',
+    address: '',
+    offerDescription: 'Automatización',
+    offerCategories: const [],
+    problemsSolved: const [],
+    prioritySolutions: prioritySolutions,
+    targetSectors: targetSectors,
+    targetCompanyTypes: targetCompanyTypes,
+    geographyCountries: const ['España'],
+    spainCoverage: 'Toda España',
+    geographyProvinces: const [],
+    targetRevenueRange: null,
+    targetEmployeeRange: null,
+    minimumOpportunityValue: null,
+    targetCompanyDescription: '',
+    investmentSignals: investmentSignals,
+    innovationSignals: const [],
+    growthSignals: const [],
+    publicFinanceSignals: const [],
+    commercialNeeds: const [],
+    opportunityTriggerDescription: 'Descripción de la oportunidad.',
+    recentCaseDescription: '',
+    currentClients: const [],
+    idealClients: const [],
+    watchlistAccounts: const [],
+    competitors: const [],
+    excludedCompanies: const [],
+    noBuyReason: '',
+    serviceTypes: const [],
+    serviceComments: '',
+    privacyAccepted: true,
+    marketingConsent: false,
+    submittedAt: DateTime.utc(2026, 9, 3),
+  );
 }
 
 ResearchScopeEstimate _scopeForGeography(
