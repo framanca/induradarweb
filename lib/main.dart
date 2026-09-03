@@ -210,7 +210,7 @@ class _LandingPageState extends State<LandingPage> {
   String? _successMessage;
   String? _submissionError;
   int _sectionScrollRequest = 0;
-  bool _showTargetSelectionErrors = false;
+  bool _showSelectionErrors = false;
 
   bool get _isSubmitting => _submissionState == LeadSubmissionState.submitting;
 
@@ -345,7 +345,7 @@ class _LandingPageState extends State<LandingPage> {
     }
 
     setState(() {
-      _showTargetSelectionErrors = true;
+      _showSelectionErrors = true;
       _privacyError = _privacyAccepted
           ? null
           : 'Necesitamos tu consentimiento para responderte.';
@@ -355,14 +355,16 @@ class _LandingPageState extends State<LandingPage> {
     });
 
     final isFormValid = _formKey.currentState?.validate() ?? false;
-    final hasRequiredTargetSelections =
-        _targetSectors.isNotEmpty && _targetCompanyTypes.isNotEmpty;
-    if (!isFormValid || !hasRequiredTargetSelections || _privacyError != null) {
+    final hasRequiredSelections =
+        _offerCategories.isNotEmpty &&
+        _targetSectors.isNotEmpty &&
+        _targetCompanyTypes.isNotEmpty;
+    if (!isFormValid || !hasRequiredSelections || _privacyError != null) {
       setState(() {
         _expandedSectionIndex = _firstInvalidSectionIndex();
       });
     }
-    if (!isFormValid || !hasRequiredTargetSelections || _privacyError != null) {
+    if (!isFormValid || !hasRequiredSelections || _privacyError != null) {
       return;
     }
 
@@ -553,7 +555,7 @@ class _LandingPageState extends State<LandingPage> {
       _submissionError = null;
       _successMessage = null;
       _submissionState = LeadSubmissionState.idle;
-      _showTargetSelectionErrors = false;
+      _showSelectionErrors = false;
     });
     _isResettingForm = false;
   }
@@ -570,6 +572,7 @@ class _LandingPageState extends State<LandingPage> {
         _fullNameController.text.trim().isEmpty ||
         _companyController.text.trim().isEmpty ||
         !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email) ||
+        _offerCategories.isEmpty ||
         (_offerCategories.contains(_otherOfferCategoryOption) &&
             _otherOfferCategoryController.text.trim().isEmpty) ||
         (_problemsSolved.contains(_otherProblemOption) &&
@@ -614,6 +617,7 @@ class _LandingPageState extends State<LandingPage> {
             _fullNameController.text.trim().isNotEmpty &&
             _companyController.text.trim().isNotEmpty &&
             RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email) &&
+            _offerCategories.isNotEmpty &&
             (!_offerCategories.contains(_otherOfferCategoryOption) ||
                 _otherOfferCategoryController.text.trim().isNotEmpty) &&
             (!_problemsSolved.contains(_otherProblemOption) ||
@@ -802,7 +806,7 @@ class _LandingPageState extends State<LandingPage> {
       spainCoverage: _spainCoverage,
       expandedSectionIndex: _expandedSectionIndex,
       sectionHeaderKeys: _sectionHeaderKeys,
-      showTargetSelectionErrors: _showTargetSelectionErrors,
+      showSelectionErrors: _showSelectionErrors,
       completedSections: List<bool>.generate(5, _isSectionComplete),
       privacyAccepted: _privacyAccepted,
       marketingConsent: _marketingConsent,
@@ -853,10 +857,13 @@ class _LandingPageState extends State<LandingPage> {
 
   void _openFormSection(int index) {
     final scrollRequest = ++_sectionScrollRequest;
-    if (_expandedSectionIndex != index) {
-      setState(() {
-        _expandedSectionIndex = index;
-      });
+    final isClosing = _expandedSectionIndex == index;
+    setState(() {
+      _expandedSectionIndex = isClosing ? -1 : index;
+    });
+    if (isClosing) {
+      FocusManager.instance.primaryFocus?.unfocus();
+      return;
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && scrollRequest == _sectionScrollRequest) {
@@ -2436,7 +2443,7 @@ class _LeadFormPanel extends StatelessWidget {
     required this.spainCoverage,
     required this.expandedSectionIndex,
     required this.sectionHeaderKeys,
-    required this.showTargetSelectionErrors,
+    required this.showSelectionErrors,
     required this.completedSections,
     required this.privacyAccepted,
     required this.marketingConsent,
@@ -2509,7 +2516,7 @@ class _LeadFormPanel extends StatelessWidget {
   final String? spainCoverage;
   final int expandedSectionIndex;
   final List<GlobalKey> sectionHeaderKeys;
-  final bool showTargetSelectionErrors;
+  final bool showSelectionErrors;
   final List<bool> completedSections;
   final bool privacyAccepted;
   final bool marketingConsent;
@@ -2723,14 +2730,20 @@ class _LeadFormPanel extends StatelessWidget {
                     title: 'Afinar tu oferta',
                     description:
                         'Categorías, problemas que resuelves y soluciones prioritarias.',
+                    showOptionalLabel: false,
                     forceExpanded:
+                        (showSelectionErrors && offerCategories.isEmpty) ||
                         (offerCategories.contains(_otherOfferCategoryOption) &&
                             otherOfferCategoryController.text.trim().isEmpty) ||
                         (problemsSolved.contains(_otherProblemOption) &&
                             otherProblemController.text.trim().isEmpty),
                     children: [
                       _MultiSelectChipGroup(
-                        title: 'Categoría principal de tu oferta',
+                        title: 'Categoría principal de tu oferta *',
+                        errorText:
+                            showSelectionErrors && offerCategories.isEmpty
+                            ? 'Selecciona al menos una categoría de oferta.'
+                            : null,
                         options: _offerCategoryOptions,
                         selectedValues: offerCategories,
                         isEnabled: !isSubmitting,
@@ -2796,8 +2809,7 @@ class _LeadFormPanel extends StatelessWidget {
                 children: [
                   _MultiSelectChipGroup(
                     title: 'Sectores objetivo',
-                    errorText:
-                        showTargetSelectionErrors && targetSectors.isEmpty
+                    errorText: showSelectionErrors && targetSectors.isEmpty
                         ? 'Selecciona al menos un sector objetivo.'
                         : null,
                     options: _targetSectorOptions,
@@ -2818,8 +2830,7 @@ class _LeadFormPanel extends StatelessWidget {
                   const SizedBox(height: 18),
                   _MultiSelectChipGroup(
                     title: 'Tipo de empresa objetivo',
-                    errorText:
-                        showTargetSelectionErrors && targetCompanyTypes.isEmpty
+                    errorText: showSelectionErrors && targetCompanyTypes.isEmpty
                         ? 'Selecciona al menos un tipo de empresa objetivo.'
                         : null,
                     options: _targetCompanyTypeOptions,
@@ -2973,7 +2984,7 @@ class _LeadFormPanel extends StatelessWidget {
               _FormSection(
                 sectionId: 'needs',
                 headerAnchorKey: sectionHeaderKeys[3],
-                title: '4. ¿Qué oportunidades te interesan?',
+                title: '4. ¿Qué necesidades quieres detectar?',
                 isLocked: submissionSucceeded,
                 isExpanded: expandedSectionIndex == 3,
                 isComplete: completedSections[3],
@@ -2987,9 +2998,10 @@ class _LeadFormPanel extends StatelessWidget {
                   ),
                   const SizedBox(height: 18),
                   _MultiSelectChipGroup(
-                    title: '¿En qué áreas buscas oportunidades de negocio?',
+                    title:
+                        '¿En qué áreas de oportunidad quieres clasificar los resultados?',
                     helperText:
-                        'Todas están incluidas en la tarifa; selecciona las que encajen con tu oferta.',
+                        'La sección 2 define en qué empresas buscar; aquí defines qué necesidades podrían encajar con tu oferta. Todas están incluidas en la tarifa.',
                     options: _commercialNeedOptions,
                     selectedValues: commercialNeeds,
                     isEnabled: !isSubmitting,
@@ -3290,10 +3302,7 @@ class _FormSection extends StatelessWidget {
                   ),
                   subtitle: Padding(
                     padding: const EdgeInsets.only(top: 3),
-                    child: _SectionStatus(
-                      isExpanded: isExpanded,
-                      isComplete: isComplete,
-                    ),
+                    child: _SectionStatus(isComplete: isComplete),
                   ),
                   trailing: AnimatedRotation(
                     turns: isExpanded ? 0.5 : 0,
@@ -3353,40 +3362,34 @@ class _FormSection extends StatelessWidget {
 }
 
 class _SectionStatus extends StatelessWidget {
-  const _SectionStatus({required this.isExpanded, required this.isComplete});
+  const _SectionStatus({required this.isComplete});
 
-  final bool isExpanded;
   final bool isComplete;
 
   @override
   Widget build(BuildContext context) {
-    final label = isExpanded
-        ? 'En curso'
-        : isComplete
-        ? 'Completo'
-        : 'Pendiente';
-    final color = isExpanded
-        ? _blue
-        : isComplete
-        ? _success
-        : _steel;
+    final label = isComplete
+        ? 'Datos obligatorios completos'
+        : 'Faltan datos obligatorios';
+    final color = isComplete ? _success : _steel;
 
     return Row(
-      mainAxisSize: MainAxisSize.min,
       children: [
         Icon(
-          isComplete && !isExpanded
-              ? Icons.check_circle_outline
-              : Icons.circle_outlined,
+          isComplete ? Icons.check_circle_outline : Icons.info_outline,
           size: 13,
           color: color,
         ),
         const SizedBox(width: 5),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: color,
-            fontWeight: FontWeight.w700,
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 2,
+            softWrap: true,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ],
@@ -3400,12 +3403,14 @@ class _OptionalFields extends StatefulWidget {
     required this.description,
     required this.children,
     this.forceExpanded = false,
+    this.showOptionalLabel = true,
   });
 
   final String title;
   final String description;
   final List<Widget> children;
   final bool forceExpanded;
+  final bool showOptionalLabel;
 
   @override
   State<_OptionalFields> createState() => _OptionalFieldsState();
@@ -3441,7 +3446,9 @@ class _OptionalFieldsState extends State<_OptionalFields> {
               child: ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 14),
                 title: Text(
-                  '${widget.title} (opcional)',
+                  widget.showOptionalLabel
+                      ? '${widget.title} (opcional)'
+                      : widget.title,
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     color: _ink,
                     fontWeight: FontWeight.w800,
@@ -4857,7 +4864,7 @@ const _portugalCountry = 'Portugal';
 const _spainAll = 'Toda España';
 const _spainByProvince = 'Seleccionar provincias';
 
-const _geographyCountryOptions = [_spainCountry, _portugalCountry];
+const _geographyCountryOptions = [_portugalCountry, _spainCountry];
 const _spainCoverageOptions = [_spainAll, _spainByProvince];
 
 const _sectorCodeByLabel = <String, String>{

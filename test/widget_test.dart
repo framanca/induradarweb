@@ -19,6 +19,26 @@ void _setTestViewSize(WidgetTester tester, Size size) {
   });
 }
 
+Future<void> _selectOfferCategory(WidgetTester tester) async {
+  await tester.ensureVisible(
+    find.byKey(const ValueKey('form-section-header-company-offer')),
+  );
+  await tester.tap(
+    find.byKey(const ValueKey('form-section-header-company-offer')),
+  );
+  await tester.pumpAndSettle();
+  await tester.ensureVisible(find.text('Afinar tu oferta'));
+  await tester.tap(find.text('Afinar tu oferta'));
+  await tester.pumpAndSettle();
+  final category = find.widgetWithText(
+    CheckboxListTile,
+    'Tecnología, automatización y software',
+  );
+  await tester.ensureVisible(category);
+  await tester.tap(category);
+  await tester.pump();
+}
+
 void main() {
   testWidgets('Landing page renders lead form', (WidgetTester tester) async {
     await tester.pumpWidget(const InduRadarApp());
@@ -31,7 +51,7 @@ void main() {
     expect(find.text('1. ¿Qué vendes?'), findsOneWidget);
     expect(find.text('2. ¿Qué empresas buscas?'), findsOneWidget);
     expect(find.text('3. ¿Qué cambios quieres detectar?'), findsOneWidget);
-    expect(find.text('4. ¿Qué oportunidades te interesan?'), findsOneWidget);
+    expect(find.text('4. ¿Qué necesidades quieres detectar?'), findsOneWidget);
     expect(
       find.text('5. ¿Cómo quieres recibir los resultados?'),
       findsOneWidget,
@@ -149,6 +169,12 @@ void main() {
     expect(targetHeaderTop, inInclusiveRange(0, 60));
     expect(firstLineTop, greaterThan(targetHeaderTop));
     expect(firstLineTop, lessThan(260));
+
+    await tester.tap(
+      find.byKey(const ValueKey('form-section-header-target-company')),
+    );
+    await tester.pumpAndSettle();
+    expect(sectionHeightFactor('target-company'), 0);
   });
 
   testWidgets('Company section starts with offer and required contact fields', (
@@ -180,6 +206,46 @@ void main() {
       tester.getTopLeft(company).dy,
       lessThan(tester.getTopLeft(email).dy),
     );
+  });
+
+  testWidgets('Offer category is required', (WidgetTester tester) async {
+    _setTestViewSize(tester, const Size(1400, 1000));
+    await tester.pumpWidget(
+      MaterialApp(home: LandingPage(pricingCatalog: _testPricingCatalog)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, '¿Qué ofrece tu empresa? *'),
+      'Automatización industrial',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Nombre y apellidos *'),
+      'Ana Pérez',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Empresa *'),
+      'Industria Ejemplo',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Email profesional *'),
+      'ana@example.com',
+    );
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('form-section-header-service')),
+    );
+    await tester.tap(find.byKey(const ValueKey('form-section-header-service')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('primary-form-cta')));
+    await tester.tap(find.byKey(const ValueKey('primary-form-cta')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Selecciona al menos una categoría de oferta.'),
+      findsOneWidget,
+    );
+    expect(find.text('Paso 1 de 5'), findsOneWidget);
   });
 
   testWidgets('Price reacts to sectors and provinces by service type', (
@@ -265,6 +331,8 @@ void main() {
     await tester.pumpWidget(const InduRadarApp());
     await tester.pumpAndSettle();
 
+    await _selectOfferCategory(tester);
+
     await tester.enterText(
       find.widgetWithText(TextFormField, '¿Qué ofrece tu empresa? *'),
       'Automatización industrial',
@@ -293,7 +361,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('form-section-header-company-offer')),
-        matching: find.text('Completo'),
+        matching: find.text('Datos obligatorios completos'),
       ),
       findsOneWidget,
     );
@@ -315,6 +383,13 @@ void main() {
       find.byKey(const ValueKey('form-section-header-target-company')),
     );
     await tester.pumpAndSettle();
+    final portugalTop = tester
+        .getTopLeft(find.widgetWithText(CheckboxListTile, 'Portugal'))
+        .dy;
+    final spainTop = tester
+        .getTopLeft(find.widgetWithText(CheckboxListTile, 'España'))
+        .dy;
+    expect(portugalTop, lessThan(spainTop));
     await tester.ensureVisible(find.widgetWithText(CheckboxListTile, 'España'));
     await tester.tap(find.widgetWithText(CheckboxListTile, 'España'));
     await tester.pumpAndSettle();
@@ -338,6 +413,8 @@ void main() {
       MaterialApp(home: LandingPage(pricingCatalog: _testPricingCatalog)),
     );
     await tester.pumpAndSettle();
+
+    await _selectOfferCategory(tester);
 
     await tester.enterText(
       find.widgetWithText(TextFormField, '¿Qué ofrece tu empresa? *'),
@@ -529,6 +606,8 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+
+    await _selectOfferCategory(tester);
 
     await tester.enterText(
       find.widgetWithText(TextFormField, '¿Qué ofrece tu empresa? *'),
