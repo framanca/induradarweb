@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:induradarweb/main.dart';
-import 'package:induradarweb/pricing.dart';
+import 'package:induradarweb/credits.dart';
 
 void main() {
   test('LeadRequest emits contract 1.3.2 and preserves form extensions', () {
@@ -43,32 +43,21 @@ void main() {
       privacyAccepted: true,
       marketingConsent: false,
       submittedAt: DateTime.utc(2026, 9, 3),
-      pricingQuote: const PricingQuote(
-        catalogVersion: '2.0.0',
-        pricingModel: 'transparent_scope_v2',
-        currency: 'EUR',
-        pilotLabel: 'Piloto -50 %',
-        pilotDiscountRate: 0.5,
+      creditsQuote: const CreditsQuote(
+        catalogVersion: '1.0.0',
+        creditsModel: 'report_scope_credits_v1',
+        unit: 'credits',
+        baseCredits: 50,
         sectorCount: 1,
         provinceCount: 2,
-        includedSectors: 3,
-        includedProvinces: 3,
-        includedCompanyTypes: 2,
-        sectorSupplementEur: 0,
-        provinceSupplementEur: 0,
-        expansionRule: 'Regla de ampliación',
-        lineItems: [
-          PricingLineItem(
-            planCode: 'one_off',
-            planLabel: 'Estudio puntual',
-            billingPeriod: 'one_time',
-            basePriceEur: 99,
-            scopeSupplementEur: 0,
-            standardPriceEur: 99,
-            pilotPriceEur: 49.5,
-            requiresActivePriorStudy: false,
-          ),
-        ],
+        signalCount: 1,
+        includedSectors: 1,
+        includedProvinces: 1,
+        includedSignals: 5,
+        sectorCredits: 0,
+        provinceCredits: 15,
+        signalCredits: 0,
+        totalCredits: 65,
       ),
     );
 
@@ -179,20 +168,17 @@ void main() {
     expect(extensions['target_employee_range'], '101-500 empleados');
     expect(extensions['current_clients'], ['Cliente actual']);
     expect(extensions['service_comments'], 'Entrega prioritaria.');
-    expect(extensions['estimated_pricing'], json['pricing']);
+    expect(extensions['estimated_credits'], json['credits']);
 
     expect(json['privacy'], {
       'privacy_notice_accepted': true,
       'commercial_contact_consent': false,
       'accepted_at': '2026-09-03T00:00:00.000Z',
     });
-    final pricing = json['pricing'] as Map<String, Object?>;
-    expect(pricing['pricing_model'], 'transparent_scope_v2');
-    expect(pricing, isNot(contains('research_scope_units')));
-    expect(
-      (pricing['line_items'] as List).single,
-      containsPair('pilot_price_eur', 49.5),
-    );
+    final credits = json['credits'] as Map<String, Object?>;
+    expect(credits['credits_model'], 'report_scope_credits_v1');
+    expect(credits, isNot(contains('research_scope_units')));
+    expect(credits['total_credits'], 65);
   });
 
   test('unknown custom taxonomy values use canonical fallback codes', () {

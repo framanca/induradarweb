@@ -1,11 +1,12 @@
 {
     "name": "InduRadar",
     "short_name": "InduRadar",
-    "start_url": ".",
+    "start_url": "/",
+    "scope": "/",
     "display": "standalone",
     "background_color": "#F4F8FA",
     "theme_color": "#075A8F",
-    "description": "Inteligencia industrial para detectar señales y oportunidades comerciales B2B.",
+    "description": "Inteligencia comercial industrial para detectar señales verificadas y oportunidades B2B en España y Portugal.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

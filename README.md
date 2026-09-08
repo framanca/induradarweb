@@ -30,28 +30,28 @@ flutter build web \
 Configura `LEAD_ENDPOINT` en **GitHub → Settings → Secrets and variables →
 Actions**. No añadas claves de Supabase, Resend ni otros secretos al frontend.
 
-## Tarifas
+## Créditos de alcance
 
 La configuración editable está en
-`assets/config/induradar_pricing_v2.json`. El precio depende únicamente del
-número de sectores (`S`) y provincias españolas (`P`) seleccionados:
+`assets/config/induradar_credits_v1.json`. La web muestra créditos estimados,
+no euros, y se actualiza al seleccionar sectores, provincias y señales.
 
 ```text
-A(n) = 0                                         si n <= 3
-A(n) = 5 * min(n - 3, 4) + 2,5 * max(n - 7, 0) si n > 3
-
-Estudio puntual = 99 + A(S) + A(P)
-Revisión mensual = 30 + 0,5 * [A(S) + A(P)]
-Revisión semanal = 50 + 0,5 * [A(S) + A(P)]
+Créditos = 50 base + suplemento de provincias
+           + suplemento de sectores + suplemento de señales
 ```
 
-Durante el piloto se aplica un 50 % al precio final. Las revisiones son cuotas
-mensuales y requieren un estudio puntual previo activo del mismo alcance. “Toda
-España” equivale a 50 provincias. Portugal se conserva como alcance nacional,
-pero no añade provincias españolas a `P`. Las RU siguen enviándose únicamente
-como métrica interna de complejidad y no intervienen en el precio.
+Los 50 créditos incluyen una provincia, un sector y hasta cinco señales. Las
+provincias y sectores adicionales se calculan por tramos marginales definidos
+en el JSON; entre 6 y 10 señales se suman 5 créditos y con 11 o más, 10. Por
+ejemplo, 3 provincias, 3 sectores y 11 o más señales suman 100 créditos.
 
-Cualquier cambio del JSON de precios requiere volver a compilar y desplegar la
+“Toda España” equivale a 50 provincias. Portugal no añade provincias mientras
+el formulario no permita seleccionar distritos portugueses; esta decisión está
+documentada en el propio catálogo. Las RU siguen enviándose solo como métrica
+interna de complejidad y no intervienen en los créditos.
+
+Cualquier cambio del JSON de créditos requiere volver a compilar y desplegar la
 web.
 
 ## Contrato de solicitud

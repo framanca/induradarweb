@@ -4,10 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
 
 import 'package:induradarweb/main.dart';
-import 'package:induradarweb/pricing.dart';
+import 'package:induradarweb/credits.dart';
 
-final _testPricingCatalog = PricingCatalog.fromJsonString(
-  File(PricingCatalog.assetPath).readAsStringSync(),
+final _testCreditsCatalog = CreditsCatalog.fromJsonString(
+  File(CreditsCatalog.assetPath).readAsStringSync(),
 );
 
 void _setTestViewSize(WidgetTester tester, Size size) {
@@ -68,7 +68,7 @@ void main() {
     (WidgetTester tester) async {
       _setTestViewSize(tester, const Size(1400, 1000));
       await tester.pumpWidget(
-        MaterialApp(home: LandingPage(pricingCatalog: _testPricingCatalog)),
+        MaterialApp(home: LandingPage(creditsCatalog: _testCreditsCatalog)),
       );
       await tester.pumpAndSettle();
 
@@ -211,7 +211,7 @@ void main() {
   testWidgets('Offer category is required', (WidgetTester tester) async {
     _setTestViewSize(tester, const Size(1400, 1000));
     await tester.pumpWidget(
-      MaterialApp(home: LandingPage(pricingCatalog: _testPricingCatalog)),
+      MaterialApp(home: LandingPage(creditsCatalog: _testCreditsCatalog)),
     );
     await tester.pumpAndSettle();
 
@@ -248,19 +248,18 @@ void main() {
     expect(find.text('Paso 1 de 5'), findsOneWidget);
   });
 
-  testWidgets('Price reacts to sectors and provinces by service type', (
+  testWidgets('Credit estimate reacts to sectors, provinces and signals', (
     WidgetTester tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1400, 1000));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
-      MaterialApp(home: LandingPage(pricingCatalog: _testPricingCatalog)),
+      MaterialApp(home: LandingPage(creditsCatalog: _testCreditsCatalog)),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Desde 49,5 €'), findsOneWidget);
-    expect(find.text('49,5 €'), findsOneWidget);
-    expect(find.text('Estudio puntual · pago único'), findsOneWidget);
+    expect(find.text('Desde 50 créditos'), findsOneWidget);
+    expect(find.text('60 créditos'), findsOneWidget);
     expect(find.textContaining('RU estimadas'), findsNothing);
 
     await tester.ensureVisible(
@@ -274,32 +273,62 @@ void main() {
     await tester.tap(find.widgetWithText(CheckboxListTile, 'España'));
     await tester.pumpAndSettle();
 
-    expect(find.text('113,25 €'), findsOneWidget);
+    expect(find.text('354 créditos'), findsOneWidget);
     expect(find.textContaining('RU estimadas'), findsNothing);
 
+    for (final sector in [
+      'Alimentación y bebidas',
+      'Química y petroquímica',
+      'Farmacéutica, biotecnología y cosmética',
+    ]) {
+      final sectorCheckbox = find.widgetWithText(CheckboxListTile, sector);
+      await tester.ensureVisible(sectorCheckbox);
+      await tester.tap(sectorCheckbox);
+      await tester.pump();
+    }
+
+    expect(find.text('364 créditos'), findsOneWidget);
+
     await tester.ensureVisible(
-      find.byKey(const ValueKey('form-section-header-service')),
+      find.byKey(const ValueKey('form-section-header-signals')),
     );
-    await tester.tap(find.byKey(const ValueKey('form-section-header-service')));
+    await tester.tap(find.byKey(const ValueKey('form-section-header-signals')));
     await tester.pumpAndSettle();
-    final weekly = find.widgetWithText(CheckboxListTile, 'Revisión semanal');
-    await tester.ensureVisible(weekly);
-    await tester.tap(weekly);
-    await tester.pumpAndSettle();
-
-    expect(find.text('56,88 €/mes'), findsOneWidget);
-    expect(find.text('Revisión semanal · cuota mensual'), findsOneWidget);
-    expect(find.text('Estudio puntual · pago único'), findsNothing);
-
-    final oneOff = find.widgetWithText(CheckboxListTile, 'Estudio puntual');
-    await tester.ensureVisible(oneOff);
-    await tester.tap(oneOff);
+    final allSignals = find.byKey(
+      const ValueKey('select-all-Seleccionar todos los cambios'),
+    );
+    await tester.ensureVisible(allSignals);
+    await tester.tap(allSignals);
     await tester.pumpAndSettle();
 
-    expect(find.text('113,25 €'), findsOneWidget);
-    expect(find.text('56,88 €/mes'), findsOneWidget);
-    expect(find.text('Estudio puntual · pago único'), findsOneWidget);
-    expect(find.text('Revisión semanal · cuota mensual'), findsOneWidget);
+    expect(find.text('354 créditos'), findsOneWidget);
+  });
+
+  testWidgets('Credit header stays fixed while form content scrolls', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(home: LandingPage(creditsCatalog: _testCreditsCatalog)),
+    );
+    await tester.pumpAndSettle();
+
+    final title = find.text('Define tu radar comercial');
+    final sectionHeader = find.byKey(
+      const ValueKey('form-section-header-company-offer'),
+    );
+    final titleTopBefore = tester.getTopLeft(title).dy;
+    final sectionTopBefore = tester.getTopLeft(sectionHeader).dy;
+
+    await tester.drag(
+      find.byKey(const ValueKey('form-content-scroll')),
+      const Offset(0, -280),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.getTopLeft(title).dy, titleTopBefore);
+    expect(tester.getTopLeft(sectionHeader).dy, lessThan(sectionTopBefore));
   });
 
   testWidgets('Landing page fits a mobile viewport without layout errors', (
@@ -307,15 +336,15 @@ void main() {
   ) async {
     _setTestViewSize(tester, const Size(390, 844));
     await tester.pumpWidget(
-      MaterialApp(home: LandingPage(pricingCatalog: _testPricingCatalog)),
+      MaterialApp(home: LandingPage(creditsCatalog: _testCreditsCatalog)),
     );
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
     for (final finder in [
       find.text('Define tu radar comercial'),
-      find.byKey(const ValueKey('pricing-entry-price')),
-      find.byKey(const ValueKey('pricing-summary')),
+      find.byKey(const ValueKey('credits-entry-estimate')),
+      find.byKey(const ValueKey('credits-summary')),
     ]) {
       final rect = tester.getRect(finder);
       expect(rect.left, greaterThanOrEqualTo(20));
@@ -410,7 +439,7 @@ void main() {
   ) async {
     _setTestViewSize(tester, const Size(1400, 1000));
     await tester.pumpWidget(
-      MaterialApp(home: LandingPage(pricingCatalog: _testPricingCatalog)),
+      MaterialApp(home: LandingPage(creditsCatalog: _testCreditsCatalog)),
     );
     await tester.pumpAndSettle();
 
@@ -601,7 +630,7 @@ void main() {
       MaterialApp(
         home: LandingPage(
           submissionService: submissionService,
-          pricingCatalog: _testPricingCatalog,
+          creditsCatalog: _testCreditsCatalog,
         ),
       ),
     );
@@ -699,16 +728,16 @@ void main() {
     expect(submissionService.submissionCount, 1);
     final submittedJson = submissionService.request!.toJson();
     expect(submittedJson['research_scope_units'], isA<num>());
-    expect(submittedJson['pricing'], isA<Map<String, Object?>>());
+    expect(submittedJson['credits'], isA<Map<String, Object?>>());
     expect(submittedJson['form_version'], '3.13.1');
     expect(submittedJson['contract_version'], '1.3.2');
     expect(
-      (submittedJson['pricing'] as Map<String, Object?>)['pricing_model'],
-      'transparent_scope_v2',
+      (submittedJson['credits'] as Map<String, Object?>)['credits_model'],
+      'report_scope_credits_v1',
     );
     expect(
-      (submittedJson['pricing'] as Map<String, Object?>)['line_items'],
-      isNotEmpty,
+      (submittedJson['credits'] as Map<String, Object?>)['total_credits'],
+      isA<int>(),
     );
     expect(
       find.textContaining('Solicitud recibida correctamente.'),

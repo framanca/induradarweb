@@ -1,0 +1,33 @@
+{
+  "catalog_version": "1.0.0",
+  "credits_model": "report_scope_credits_v1",
+  "unit": "credits",
+  "base_credits": 50,
+  "included": {
+    "provinces": 1,
+    "sectors": 1,
+    "signals": 5
+  },
+  "province_bands": [
+    { "from": 2, "to": 3, "credits_per_unit": 15 },
+    { "from": 4, "to": 5, "credits_per_unit": 12 },
+    { "from": 6, "to": 10, "credits_per_unit": 10 },
+    { "from": 11, "to": 20, "credits_per_unit": 7 },
+    { "from": 21, "to": null, "credits_per_unit": 4 }
+  ],
+  "sector_bands": [
+    { "from": 2, "to": 5, "credits_per_unit": 5 },
+    { "from": 6, "to": 10, "credits_per_unit": 3 },
+    { "from": 11, "to": null, "credits_per_unit": 2 }
+  ],
+  "signal_bands": [
+    { "from": 0, "to": 5, "credits_per_unit": 0 },
+    { "from": 6, "to": 10, "credits_per_unit": 5 },
+    { "from": 11, "to": null, "credits_per_unit": 10 }
+  ],
+  "country_scopes": {
+    "spain_all_provinces": 50,
+    "portugal_province_equivalent": 0,
+    "portugal_note": "Portugal no suma provincias porque el formulario no permite elegir distritos portugueses."
+  }
+}

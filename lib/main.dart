@@ -8,7 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 import 'demo_report_downloader.dart';
-import 'pricing.dart';
+import 'credits.dart';
 
 const _leadEndpoint = String.fromEnvironment('LEAD_ENDPOINT');
 const _privacyPolicyUrl = String.fromEnvironment(
@@ -129,12 +129,12 @@ class LandingPage extends StatefulWidget {
   const LandingPage({
     super.key,
     LeadSubmissionService? submissionService,
-    PricingCatalog? pricingCatalog,
+    CreditsCatalog? creditsCatalog,
   }) : _submissionService = submissionService,
-       _initialPricingCatalog = pricingCatalog;
+       _initialCreditsCatalog = creditsCatalog;
 
   final LeadSubmissionService? _submissionService;
-  final PricingCatalog? _initialPricingCatalog;
+  final CreditsCatalog? _initialCreditsCatalog;
 
   @override
   State<LandingPage> createState() => _LandingPageState();
@@ -144,6 +144,7 @@ class _LandingPageState extends State<LandingPage> {
   final _formKey = GlobalKey<FormState>();
   final _formAnchorKey = GlobalKey();
   final _scrollController = ScrollController();
+  final _formContentScrollController = ScrollController();
 
   final _fullNameController = TextEditingController();
   final _companyController = TextEditingController();
@@ -204,12 +205,11 @@ class _LandingPageState extends State<LandingPage> {
   bool _marketingConsent = false;
   bool _isResettingForm = false;
   LeadSubmissionState _submissionState = LeadSubmissionState.idle;
-  PricingCatalog? _pricingCatalog;
-  bool _pricingLoadFailed = false;
+  CreditsCatalog? _creditsCatalog;
+  bool _creditsLoadFailed = false;
   String? _privacyError;
   String? _successMessage;
   String? _submissionError;
-  int _sectionScrollRequest = 0;
   bool _showSelectionErrors = false;
 
   bool get _isSubmitting => _submissionState == LeadSubmissionState.submitting;
@@ -220,9 +220,9 @@ class _LandingPageState extends State<LandingPage> {
   @override
   void initState() {
     super.initState();
-    _pricingCatalog = widget._initialPricingCatalog;
-    if (_pricingCatalog == null) {
-      unawaited(_loadPricingCatalog());
+    _creditsCatalog = widget._initialCreditsCatalog;
+    if (_creditsCatalog == null) {
+      unawaited(_loadCreditsCatalog());
     }
     for (final controller in [
       _offerDescriptionController,
@@ -278,6 +278,7 @@ class _LandingPageState extends State<LandingPage> {
       controller.dispose();
     }
     _scrollController.dispose();
+    _formContentScrollController.dispose();
     super.dispose();
   }
 
@@ -287,31 +288,31 @@ class _LandingPageState extends State<LandingPage> {
     }
   }
 
-  Future<void> _loadPricingCatalog() async {
+  Future<void> _loadCreditsCatalog() async {
     try {
-      final source = await rootBundle.loadString(PricingCatalog.assetPath);
-      final catalog = PricingCatalog.fromJsonString(source);
+      final source = await rootBundle.loadString(CreditsCatalog.assetPath);
+      final catalog = CreditsCatalog.fromJsonString(source);
       if (!mounted) {
         return;
       }
       setState(() {
-        _pricingCatalog = catalog;
-        _pricingLoadFailed = false;
+        _creditsCatalog = catalog;
+        _creditsLoadFailed = false;
       });
     } catch (error) {
-      _logLeadDebug('Pricing catalog error: ${error.runtimeType}');
+      _logLeadDebug('Credits catalog error: ${error.runtimeType}');
       if (!mounted) {
         return;
       }
       setState(() {
-        _pricingCatalog = null;
-        _pricingLoadFailed = true;
+        _creditsCatalog = null;
+        _creditsLoadFailed = true;
       });
     }
   }
 
-  PricingQuote? _currentPricingQuote() {
-    final catalog = _pricingCatalog;
+  CreditsQuote? _currentCreditsQuote() {
+    final catalog = _creditsCatalog;
     if (catalog == null) {
       return null;
     }
@@ -321,22 +322,29 @@ class _LandingPageState extends State<LandingPage> {
         _otherSectorController.text,
         otherOption: _otherSectorOption,
       ).toSet().length,
-      provinceCount: _pricingProvinceCount(catalog),
-      serviceTypes: _serviceTypes,
+      provinceCount: _creditProvinceCount(catalog),
+      signalCount: {
+        ..._investmentSignals,
+        ..._innovationSignals,
+        ..._growthSignals,
+        ..._publicFinanceSignals,
+      }.length,
     );
   }
 
-  int _pricingProvinceCount(PricingCatalog catalog) {
-    if (!_geographyCountries.contains(_spainCountry)) {
-      return 0;
+  int _creditProvinceCount(CreditsCatalog catalog) {
+    var count = 0;
+    if (_geographyCountries.contains(_spainCountry)) {
+      if (_spainCoverage == _spainAll) {
+        count += catalog.spainProvinceCount;
+      } else if (_spainCoverage == _spainByProvince) {
+        count += _spanishProvinces.length;
+      }
     }
-    if (_spainCoverage == _spainAll) {
-      return catalog.spainProvinceCount;
+    if (_geographyCountries.contains(_portugalCountry)) {
+      count += catalog.portugalProvinceEquivalent;
     }
-    if (_spainCoverage == _spainByProvince) {
-      return _spanishProvinces.length;
-    }
-    return 0;
+    return count;
   }
 
   Future<void> _submit() async {
@@ -368,12 +376,12 @@ class _LandingPageState extends State<LandingPage> {
       return;
     }
 
-    final pricingQuote = _currentPricingQuote();
-    if (pricingQuote == null) {
+    final creditsQuote = _currentCreditsQuote();
+    if (creditsQuote == null) {
       setState(() {
         _submissionState = LeadSubmissionState.error;
         _submissionError =
-            'No hemos podido calcular el coste de la solicitud. Recarga la página e inténtalo de nuevo.';
+            'No hemos podido calcular los créditos de la solicitud. Recarga la página e inténtalo de nuevo.';
       });
       return;
     }
@@ -446,7 +454,7 @@ class _LandingPageState extends State<LandingPage> {
       privacyAccepted: _privacyAccepted,
       marketingConsent: _marketingConsent,
       submittedAt: DateTime.now().toUtc(),
-      pricingQuote: pricingQuote,
+      creditsQuote: creditsQuote,
     );
 
     try {
@@ -815,9 +823,10 @@ class _LandingPageState extends State<LandingPage> {
       submissionError: _submissionError,
       isSubmitting: _isSubmitting,
       submissionSucceeded: _submissionSucceeded,
-      pricingQuote: _currentPricingQuote(),
-      pricingLoadFailed: _pricingLoadFailed,
-      entryPilotPriceEur: _pricingCatalog?.entryPilotPriceEur,
+      creditsQuote: _currentCreditsQuote(),
+      creditsLoadFailed: _creditsLoadFailed,
+      entryCredits: _creditsCatalog?.baseCredits,
+      formContentScrollController: _formContentScrollController,
       onToggleOption: _toggleOption,
       onRevenueChanged: (value) => setState(() => _targetRevenueRange = value),
       onEmployeeRangeChanged: (value) {
@@ -856,51 +865,13 @@ class _LandingPageState extends State<LandingPage> {
   }
 
   void _openFormSection(int index) {
-    final scrollRequest = ++_sectionScrollRequest;
     final isClosing = _expandedSectionIndex == index;
     setState(() {
       _expandedSectionIndex = isClosing ? -1 : index;
     });
     if (isClosing) {
       FocusManager.instance.primaryFocus?.unfocus();
-      return;
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && scrollRequest == _sectionScrollRequest) {
-        unawaited(_scrollToSectionHeader(index, scrollRequest));
-      }
-    });
-  }
-
-  Future<void> _scrollToSectionHeader(int index, int scrollRequest) async {
-    await Future<void>.delayed(const Duration(milliseconds: 240));
-    if (!mounted || scrollRequest != _sectionScrollRequest) {
-      return;
-    }
-
-    final sectionContext = _sectionHeaderKeys[index].currentContext;
-    if (sectionContext == null || !sectionContext.mounted) {
-      return;
-    }
-
-    final renderObject = sectionContext.findRenderObject();
-    if (renderObject is! RenderBox || !_scrollController.hasClients) {
-      return;
-    }
-
-    final viewportTop = MediaQuery.paddingOf(context).top + 16;
-    final offsetDelta =
-        renderObject.localToGlobal(Offset.zero).dy - viewportTop;
-    final targetOffset = (_scrollController.offset + offsetDelta).clamp(
-      0.0,
-      _scrollController.position.maxScrollExtent,
-    );
-
-    await _scrollController.animateTo(
-      targetOffset,
-      duration: const Duration(milliseconds: 320),
-      curve: Curves.easeOutCubic,
-    );
   }
 
   void _toggleOption(Set<String> selectedValues, String label, bool selected) {
@@ -2186,16 +2157,16 @@ class _SectionHeading extends StatelessWidget {
   }
 }
 
-class _FormPricingHeader extends StatelessWidget {
-  const _FormPricingHeader({
-    required this.pricingQuote,
-    required this.pricingLoadFailed,
-    required this.entryPilotPriceEur,
+class _FormCreditsHeader extends StatelessWidget {
+  const _FormCreditsHeader({
+    required this.creditsQuote,
+    required this.creditsLoadFailed,
+    required this.entryCredits,
   });
 
-  final PricingQuote? pricingQuote;
-  final bool pricingLoadFailed;
-  final num? entryPilotPriceEur;
+  final CreditsQuote? creditsQuote;
+  final bool creditsLoadFailed;
+  final int? entryCredits;
 
   @override
   Widget build(BuildContext context) {
@@ -2216,16 +2187,16 @@ class _FormPricingHeader extends StatelessWidget {
                 letterSpacing: 0,
               ),
             ),
-            if (entryPilotPriceEur != null)
+            if (entryCredits != null)
               Container(
-                key: const ValueKey('pricing-entry-price'),
+                key: const ValueKey('credits-entry-estimate'),
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: const Color(0xFFE2F6F8),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  'Desde ${_formatPrice(entryPilotPriceEur!)} €',
+                  'Desde $entryCredits créditos',
                   style: textTheme.labelLarge?.copyWith(
                     color: _blue,
                     fontWeight: FontWeight.w800,
@@ -2245,15 +2216,15 @@ class _FormPricingHeader extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isWide = constraints.maxWidth >= 560;
-        final price = _PricingSummary(
-          quote: pricingQuote,
-          loadFailed: pricingLoadFailed,
+        final credits = _CreditsSummary(
+          quote: creditsQuote,
+          loadFailed: creditsLoadFailed,
           horizontal: !isWide,
         );
         if (!isWide) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [title, const SizedBox(height: 16), price],
+            children: [title, const SizedBox(height: 16), credits],
           );
         }
         return Row(
@@ -2261,7 +2232,7 @@ class _FormPricingHeader extends StatelessWidget {
           children: [
             Expanded(child: title),
             const SizedBox(width: 20),
-            SizedBox(width: 190, child: price),
+            SizedBox(width: 190, child: credits),
           ],
         );
       },
@@ -2269,14 +2240,14 @@ class _FormPricingHeader extends StatelessWidget {
   }
 }
 
-class _PricingSummary extends StatelessWidget {
-  const _PricingSummary({
+class _CreditsSummary extends StatelessWidget {
+  const _CreditsSummary({
     required this.quote,
     required this.loadFailed,
     required this.horizontal,
   });
 
-  final PricingQuote? quote;
+  final CreditsQuote? quote;
   final bool loadFailed;
   final bool horizontal;
 
@@ -2291,16 +2262,14 @@ class _PricingSummary extends StatelessWidget {
         : const EdgeInsets.only(left: 14);
 
     return Container(
-      key: const ValueKey('pricing-summary'),
+      key: const ValueKey('credits-summary'),
       decoration: BoxDecoration(border: border),
       padding: padding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            quote == null
-                ? 'ESTIMACIÓN DE PRECIO'
-                : 'ESTIMACIÓN · ${quote!.pilotLabel.toUpperCase()}',
+            quote == null ? 'ESTIMACIÓN DE CRÉDITOS' : 'CRÉDITOS ESTIMADOS',
             style: textTheme.labelSmall?.copyWith(
               color: _blue,
               fontWeight: FontWeight.w800,
@@ -2311,25 +2280,21 @@ class _PricingSummary extends StatelessWidget {
           if (quote == null)
             Text(
               loadFailed
-                  ? 'Precio pendiente de revisión'
-                  : 'Calculando precio…',
+                  ? 'Créditos pendientes de revisión'
+                  : 'Calculando créditos…',
               style: textTheme.bodyMedium?.copyWith(
                 color: _ink,
                 fontWeight: FontWeight.w700,
               ),
             )
           else
-            for (var index = 0; index < quote!.lineItems.length; index++) ...[
-              if (index > 0) const SizedBox(height: 8),
-              _PricingLine(item: quote!.lineItems[index]),
-            ],
+            _CreditsLine(quote: quote!),
           if (quote != null) ...[
             const SizedBox(height: 8),
             Text(
-              'Incluye hasta ${quote!.includedSectors} sectores, '
-              '${quote!.includedProvinces} provincias y '
-              '${quote!.includedCompanyTypes} tipos de empresa. '
-              'Señales y áreas incluidas.',
+              'Base: ${quote!.includedProvinces} provincia, '
+              '${quote!.includedSectors} sector y hasta '
+              '${quote!.includedSignals} señales. Más detalle no incrementa créditos.',
               style: textTheme.bodySmall?.copyWith(color: _steel, height: 1.35),
             ),
           ],
@@ -2339,22 +2304,20 @@ class _PricingSummary extends StatelessWidget {
   }
 }
 
-class _PricingLine extends StatelessWidget {
-  const _PricingLine({required this.item});
+class _CreditsLine extends StatelessWidget {
+  const _CreditsLine({required this.quote});
 
-  final PricingLineItem item;
+  final CreditsQuote quote;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final suffix = item.isMonthly ? '/mes' : '';
-    final billingLabel = item.isMonthly ? 'cuota mensual' : 'pago único';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '${_formatPrice(item.pilotPriceEur)} €$suffix',
-          key: ValueKey('pricing-${item.planCode}'),
+          '${quote.totalCredits} créditos',
+          key: const ValueKey('credits-total'),
           style: textTheme.titleLarge?.copyWith(
             color: _ink,
             fontWeight: FontWeight.w800,
@@ -2362,39 +2325,19 @@ class _PricingLine extends StatelessWidget {
           ),
         ),
         Text(
-          '${item.planLabel} · $billingLabel',
+          '${quote.baseCredits} base'
+          '${quote.provinceCredits > 0 ? ' · +${quote.provinceCredits} provincias' : ''}'
+          '${quote.sectorCredits > 0 ? ' · +${quote.sectorCredits} sectores' : ''}'
+          '${quote.signalCredits > 0 ? ' · +${quote.signalCredits} señales' : ''}',
           style: textTheme.bodySmall?.copyWith(
             color: _ink,
             fontWeight: FontWeight.w700,
             height: 1.35,
           ),
         ),
-        Text(
-          'Estándar: ${_formatPrice(item.standardPriceEur)} €$suffix',
-          style: textTheme.bodySmall?.copyWith(color: _steel, height: 1.35),
-        ),
-        if (item.requiresActivePriorStudy)
-          Text(
-            'Requiere un estudio puntual previo activo del mismo alcance.',
-            style: textTheme.bodySmall?.copyWith(
-              color: _blue,
-              fontWeight: FontWeight.w700,
-              height: 1.35,
-            ),
-          ),
       ],
     );
   }
-}
-
-String _formatPrice(num value) {
-  if (value == value.roundToDouble()) {
-    return value.toInt().toString();
-  }
-  return value
-      .toStringAsFixed(2)
-      .replaceFirst(RegExp(r'0+$'), '')
-      .replaceAll('.', ',');
 }
 
 class _LeadFormPanel extends StatelessWidget {
@@ -2452,9 +2395,10 @@ class _LeadFormPanel extends StatelessWidget {
     required this.submissionError,
     required this.isSubmitting,
     required this.submissionSucceeded,
-    required this.pricingQuote,
-    required this.pricingLoadFailed,
-    required this.entryPilotPriceEur,
+    required this.creditsQuote,
+    required this.creditsLoadFailed,
+    required this.entryCredits,
+    required this.formContentScrollController,
     required this.onToggleOption,
     required this.onRevenueChanged,
     required this.onEmployeeRangeChanged,
@@ -2525,9 +2469,10 @@ class _LeadFormPanel extends StatelessWidget {
   final String? submissionError;
   final bool isSubmitting;
   final bool submissionSucceeded;
-  final PricingQuote? pricingQuote;
-  final bool pricingLoadFailed;
-  final num? entryPilotPriceEur;
+  final CreditsQuote? creditsQuote;
+  final bool creditsLoadFailed;
+  final int? entryCredits;
+  final ScrollController formContentScrollController;
   final void Function(Set<String> values, String label, bool selected)
   onToggleOption;
   final ValueChanged<String?> onRevenueChanged;
@@ -2558,6 +2503,9 @@ class _LeadFormPanel extends StatelessWidget {
     );
     final allCommercialNeedsSelected =
         selectedStandardNeeds.length == _commercialNeedOptions.length - 1;
+    final formContentHeight = (MediaQuery.sizeOf(context).height * 0.58)
+        .clamp(420.0, 620.0)
+        .toDouble();
 
     return DecoratedBox(
       key: const ValueKey('lead-form-panel'),
@@ -2581,10 +2529,10 @@ class _LeadFormPanel extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              _FormPricingHeader(
-                pricingQuote: pricingQuote,
-                pricingLoadFailed: pricingLoadFailed,
-                entryPilotPriceEur: entryPilotPriceEur,
+              _FormCreditsHeader(
+                creditsQuote: creditsQuote,
+                creditsLoadFailed: creditsLoadFailed,
+                entryCredits: entryCredits,
               ),
               const SizedBox(height: 10),
               Wrap(
@@ -2617,605 +2565,685 @@ class _LeadFormPanel extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 22),
-              if (successMessage != null) ...[
-                _SuccessBanner(
-                  message: successMessage!,
-                  onStartNewRequest: onStartNewRequest,
-                ),
-                const SizedBox(height: 18),
-              ],
-              if (submissionError != null) ...[
-                _ErrorBanner(message: submissionError!),
-                const SizedBox(height: 18),
-              ],
-              _FormSection(
-                sectionId: 'company-offer',
-                headerAnchorKey: sectionHeaderKeys[0],
-                title: '1. ¿Qué vendes?',
-                isLocked: submissionSucceeded,
-                isExpanded: expandedSectionIndex == 0,
-                isComplete: completedSections[0],
-                onToggle: () => onSectionChanged(0),
-                children: [
-                  TextFormField(
-                    controller: offerDescriptionController,
-                    minLines: 3,
-                    maxLines: 6,
-                    decoration: const InputDecoration(
-                      labelText: '¿Qué ofrece tu empresa? *',
-                      hintText:
-                          'Productos o servicios que quieres vender o promocionar.',
-                      alignLabelWithHint: true,
-                      prefixIcon: Icon(Icons.inventory_2_outlined),
-                    ),
-                    validator: _required,
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: fullNameController,
-                    autofillHints: const [AutofillHints.name],
-                    decoration: const InputDecoration(
-                      labelText: 'Nombre y apellidos *',
-                      prefixIcon: Icon(Icons.person_outline),
-                    ),
-                    textInputAction: TextInputAction.next,
-                    validator: _required,
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: companyController,
-                    autofillHints: const [AutofillHints.organizationName],
-                    decoration: const InputDecoration(
-                      labelText: 'Empresa *',
-                      prefixIcon: Icon(Icons.apartment_outlined),
-                    ),
-                    textInputAction: TextInputAction.next,
-                    validator: _required,
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: emailController,
-                    autofillHints: const [AutofillHints.email],
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      labelText: 'Email profesional *',
-                      prefixIcon: Icon(Icons.alternate_email_outlined),
-                    ),
-                    textInputAction: TextInputAction.next,
-                    validator: _emailValidator,
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: jobTitleController,
-                    decoration: const InputDecoration(
-                      labelText: 'Cargo / función (opcional)',
-                      prefixIcon: Icon(Icons.work_outline),
-                    ),
-                    textInputAction: TextInputAction.next,
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: phoneController,
-                    autofillHints: const [AutofillHints.telephoneNumber],
-                    keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(
-                      labelText: 'Teléfono (opcional)',
-                      prefixIcon: Icon(Icons.phone_outlined),
-                    ),
-                    textInputAction: TextInputAction.next,
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: websiteController,
-                    autofillHints: const [AutofillHints.url],
-                    keyboardType: TextInputType.url,
-                    decoration: const InputDecoration(
-                      labelText: 'Web de la empresa (opcional)',
-                      prefixIcon: Icon(Icons.language_outlined),
-                    ),
-                    textInputAction: TextInputAction.next,
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: addressController,
-                    autofillHints: const [AutofillHints.fullStreetAddress],
-                    decoration: const InputDecoration(
-                      labelText: 'Dirección (opcional)',
-                      prefixIcon: Icon(Icons.location_on_outlined),
-                    ),
-                    textInputAction: TextInputAction.next,
-                  ),
-                  const SizedBox(height: 18),
-                  _OptionalFields(
-                    title: 'Afinar tu oferta',
-                    description:
-                        'Categorías, problemas que resuelves y soluciones prioritarias.',
-                    showOptionalLabel: false,
-                    forceExpanded:
-                        (showSelectionErrors && offerCategories.isEmpty) ||
-                        (offerCategories.contains(_otherOfferCategoryOption) &&
-                            otherOfferCategoryController.text.trim().isEmpty) ||
-                        (problemsSolved.contains(_otherProblemOption) &&
-                            otherProblemController.text.trim().isEmpty),
-                    children: [
-                      _MultiSelectChipGroup(
-                        title: 'Categoría principal de tu oferta *',
-                        errorText:
-                            showSelectionErrors && offerCategories.isEmpty
-                            ? 'Selecciona al menos una categoría de oferta.'
-                            : null,
-                        options: _offerCategoryOptions,
-                        selectedValues: offerCategories,
-                        isEnabled: !isSubmitting,
-                        onChanged: (label, selected) {
-                          onToggleOption(offerCategories, label, selected);
-                        },
-                      ),
-                      if (offerCategories.contains(
-                        _otherOfferCategoryOption,
-                      )) ...[
-                        const SizedBox(height: 10),
-                        _OtherField(
-                          controller: otherOfferCategoryController,
-                          label: 'Otra categoría',
-                          isRequired: true,
-                        ),
-                      ],
-                      const SizedBox(height: 18),
-                      _MultiSelectChipGroup(
-                        title: '¿Qué problemas ayudas a resolver?',
-                        options: _problemOptions,
-                        selectedValues: problemsSolved,
-                        isEnabled: !isSubmitting,
-                        onChanged: (label, selected) {
-                          onToggleOption(problemsSolved, label, selected);
-                        },
-                      ),
-                      if (problemsSolved.contains(_otherProblemOption)) ...[
-                        const SizedBox(height: 10),
-                        _OtherField(
-                          controller: otherProblemController,
-                          label: 'Otro problema',
-                          isRequired: true,
-                        ),
-                      ],
-                      const SizedBox(height: 14),
-                      TextFormField(
-                        controller: prioritySolutionsController,
-                        minLines: 2,
-                        maxLines: 4,
-                        decoration: const InputDecoration(
-                          labelText:
-                              'Productos, soluciones o servicios que quieres priorizar (opcional)',
-                          hintText:
-                              'Familias concretas, especialidades, marcas, tecnologías, aplicaciones o servicios.',
-                          alignLabelWithHint: true,
-                          prefixIcon: Icon(Icons.tune_outlined),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _FormSection(
-                sectionId: 'target-company',
-                headerAnchorKey: sectionHeaderKeys[1],
-                title: '2. ¿Qué empresas buscas?',
-                isLocked: submissionSucceeded,
-                isExpanded: expandedSectionIndex == 1,
-                isComplete: completedSections[1],
-                onToggle: () => onSectionChanged(1),
-                children: [
-                  _MultiSelectChipGroup(
-                    title: 'Sectores objetivo',
-                    errorText: showSelectionErrors && targetSectors.isEmpty
-                        ? 'Selecciona al menos un sector objetivo.'
-                        : null,
-                    options: _targetSectorOptions,
-                    selectedValues: targetSectors,
-                    isEnabled: !isSubmitting,
-                    onChanged: (label, selected) {
-                      onToggleOption(targetSectors, label, selected);
-                    },
-                  ),
-                  if (targetSectors.contains(_otherSectorOption)) ...[
-                    const SizedBox(height: 10),
-                    _OtherField(
-                      controller: otherSectorController,
-                      label: 'Otros sectores',
-                      isRequired: true,
-                    ),
-                  ],
-                  const SizedBox(height: 18),
-                  _MultiSelectChipGroup(
-                    title: 'Tipo de empresa objetivo',
-                    errorText: showSelectionErrors && targetCompanyTypes.isEmpty
-                        ? 'Selecciona al menos un tipo de empresa objetivo.'
-                        : null,
-                    options: _targetCompanyTypeOptions,
-                    selectedValues: targetCompanyTypes,
-                    isEnabled: !isSubmitting,
-                    onChanged: (label, selected) {
-                      onToggleOption(targetCompanyTypes, label, selected);
-                    },
-                  ),
-                  if (targetCompanyTypes.contains(
-                    _otherTargetCompanyTypeOption,
-                  )) ...[
-                    const SizedBox(height: 10),
-                    _OtherField(
-                      controller: otherTargetCompanyTypeController,
-                      label: 'Otro tipo de empresa objetivo',
-                      isRequired: true,
-                    ),
-                  ],
-                  const SizedBox(height: 18),
-                  _GeographySelector(
-                    countries: geographyCountries,
-                    spainCoverage: spainCoverage,
-                    spanishProvinces: spanishProvinces,
-                    isEnabled: !isSubmitting,
-                    onCountriesChanged: onGeographyCountriesChanged,
-                    onSpainCoverageChanged: onSpainCoverageChanged,
-                    onProvincesChanged: onSpanishProvincesChanged,
-                  ),
-                  const SizedBox(height: 18),
-                  _OptionalFields(
-                    title: 'Criterios avanzados',
-                    description:
-                        'Tamaño, valor mínimo y características de la empresa ideal.',
-                    forceExpanded:
-                        minimumOpportunityValue == _otherMinimumValueOption &&
-                        otherMinimumValueController.text.trim().isEmpty,
-                    children: [
-                      _SingleSelectChipGroup(
-                        title: 'Facturación anual aproximada',
-                        options: _revenueRangeOptions,
-                        selectedValue: targetRevenueRange,
-                        isEnabled: !isSubmitting,
-                        onChanged: onRevenueChanged,
-                      ),
-                      const SizedBox(height: 18),
-                      _SingleSelectChipGroup(
-                        title: 'Empleo / tamaño de la operación industrial',
-                        options: _employeeRangeOptions,
-                        selectedValue: targetEmployeeRange,
-                        isEnabled: !isSubmitting,
-                        onChanged: onEmployeeRangeChanged,
-                      ),
-                      const SizedBox(height: 18),
-                      _SingleSelectChipGroup(
-                        title:
-                            '¿A partir de qué valor aproximado merece la pena investigar una oportunidad?',
-                        helperText:
-                            'No implica que InduRadar conozca el importe real del proyecto; sirve para priorizar.',
-                        options: _minimumOpportunityValueOptions,
-                        selectedValue: minimumOpportunityValue,
-                        isEnabled: !isSubmitting,
-                        onChanged: onMinimumValueChanged,
-                      ),
-                      if (minimumOpportunityValue ==
-                          _otherMinimumValueOption) ...[
-                        const SizedBox(height: 10),
-                        _OtherField(
-                          controller: otherMinimumValueController,
-                          label: 'Otro valor aproximado',
-                          isRequired: true,
-                        ),
-                      ],
-                      const SizedBox(height: 14),
-                      TextFormField(
-                        controller: targetCompanyDescriptionController,
-                        minLines: 3,
-                        maxLines: 6,
-                        decoration: const InputDecoration(
-                          labelText:
-                              'Define tu empresa objetivo ideal (opcional)',
-                          hintText:
-                              'Producción propia, decisión local, varias plantas, exportación, tecnologías concretas, certificaciones, tamaño mínimo...',
-                          alignLabelWithHint: true,
-                          prefixIcon: Icon(Icons.business_center_outlined),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _FormSection(
-                sectionId: 'signals',
-                headerAnchorKey: sectionHeaderKeys[2],
-                title: '3. ¿Qué cambios quieres detectar?',
-                isLocked: submissionSucceeded,
-                isExpanded: expandedSectionIndex == 2,
-                isComplete: completedSections[2],
-                onToggle: () => onSectionChanged(2),
-                children: [
-                  _SelectAllControl(
-                    label: 'Seleccionar todos los cambios',
-                    isSelected: allSignalsSelected,
-                    isEnabled: !isSubmitting,
-                    onChanged: onSetAllSignals,
-                  ),
-                  const SizedBox(height: 18),
-                  _MultiSelectChipGroup(
-                    title: 'A. Inversión y capacidad',
-                    options: _investmentSignalOptions,
-                    selectedValues: investmentSignals,
-                    isEnabled: !isSubmitting,
-                    onChanged: (label, selected) {
-                      onToggleOption(investmentSignals, label, selected);
-                    },
-                  ),
-                  const SizedBox(height: 18),
-                  _MultiSelectChipGroup(
-                    title: 'B. Innovación y producto',
-                    options: _innovationSignalOptions,
-                    selectedValues: innovationSignals,
-                    isEnabled: !isSubmitting,
-                    onChanged: (label, selected) {
-                      onToggleOption(innovationSignals, label, selected);
-                    },
-                  ),
-                  const SizedBox(height: 18),
-                  _MultiSelectChipGroup(
-                    title: 'C. Organización y crecimiento',
-                    options: _growthSignalOptions,
-                    selectedValues: growthSignals,
-                    isEnabled: !isSubmitting,
-                    onChanged: (label, selected) {
-                      onToggleOption(growthSignals, label, selected);
-                    },
-                  ),
-                  const SizedBox(height: 18),
-                  _MultiSelectChipGroup(
-                    title: 'D. Compra pública y apoyo financiero',
-                    options: _publicFinanceSignalOptions,
-                    selectedValues: publicFinanceSignals,
-                    isEnabled: !isSubmitting,
-                    onChanged: (label, selected) {
-                      onToggleOption(publicFinanceSignals, label, selected);
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _FormSection(
-                sectionId: 'needs',
-                headerAnchorKey: sectionHeaderKeys[3],
-                title: '4. ¿Qué necesidades quieres detectar?',
-                isLocked: submissionSucceeded,
-                isExpanded: expandedSectionIndex == 3,
-                isComplete: completedSections[3],
-                onToggle: () => onSectionChanged(3),
-                children: [
-                  _SelectAllControl(
-                    label: 'Seleccionar todas las áreas',
-                    isSelected: allCommercialNeedsSelected,
-                    isEnabled: !isSubmitting,
-                    onChanged: onSetAllCommercialNeeds,
-                  ),
-                  const SizedBox(height: 18),
-                  _MultiSelectChipGroup(
-                    title:
-                        '¿En qué áreas de oportunidad quieres clasificar los resultados?',
-                    helperText:
-                        'La sección 2 define en qué empresas buscar; aquí defines qué necesidades podrían encajar con tu oferta. Todas están incluidas en la tarifa.',
-                    options: _commercialNeedOptions,
-                    selectedValues: commercialNeeds,
-                    isEnabled: !isSubmitting,
-                    onChanged: (label, selected) {
-                      onToggleOption(commercialNeeds, label, selected);
-                    },
-                  ),
-                  if (commercialNeeds.contains(_otherNeedOption)) ...[
-                    const SizedBox(height: 10),
-                    _OtherField(
-                      controller: otherNeedController,
-                      label: 'Otra área de oportunidad',
-                      isRequired: true,
-                    ),
-                  ],
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: opportunityTriggerController,
-                    minLines: 4,
-                    maxLines: 7,
-                    decoration: const InputDecoration(
-                      labelText:
-                          'Describe una oportunidad comercial que justificaría una acción de tu equipo de ventas *',
-                      hintText:
-                          'Qué tendría que ocurrir para que merezca una llamada, visita, reunión o investigación adicional.',
-                      alignLabelWithHint: true,
-                      prefixIcon: Icon(Icons.notes_outlined),
-                    ),
-                    validator: _required,
-                  ),
-                  const SizedBox(height: 14),
-                  _OptionalFields(
-                    title: 'Referencias y exclusiones',
-                    description:
-                        'Casos, clientes, cuentas y límites que nos ayudan a afinar el encaje.',
-                    children: [
-                      TextFormField(
-                        controller: recentCaseController,
-                        minLines: 3,
-                        maxLines: 6,
-                        decoration: const InputDecoration(
-                          labelText:
-                              'Ayúdanos con un caso real o reciente (opcional)',
-                          hintText:
-                              'Qué estaba ocurriendo en ese cliente antes de que surgiera la oportunidad.',
-                          alignLabelWithHint: true,
-                          prefixIcon: Icon(Icons.history_outlined),
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      Text(
-                        'Empresas de referencia',
-                        style: textTheme.titleSmall?.copyWith(
-                          color: _ink,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      _ResponsiveFields(
-                        children: [
-                          _MultilineReferenceField(
-                            controller: currentClientsController,
-                            label:
-                                'Clientes actuales para buscar perfiles similares (opcional)',
-                            hint:
-                                'Empresas ya clientes cuyo perfil quieres replicar. Hasta 5, una por línea.',
+              SizedBox(
+                key: const ValueKey('form-content-scroll-viewport'),
+                height: formContentHeight,
+                child: Scrollbar(
+                  controller: formContentScrollController,
+                  thumbVisibility: true,
+                  child: SingleChildScrollView(
+                    key: const ValueKey('form-content-scroll'),
+                    controller: formContentScrollController,
+                    padding: const EdgeInsets.only(right: 8, bottom: 4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (successMessage != null) ...[
+                          _SuccessBanner(
+                            message: successMessage!,
+                            onStartNewRequest: onStartNewRequest,
                           ),
-                          _MultilineReferenceField(
-                            controller: idealClientsController,
-                            label:
-                                'Clientes ideales: clientes de la competencia a seguir (opcional)',
-                            hint:
-                                'Empresas que compran a competidores y quieres investigar. Hasta 5, una por línea.',
-                          ),
+                          const SizedBox(height: 18),
                         ],
-                      ),
-                      const SizedBox(height: 14),
-                      _ResponsiveFields(
-                        children: [
-                          _MultilineReferenceField(
-                            controller: watchlistAccountsController,
-                            label:
-                                'Cuentas estratégicas para búsqueda especializada (opcional)',
-                            hint:
-                                'Empresas concretas para una investigación más profunda. Hasta 5, una por línea.',
-                          ),
-                          _MultilineReferenceField(
-                            controller: competitorsController,
-                            label: 'Competidores (opcional)',
-                            hint:
-                                'Indica si quieres excluirlos o monitorizarlos.',
-                          ),
+                        if (submissionError != null) ...[
+                          _ErrorBanner(message: submissionError!),
+                          const SizedBox(height: 18),
                         ],
-                      ),
-                      const SizedBox(height: 14),
-                      TextFormField(
-                        controller: excludedCompaniesController,
-                        minLines: 2,
-                        maxLines: 4,
-                        decoration: const InputDecoration(
-                          labelText: 'Empresas excluidas (opcional)',
-                          hintText:
-                              'Clientes protegidos, cuentas ya trabajadas, empresas excluidas...',
-                          alignLabelWithHint: true,
-                          prefixIcon: Icon(Icons.block_outlined),
+                        _FormSection(
+                          sectionId: 'company-offer',
+                          headerAnchorKey: sectionHeaderKeys[0],
+                          title: '1. ¿Qué vendes?',
+                          isLocked: submissionSucceeded,
+                          isExpanded: expandedSectionIndex == 0,
+                          isComplete: completedSections[0],
+                          onToggle: () => onSectionChanged(0),
+                          children: [
+                            TextFormField(
+                              controller: offerDescriptionController,
+                              minLines: 3,
+                              maxLines: 6,
+                              decoration: const InputDecoration(
+                                labelText: '¿Qué ofrece tu empresa? *',
+                                hintText:
+                                    'Productos o servicios que quieres vender o promocionar.',
+                                alignLabelWithHint: true,
+                                prefixIcon: Icon(Icons.inventory_2_outlined),
+                              ),
+                              validator: _required,
+                            ),
+                            const SizedBox(height: 14),
+                            TextFormField(
+                              controller: fullNameController,
+                              autofillHints: const [AutofillHints.name],
+                              decoration: const InputDecoration(
+                                labelText: 'Nombre y apellidos *',
+                                prefixIcon: Icon(Icons.person_outline),
+                              ),
+                              textInputAction: TextInputAction.next,
+                              validator: _required,
+                            ),
+                            const SizedBox(height: 14),
+                            TextFormField(
+                              controller: companyController,
+                              autofillHints: const [
+                                AutofillHints.organizationName,
+                              ],
+                              decoration: const InputDecoration(
+                                labelText: 'Empresa *',
+                                prefixIcon: Icon(Icons.apartment_outlined),
+                              ),
+                              textInputAction: TextInputAction.next,
+                              validator: _required,
+                            ),
+                            const SizedBox(height: 14),
+                            TextFormField(
+                              controller: emailController,
+                              autofillHints: const [AutofillHints.email],
+                              keyboardType: TextInputType.emailAddress,
+                              decoration: const InputDecoration(
+                                labelText: 'Email profesional *',
+                                prefixIcon: Icon(
+                                  Icons.alternate_email_outlined,
+                                ),
+                              ),
+                              textInputAction: TextInputAction.next,
+                              validator: _emailValidator,
+                            ),
+                            const SizedBox(height: 14),
+                            TextFormField(
+                              controller: jobTitleController,
+                              decoration: const InputDecoration(
+                                labelText: 'Cargo / función (opcional)',
+                                prefixIcon: Icon(Icons.work_outline),
+                              ),
+                              textInputAction: TextInputAction.next,
+                            ),
+                            const SizedBox(height: 14),
+                            TextFormField(
+                              controller: phoneController,
+                              autofillHints: const [
+                                AutofillHints.telephoneNumber,
+                              ],
+                              keyboardType: TextInputType.phone,
+                              decoration: const InputDecoration(
+                                labelText: 'Teléfono (opcional)',
+                                prefixIcon: Icon(Icons.phone_outlined),
+                              ),
+                              textInputAction: TextInputAction.next,
+                            ),
+                            const SizedBox(height: 14),
+                            TextFormField(
+                              controller: websiteController,
+                              autofillHints: const [AutofillHints.url],
+                              keyboardType: TextInputType.url,
+                              decoration: const InputDecoration(
+                                labelText: 'Web de la empresa (opcional)',
+                                prefixIcon: Icon(Icons.language_outlined),
+                              ),
+                              textInputAction: TextInputAction.next,
+                            ),
+                            const SizedBox(height: 14),
+                            TextFormField(
+                              controller: addressController,
+                              autofillHints: const [
+                                AutofillHints.fullStreetAddress,
+                              ],
+                              decoration: const InputDecoration(
+                                labelText: 'Dirección (opcional)',
+                                prefixIcon: Icon(Icons.location_on_outlined),
+                              ),
+                              textInputAction: TextInputAction.next,
+                            ),
+                            const SizedBox(height: 18),
+                            _OptionalFields(
+                              title: 'Afinar tu oferta',
+                              description:
+                                  'Categorías, problemas que resuelves y soluciones prioritarias.',
+                              showOptionalLabel: false,
+                              forceExpanded:
+                                  (showSelectionErrors &&
+                                      offerCategories.isEmpty) ||
+                                  (offerCategories.contains(
+                                        _otherOfferCategoryOption,
+                                      ) &&
+                                      otherOfferCategoryController.text
+                                          .trim()
+                                          .isEmpty) ||
+                                  (problemsSolved.contains(
+                                        _otherProblemOption,
+                                      ) &&
+                                      otherProblemController.text
+                                          .trim()
+                                          .isEmpty),
+                              children: [
+                                _MultiSelectChipGroup(
+                                  title: 'Categoría principal de tu oferta *',
+                                  errorText:
+                                      showSelectionErrors &&
+                                          offerCategories.isEmpty
+                                      ? 'Selecciona al menos una categoría de oferta.'
+                                      : null,
+                                  options: _offerCategoryOptions,
+                                  selectedValues: offerCategories,
+                                  isEnabled: !isSubmitting,
+                                  onChanged: (label, selected) {
+                                    onToggleOption(
+                                      offerCategories,
+                                      label,
+                                      selected,
+                                    );
+                                  },
+                                ),
+                                if (offerCategories.contains(
+                                  _otherOfferCategoryOption,
+                                )) ...[
+                                  const SizedBox(height: 10),
+                                  _OtherField(
+                                    controller: otherOfferCategoryController,
+                                    label: 'Otra categoría',
+                                    isRequired: true,
+                                  ),
+                                ],
+                                const SizedBox(height: 18),
+                                _MultiSelectChipGroup(
+                                  title: '¿Qué problemas ayudas a resolver?',
+                                  options: _problemOptions,
+                                  selectedValues: problemsSolved,
+                                  isEnabled: !isSubmitting,
+                                  onChanged: (label, selected) {
+                                    onToggleOption(
+                                      problemsSolved,
+                                      label,
+                                      selected,
+                                    );
+                                  },
+                                ),
+                                if (problemsSolved.contains(
+                                  _otherProblemOption,
+                                )) ...[
+                                  const SizedBox(height: 10),
+                                  _OtherField(
+                                    controller: otherProblemController,
+                                    label: 'Otro problema',
+                                    isRequired: true,
+                                  ),
+                                ],
+                                const SizedBox(height: 14),
+                                TextFormField(
+                                  controller: prioritySolutionsController,
+                                  minLines: 2,
+                                  maxLines: 4,
+                                  decoration: const InputDecoration(
+                                    labelText:
+                                        'Productos, soluciones o servicios que quieres priorizar (opcional)',
+                                    hintText:
+                                        'Familias concretas, especialidades, marcas, tecnologías, aplicaciones o servicios.',
+                                    alignLabelWithHint: true,
+                                    prefixIcon: Icon(Icons.tune_outlined),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 14),
-                      TextFormField(
-                        controller: noBuyReasonController,
-                        minLines: 3,
-                        maxLines: 6,
-                        decoration: const InputDecoration(
-                          labelText:
-                              '¿Por qué una empresa aparentemente ideal no os compraría? (opcional)',
-                          hintText:
-                              'Decisión centralizada en otro país, consumo insuficiente, tecnología incompatible, ticket demasiado pequeño...',
-                          alignLabelWithHint: true,
-                          prefixIcon: Icon(Icons.report_problem_outlined),
+                        const SizedBox(height: 12),
+                        _FormSection(
+                          sectionId: 'target-company',
+                          headerAnchorKey: sectionHeaderKeys[1],
+                          title: '2. ¿Qué empresas buscas?',
+                          isLocked: submissionSucceeded,
+                          isExpanded: expandedSectionIndex == 1,
+                          isComplete: completedSections[1],
+                          onToggle: () => onSectionChanged(1),
+                          children: [
+                            _MultiSelectChipGroup(
+                              title: 'Sectores objetivo',
+                              errorText:
+                                  showSelectionErrors && targetSectors.isEmpty
+                                  ? 'Selecciona al menos un sector objetivo.'
+                                  : null,
+                              options: _targetSectorOptions,
+                              selectedValues: targetSectors,
+                              isEnabled: !isSubmitting,
+                              onChanged: (label, selected) {
+                                onToggleOption(targetSectors, label, selected);
+                              },
+                            ),
+                            if (targetSectors.contains(_otherSectorOption)) ...[
+                              const SizedBox(height: 10),
+                              _OtherField(
+                                controller: otherSectorController,
+                                label: 'Otros sectores',
+                                isRequired: true,
+                              ),
+                            ],
+                            const SizedBox(height: 18),
+                            _MultiSelectChipGroup(
+                              title: 'Tipo de empresa objetivo',
+                              errorText:
+                                  showSelectionErrors &&
+                                      targetCompanyTypes.isEmpty
+                                  ? 'Selecciona al menos un tipo de empresa objetivo.'
+                                  : null,
+                              options: _targetCompanyTypeOptions,
+                              selectedValues: targetCompanyTypes,
+                              isEnabled: !isSubmitting,
+                              onChanged: (label, selected) {
+                                onToggleOption(
+                                  targetCompanyTypes,
+                                  label,
+                                  selected,
+                                );
+                              },
+                            ),
+                            if (targetCompanyTypes.contains(
+                              _otherTargetCompanyTypeOption,
+                            )) ...[
+                              const SizedBox(height: 10),
+                              _OtherField(
+                                controller: otherTargetCompanyTypeController,
+                                label: 'Otro tipo de empresa objetivo',
+                                isRequired: true,
+                              ),
+                            ],
+                            const SizedBox(height: 18),
+                            _GeographySelector(
+                              countries: geographyCountries,
+                              spainCoverage: spainCoverage,
+                              spanishProvinces: spanishProvinces,
+                              isEnabled: !isSubmitting,
+                              onCountriesChanged: onGeographyCountriesChanged,
+                              onSpainCoverageChanged: onSpainCoverageChanged,
+                              onProvincesChanged: onSpanishProvincesChanged,
+                            ),
+                            const SizedBox(height: 18),
+                            _OptionalFields(
+                              title: 'Criterios avanzados',
+                              description:
+                                  'Tamaño, valor mínimo y características de la empresa ideal.',
+                              forceExpanded:
+                                  minimumOpportunityValue ==
+                                      _otherMinimumValueOption &&
+                                  otherMinimumValueController.text
+                                      .trim()
+                                      .isEmpty,
+                              children: [
+                                _SingleSelectChipGroup(
+                                  title: 'Facturación anual aproximada',
+                                  options: _revenueRangeOptions,
+                                  selectedValue: targetRevenueRange,
+                                  isEnabled: !isSubmitting,
+                                  onChanged: onRevenueChanged,
+                                ),
+                                const SizedBox(height: 18),
+                                _SingleSelectChipGroup(
+                                  title:
+                                      'Empleo / tamaño de la operación industrial',
+                                  options: _employeeRangeOptions,
+                                  selectedValue: targetEmployeeRange,
+                                  isEnabled: !isSubmitting,
+                                  onChanged: onEmployeeRangeChanged,
+                                ),
+                                const SizedBox(height: 18),
+                                _SingleSelectChipGroup(
+                                  title:
+                                      '¿A partir de qué valor aproximado merece la pena investigar una oportunidad?',
+                                  helperText:
+                                      'No implica que InduRadar conozca el importe real del proyecto; sirve para priorizar.',
+                                  options: _minimumOpportunityValueOptions,
+                                  selectedValue: minimumOpportunityValue,
+                                  isEnabled: !isSubmitting,
+                                  onChanged: onMinimumValueChanged,
+                                ),
+                                if (minimumOpportunityValue ==
+                                    _otherMinimumValueOption) ...[
+                                  const SizedBox(height: 10),
+                                  _OtherField(
+                                    controller: otherMinimumValueController,
+                                    label: 'Otro valor aproximado',
+                                    isRequired: true,
+                                  ),
+                                ],
+                                const SizedBox(height: 14),
+                                TextFormField(
+                                  controller:
+                                      targetCompanyDescriptionController,
+                                  minLines: 3,
+                                  maxLines: 6,
+                                  decoration: const InputDecoration(
+                                    labelText:
+                                        'Define tu empresa objetivo ideal (opcional)',
+                                    hintText:
+                                        'Producción propia, decisión local, varias plantas, exportación, tecnologías concretas, certificaciones, tamaño mínimo...',
+                                    alignLabelWithHint: true,
+                                    prefixIcon: Icon(
+                                      Icons.business_center_outlined,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _FormSection(
-                sectionId: 'service',
-                headerAnchorKey: sectionHeaderKeys[4],
-                title: '5. ¿Cómo quieres recibir los resultados?',
-                isLocked: submissionSucceeded,
-                isExpanded: expandedSectionIndex == 4,
-                isComplete: completedSections[4],
-                onToggle: () => onSectionChanged(4),
-                children: [
-                  _MultiSelectChipGroup(
-                    title:
-                        'Selecciona el tipo de servicio que mejor encaja con tu necesidad',
-                    options: _serviceTypeOptions,
-                    selectedValues: serviceTypes,
-                    isEnabled: !isSubmitting,
-                    onChanged: (label, selected) {
-                      onToggleOption(serviceTypes, label, selected);
-                    },
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Las revisiones requieren un estudio puntual previo activo del mismo alcance. Si amplías sectores o provincias, primero se presupuesta la ampliación puntual.',
-                    style: textTheme.bodySmall?.copyWith(
-                      color: _steel,
-                      height: 1.45,
+                        const SizedBox(height: 12),
+                        _FormSection(
+                          sectionId: 'signals',
+                          headerAnchorKey: sectionHeaderKeys[2],
+                          title: '3. ¿Qué cambios quieres detectar?',
+                          isLocked: submissionSucceeded,
+                          isExpanded: expandedSectionIndex == 2,
+                          isComplete: completedSections[2],
+                          onToggle: () => onSectionChanged(2),
+                          children: [
+                            _SelectAllControl(
+                              label: 'Seleccionar todos los cambios',
+                              isSelected: allSignalsSelected,
+                              isEnabled: !isSubmitting,
+                              onChanged: onSetAllSignals,
+                            ),
+                            const SizedBox(height: 18),
+                            _MultiSelectChipGroup(
+                              title: 'A. Inversión y capacidad',
+                              options: _investmentSignalOptions,
+                              selectedValues: investmentSignals,
+                              isEnabled: !isSubmitting,
+                              onChanged: (label, selected) {
+                                onToggleOption(
+                                  investmentSignals,
+                                  label,
+                                  selected,
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 18),
+                            _MultiSelectChipGroup(
+                              title: 'B. Innovación y producto',
+                              options: _innovationSignalOptions,
+                              selectedValues: innovationSignals,
+                              isEnabled: !isSubmitting,
+                              onChanged: (label, selected) {
+                                onToggleOption(
+                                  innovationSignals,
+                                  label,
+                                  selected,
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 18),
+                            _MultiSelectChipGroup(
+                              title: 'C. Organización y crecimiento',
+                              options: _growthSignalOptions,
+                              selectedValues: growthSignals,
+                              isEnabled: !isSubmitting,
+                              onChanged: (label, selected) {
+                                onToggleOption(growthSignals, label, selected);
+                              },
+                            ),
+                            const SizedBox(height: 18),
+                            _MultiSelectChipGroup(
+                              title: 'D. Compra pública y apoyo financiero',
+                              options: _publicFinanceSignalOptions,
+                              selectedValues: publicFinanceSignals,
+                              isEnabled: !isSubmitting,
+                              onChanged: (label, selected) {
+                                onToggleOption(
+                                  publicFinanceSignals,
+                                  label,
+                                  selected,
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _FormSection(
+                          sectionId: 'needs',
+                          headerAnchorKey: sectionHeaderKeys[3],
+                          title: '4. ¿Qué necesidades quieres detectar?',
+                          isLocked: submissionSucceeded,
+                          isExpanded: expandedSectionIndex == 3,
+                          isComplete: completedSections[3],
+                          onToggle: () => onSectionChanged(3),
+                          children: [
+                            _SelectAllControl(
+                              label: 'Seleccionar todas las áreas',
+                              isSelected: allCommercialNeedsSelected,
+                              isEnabled: !isSubmitting,
+                              onChanged: onSetAllCommercialNeeds,
+                            ),
+                            const SizedBox(height: 18),
+                            _MultiSelectChipGroup(
+                              title:
+                                  '¿En qué áreas de oportunidad quieres clasificar los resultados?',
+                              helperText:
+                                  'La sección 2 define en qué empresas buscar; aquí defines qué necesidades podrían encajar con tu oferta. Todas están incluidas en la tarifa.',
+                              options: _commercialNeedOptions,
+                              selectedValues: commercialNeeds,
+                              isEnabled: !isSubmitting,
+                              onChanged: (label, selected) {
+                                onToggleOption(
+                                  commercialNeeds,
+                                  label,
+                                  selected,
+                                );
+                              },
+                            ),
+                            if (commercialNeeds.contains(_otherNeedOption)) ...[
+                              const SizedBox(height: 10),
+                              _OtherField(
+                                controller: otherNeedController,
+                                label: 'Otra área de oportunidad',
+                                isRequired: true,
+                              ),
+                            ],
+                            const SizedBox(height: 14),
+                            TextFormField(
+                              controller: opportunityTriggerController,
+                              minLines: 4,
+                              maxLines: 7,
+                              decoration: const InputDecoration(
+                                labelText:
+                                    'Describe una oportunidad comercial que justificaría una acción de tu equipo de ventas *',
+                                hintText:
+                                    'Qué tendría que ocurrir para que merezca una llamada, visita, reunión o investigación adicional.',
+                                alignLabelWithHint: true,
+                                prefixIcon: Icon(Icons.notes_outlined),
+                              ),
+                              validator: _required,
+                            ),
+                            const SizedBox(height: 14),
+                            _OptionalFields(
+                              title: 'Referencias y exclusiones',
+                              description:
+                                  'Casos, clientes, cuentas y límites que nos ayudan a afinar el encaje.',
+                              children: [
+                                TextFormField(
+                                  controller: recentCaseController,
+                                  minLines: 3,
+                                  maxLines: 6,
+                                  decoration: const InputDecoration(
+                                    labelText:
+                                        'Ayúdanos con un caso real o reciente (opcional)',
+                                    hintText:
+                                        'Qué estaba ocurriendo en ese cliente antes de que surgiera la oportunidad.',
+                                    alignLabelWithHint: true,
+                                    prefixIcon: Icon(Icons.history_outlined),
+                                  ),
+                                ),
+                                const SizedBox(height: 18),
+                                Text(
+                                  'Empresas de referencia',
+                                  style: textTheme.titleSmall?.copyWith(
+                                    color: _ink,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                _ResponsiveFields(
+                                  children: [
+                                    _MultilineReferenceField(
+                                      controller: currentClientsController,
+                                      label:
+                                          'Clientes actuales para buscar perfiles similares (opcional)',
+                                      hint:
+                                          'Empresas ya clientes cuyo perfil quieres replicar. Hasta 5, una por línea.',
+                                    ),
+                                    _MultilineReferenceField(
+                                      controller: idealClientsController,
+                                      label:
+                                          'Clientes ideales: clientes de la competencia a seguir (opcional)',
+                                      hint:
+                                          'Empresas que compran a competidores y quieres investigar. Hasta 5, una por línea.',
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 14),
+                                _ResponsiveFields(
+                                  children: [
+                                    _MultilineReferenceField(
+                                      controller: watchlistAccountsController,
+                                      label:
+                                          'Cuentas estratégicas para búsqueda especializada (opcional)',
+                                      hint:
+                                          'Empresas concretas para una investigación más profunda. Hasta 5, una por línea.',
+                                    ),
+                                    _MultilineReferenceField(
+                                      controller: competitorsController,
+                                      label: 'Competidores (opcional)',
+                                      hint:
+                                          'Indica si quieres excluirlos o monitorizarlos.',
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 14),
+                                TextFormField(
+                                  controller: excludedCompaniesController,
+                                  minLines: 2,
+                                  maxLines: 4,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Empresas excluidas (opcional)',
+                                    hintText:
+                                        'Clientes protegidos, cuentas ya trabajadas, empresas excluidas...',
+                                    alignLabelWithHint: true,
+                                    prefixIcon: Icon(Icons.block_outlined),
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                TextFormField(
+                                  controller: noBuyReasonController,
+                                  minLines: 3,
+                                  maxLines: 6,
+                                  decoration: const InputDecoration(
+                                    labelText:
+                                        '¿Por qué una empresa aparentemente ideal no os compraría? (opcional)',
+                                    hintText:
+                                        'Decisión centralizada en otro país, consumo insuficiente, tecnología incompatible, ticket demasiado pequeño...',
+                                    alignLabelWithHint: true,
+                                    prefixIcon: Icon(
+                                      Icons.report_problem_outlined,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _FormSection(
+                          sectionId: 'service',
+                          headerAnchorKey: sectionHeaderKeys[4],
+                          title: '5. ¿Cómo quieres recibir los resultados?',
+                          isLocked: submissionSucceeded,
+                          isExpanded: expandedSectionIndex == 4,
+                          isComplete: completedSections[4],
+                          onToggle: () => onSectionChanged(4),
+                          children: [
+                            _MultiSelectChipGroup(
+                              title:
+                                  'Selecciona el tipo de servicio que mejor encaja con tu necesidad',
+                              options: _serviceTypeOptions,
+                              selectedValues: serviceTypes,
+                              isEnabled: !isSubmitting,
+                              onChanged: (label, selected) {
+                                onToggleOption(serviceTypes, label, selected);
+                              },
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              'Las revisiones requieren un estudio puntual previo activo del mismo alcance. Si amplías sectores o provincias, primero se presupuesta la ampliación puntual.',
+                              style: textTheme.bodySmall?.copyWith(
+                                color: _steel,
+                                height: 1.45,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            TextFormField(
+                              controller: serviceCommentsController,
+                              minLines: 2,
+                              maxLines: 5,
+                              decoration: const InputDecoration(
+                                labelText:
+                                    'Comentarios sobre cuentas concretas a monitorizar, frecuencia, fechas o alcance (opcional)',
+                                alignLabelWithHint: true,
+                                prefixIcon: Icon(Icons.event_note_outlined),
+                              ),
+                            ),
+                            const SizedBox(height: 18),
+                            const Divider(color: _line),
+                            const SizedBox(height: 8),
+                            _PrivacyConsent(
+                              privacyAccepted: privacyAccepted,
+                              marketingConsent: marketingConsent,
+                              errorText: privacyError,
+                              onPrivacyChanged: isSubmitting
+                                  ? null
+                                  : onPrivacyChanged,
+                              onMarketingChanged: isSubmitting
+                                  ? null
+                                  : onMarketingChanged,
+                              onPrivacyPolicyTap: onPrivacyPolicyTap,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 22),
+                        FilledButton.icon(
+                          key: const ValueKey('primary-form-cta'),
+                          onPressed: isSubmitting || submissionSucceeded
+                              ? null
+                              : onSubmit,
+                          icon: isSubmitting
+                              ? const SizedBox.square(
+                                  dimension: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Icon(
+                                  submissionSucceeded
+                                      ? Icons.check_circle_outline
+                                      : Icons.send_outlined,
+                                ),
+                          label: Text(
+                            isSubmitting
+                                ? 'Enviando solicitud…'
+                                : submissionSucceeded
+                                ? 'Solicitud recibida'
+                                : 'Definir mi radar comercial',
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Revisaremos tu solicitud antes de iniciar la investigación.',
+                          textAlign: TextAlign.center,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: _steel,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: serviceCommentsController,
-                    minLines: 2,
-                    maxLines: 5,
-                    decoration: const InputDecoration(
-                      labelText:
-                          'Comentarios sobre cuentas concretas a monitorizar, frecuencia, fechas o alcance (opcional)',
-                      alignLabelWithHint: true,
-                      prefixIcon: Icon(Icons.event_note_outlined),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  const Divider(color: _line),
-                  const SizedBox(height: 8),
-                  _PrivacyConsent(
-                    privacyAccepted: privacyAccepted,
-                    marketingConsent: marketingConsent,
-                    errorText: privacyError,
-                    onPrivacyChanged: isSubmitting ? null : onPrivacyChanged,
-                    onMarketingChanged: isSubmitting
-                        ? null
-                        : onMarketingChanged,
-                    onPrivacyPolicyTap: onPrivacyPolicyTap,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 22),
-              FilledButton.icon(
-                key: const ValueKey('primary-form-cta'),
-                onPressed: isSubmitting || submissionSucceeded
-                    ? null
-                    : onSubmit,
-                icon: isSubmitting
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Icon(
-                        submissionSucceeded
-                            ? Icons.check_circle_outline
-                            : Icons.send_outlined,
-                      ),
-                label: Text(
-                  isSubmitting
-                      ? 'Enviando solicitud…'
-                      : submissionSucceeded
-                      ? 'Solicitud recibida'
-                      : 'Definir mi radar comercial',
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Revisaremos tu solicitud antes de iniciar la investigación.',
-                textAlign: TextAlign.center,
-                style: textTheme.bodySmall?.copyWith(
-                  color: _steel,
-                  height: 1.4,
                 ),
               ),
             ],
@@ -4348,7 +4376,7 @@ class LeadRequest {
     required this.privacyAccepted,
     required this.marketingConsent,
     required this.submittedAt,
-    this.pricingQuote,
+    this.creditsQuote,
   });
 
   final String fullName;
@@ -4389,7 +4417,7 @@ class LeadRequest {
   final bool privacyAccepted;
   final bool marketingConsent;
   final DateTime submittedAt;
-  final PricingQuote? pricingQuote;
+  final CreditsQuote? creditsQuote;
 
   Map<String, Object?> toJson() {
     final nameParts = fullName
@@ -4478,7 +4506,7 @@ class LeadRequest {
       'research_scope_units': scopeEstimate.units,
       'research_scope_level': scopeEstimate.level,
       'research_scope_model_version': ResearchScopeCalculator.modelVersion,
-      if (pricingQuote != null) 'estimated_pricing': pricingQuote!.toJson(),
+      if (creditsQuote != null) 'estimated_credits': creditsQuote!.toJson(),
     };
 
     return {
@@ -4499,7 +4527,7 @@ class LeadRequest {
       'research_scope_model_version': ResearchScopeCalculator.modelVersion,
       'channel': 'web_form',
       'submitted_at': submittedAtIso,
-      if (pricingQuote != null) 'pricing': pricingQuote!.toJson(),
+      if (creditsQuote != null) 'credits': creditsQuote!.toJson(),
       'contact': {
         'first_name': firstName,
         'last_name': lastName,
