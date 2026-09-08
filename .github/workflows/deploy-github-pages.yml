@@ -1,4 +1,4 @@
-name: Deploy Flutter web to GitHub Pages
+name: Deploy static landing to GitHub Pages
 
 on:
   push:
@@ -23,26 +23,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Build web
+      - name: Build static landing
         run: |
-          BASE_HREF="${{ vars.BASE_HREF }}"
-          if [ -z "$BASE_HREF" ]; then
-            BASE_HREF="/"
-          fi
-
-          flutter build web \
-            --release \
-            --base-href "$BASE_HREF" \
-            --dart-define=LEAD_ENDPOINT="${{ secrets.LEAD_ENDPOINT }}"
+          node --check site/app.js
+          node --test test/static_credits_test.mjs
+          LEAD_ENDPOINT="${{ secrets.LEAD_ENDPOINT }}" \
+            bash scripts/build_static_site.sh build/site
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
@@ -50,7 +36,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v4
         with:
-          path: build/web
+          path: build/site
 
   deploy:
     environment:

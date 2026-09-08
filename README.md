@@ -1,30 +1,33 @@
 # InduRadar Web
 
-Landing page pública de InduRadar — Industrial Opportunity Intelligence.
+Landing pública de InduRadar — Industrial Opportunity Intelligence.
 
-Construida con Flutter Web y desplegada mediante GitHub Pages.
+La página publicada es HTML, CSS y JavaScript estáticos para servir el contenido
+indexable sin arrancar Flutter. El proyecto Flutter se conserva como base del
+futuro portal y app móvil; la versión anterior de la landing está marcada con
+la rama `legacy/flutter-landing` y el tag `flutter-landing-2026-09-08`.
 
 ## Desarrollo local
 
 ```bash
-flutter pub get
-flutter run -d chrome \
-  --dart-define=LEAD_ENDPOINT='https://<PROJECT_REF>.supabase.co/functions/v1/submit-lead'
+LEAD_ENDPOINT='https://<PROJECT_REF>.supabase.co/functions/v1/submit-lead' \
+  bash scripts/build_static_site.sh build/static
+python3 -m http.server 8080 --directory build/static
 ```
 
-`LEAD_ENDPOINT` se incorpora en tiempo de compilación. Si no se proporciona, la
-web se puede abrir, pero el formulario mostrará un error de configuración y no
-simulará un envío correcto.
+El script genera `build/static`, que es exactamente el directorio publicado.
+`LEAD_ENDPOINT` se inyecta como configuración pública en tiempo de build. Si
+no se proporciona, la landing abre pero el formulario informa de que falta la
+configuración y no simula un envío correcto. La URL del endpoint es visible en
+el navegador y no es un secreto; nunca incluyas claves de Supabase o Resend.
 
 ## Despliegue
 
-El workflow `.github/workflows/deploy-github-pages.yml` construye la web con:
+El workflow `.github/workflows/deploy-github-pages.yml` publica la landing con:
 
 ```bash
-flutter build web \
-  --release \
-  --base-href "$BASE_HREF" \
-  --dart-define=LEAD_ENDPOINT="${{ secrets.LEAD_ENDPOINT }}"
+LEAD_ENDPOINT="${{ secrets.LEAD_ENDPOINT }}" \
+  bash scripts/build_static_site.sh build/site
 ```
 
 Configura `LEAD_ENDPOINT` en **GitHub → Settings → Secrets and variables →
@@ -33,8 +36,9 @@ Actions**. No añadas claves de Supabase, Resend ni otros secretos al frontend.
 ## Créditos de alcance
 
 La configuración editable está en
-`assets/config/induradar_credits_v1.json`. La web muestra créditos estimados,
-no euros, y se actualiza al seleccionar sectores, provincias y señales.
+`assets/config/induradar_credits_v1.json`. La landing la carga en tiempo de
+ejecución, muestra créditos estimados y se actualiza al seleccionar sectores,
+provincias y señales.
 
 ```text
 Créditos = 50 base + suplemento de provincias
@@ -51,8 +55,8 @@ el formulario no permita seleccionar distritos portugueses; esta decisión está
 documentada en el propio catálogo. Las RU siguen enviándose solo como métrica
 interna de complejidad y no intervienen en los créditos.
 
-Cualquier cambio del JSON de créditos requiere volver a compilar y desplegar la
-web.
+Todo cambio del JSON requiere volver a desplegar la web para publicar el nuevo
+catálogo.
 
 ## Contrato de solicitud
 
