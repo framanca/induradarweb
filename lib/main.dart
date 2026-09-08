@@ -736,20 +736,23 @@ class _LandingPageState extends State<LandingPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
-                            flex: 7,
+                            flex: 9,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 const _BrandHeader(),
-                                const SizedBox(height: 46),
-                                _LandingIntro(
-                                  onDemoReportPressed: _downloadDemoReport,
-                                ),
+                                const SizedBox(height: 30),
+                                form,
                               ],
                             ),
                           ),
                           const SizedBox(width: 48),
-                          Expanded(flex: 9, child: form),
+                          Expanded(
+                            flex: 7,
+                            child: _LandingIntro(
+                              onDemoReportPressed: _downloadDemoReport,
+                            ),
+                          ),
                         ],
                       );
                     },
@@ -1055,6 +1058,7 @@ class _LandingIntro extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Column(
+      key: const ValueKey('landing-intro'),
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [

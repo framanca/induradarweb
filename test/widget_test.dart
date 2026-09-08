@@ -64,7 +64,7 @@ void main() {
   });
 
   testWidgets(
-    'Desktop aligns the form with the brand and enlarges step titles',
+    'Desktop places the form below the brand and the intro on the right',
     (WidgetTester tester) async {
       _setTestViewSize(tester, const Size(1400, 1000));
       await tester.pumpWidget(
@@ -80,7 +80,14 @@ void main() {
       final formTop = tester
           .getTopLeft(find.byKey(const ValueKey('lead-form-panel')))
           .dy;
-      expect(formTop, closeTo(brandTop, 0.1));
+      final formBounds = tester.getRect(
+        find.byKey(const ValueKey('lead-form-panel')),
+      );
+      final introBounds = tester.getRect(
+        find.byKey(const ValueKey('landing-intro')),
+      );
+      expect(formTop, greaterThan(brandTop));
+      expect(formBounds.left, lessThan(introBounds.left));
 
       final brandBounds = tester.getRect(
         find.byKey(const ValueKey('brand-header')),
