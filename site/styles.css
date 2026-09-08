@@ -156,6 +156,7 @@ input[aria-invalid="true"], textarea[aria-invalid="true"] { border-color: var(--
 .site-footer div { display: flex; align-items: center; gap: 10px; }
 .site-footer img { display: block; border-radius: 50%; background: #fff; }
 .site-footer a { color: #fff; font-weight: 750; }
+.site-footer .site-footer-links { display: flex; align-items: center; gap: 18px; }
 .noscript { position: fixed; right: 20px; bottom: 20px; max-width: 350px; padding: 12px; border: 1px solid #edb6b0; border-radius: 8px; background: #fff4f2; color: var(--error); }
 
 @media (max-width: 940px) { .hero-grid { grid-template-columns: 1fr; gap: 36px; } .intro-column { order: -1; } .brand { margin-bottom: 24px; } .form-summary { position: static; } .form-scroll { max-height: none; overflow: visible; } }
