@@ -10,7 +10,7 @@ mkdir -p "$output_dir"
 
 cp -R site/. "$output_dir/"
 mkdir -p "$output_dir/assets/config"
-cp assets/InduRadarLogo.svg "$output_dir/assets/"
+cp assets/InduRadarLogoVertical.png "$output_dir/assets/"
 cp assets/InduRadar_Informe_Demo_Anonimizado_Flexografia.pdf "$output_dir/assets/"
 cp assets/config/induradar_credits_v1.json "$output_dir/assets/config/"
 cp -R web/privacidad "$output_dir/privacidad"
