@@ -138,9 +138,22 @@
     <section class="content-band final-cta" aria-labelledby="cta-title">
       <div class="content-wrap"><p class="eyebrow">Empieza con un alcance concreto</p><h2 id="cta-title">Define dónde quieres encontrar tu próxima oportunidad</h2><p>El formulario permite concretar sectores, empresas objetivo, geografía y señales sin compromiso de automatización.</p><a class="primary-link" href="#formulario">Configurar mi radar comercial</a></div>
     </section>
+
+    <section id="contacto" class="content-band contact-band" aria-labelledby="contact-title">
+      <div class="content-wrap contact-layout">
+        <div><p class="eyebrow">Contacto</p><h2 id="contact-title">¿Tienes una consulta?</h2><p class="section-intro">Cuéntanos brevemente qué necesitas y prepararemos un correo dirigido a <a href="mailto:info@induradar.com">info@induradar.com</a>.</p></div>
+        <form id="contact-form" class="contact-form" novalidate>
+          <div id="contact-status" class="contact-status" hidden role="status" aria-live="polite"></div>
+          <div class="contact-field"><label for="contact-name">Nombre *</label><input id="contact-name" name="contactName" type="text" autocomplete="name"><p class="field-error" data-contact-error-for="contactName" hidden></p></div>
+          <div class="contact-field"><label for="contact-email">Email *</label><input id="contact-email" name="contactEmail" type="email" autocomplete="email"><p class="field-error" data-contact-error-for="contactEmail" hidden></p></div>
+          <div class="contact-field"><label for="contact-message">Consulta *</label><textarea id="contact-message" name="contactMessage" rows="5"></textarea><p class="field-error" data-contact-error-for="contactMessage" hidden></p></div>
+          <button class="contact-submit" type="submit">Enviar consulta</button>
+        </form>
+      </div>
+    </section>
   </main>
 
-  <footer class="site-footer"><div><img src="assets/InduRadarLogoVertical.png" width="44" height="35" alt=""><span>InduRadar · Inteligencia comercial industrial</span></div><nav class="site-footer-links" aria-label="Enlaces secundarios"><a href="recursos/">Recursos</a><a href="privacidad/">Política de privacidad</a></nav></footer>
+  <footer class="site-footer"><div><img src="assets/InduRadarLogoVertical.png" width="44" height="35" alt=""><span>InduRadar · Inteligencia comercial industrial</span></div><nav class="site-footer-links" aria-label="Enlaces secundarios"><a href="recursos/">Recursos</a><a href="#contacto">Contacto</a><a href="privacidad/">Política de privacidad</a></nav></footer>
 
   <noscript><div class="noscript">Activa JavaScript para completar y enviar el formulario de solicitud.</div></noscript>
   <script src="config.js"></script>

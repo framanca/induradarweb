@@ -8,6 +8,8 @@ const progressValue = document.querySelector('#progress-value');
 const stepLabel = document.querySelector('#step-label');
 const creditsTotal = document.querySelector('#credits-total');
 const creditsBreakdown = document.querySelector('#credits-breakdown');
+const contactForm = document.querySelector('#contact-form');
+const contactStatus = document.querySelector('#contact-status');
 
 const FORM_VERSION = '3.13.1';
 const CONTRACT_VERSION = '1.3.2';
@@ -343,13 +345,13 @@ function renderForm() {
       textField('phone', 'Teléfono (opcional)', { type: 'tel' }),
       textField('website', 'Web de la empresa (opcional)', { type: 'url' }),
       textField('address', 'Dirección (opcional)', { hint: 'Ciudad, provincia o dirección profesional.' }),
-      optionalFields('Afinar tu oferta', 'Categorías, problemas que resuelves y soluciones prioritarias.', [
+      `<div class="offer-refinement"><div class="offer-refinement__heading"><h3>Afinar tu oferta</h3><p>Categorías, problemas que resuelves y soluciones prioritarias.</p></div>${[
         checkboxGroup('offerCategories', 'Categoría principal de tu oferta *', options.offerCategories),
         `<div id="other-offer-category" class="conditional" hidden>${textField('otherOfferCategory', 'Otra categoría', { required: true, hint: 'Puedes separar varios valores con comas.' })}</div>`,
         checkboxGroup('problemsSolved', '¿Qué problemas ayudas a resolver?', options.problems),
         `<div id="other-problem" class="conditional" hidden>${textField('otherProblem', 'Otro problema', { required: true, hint: 'Puedes separar varios valores con comas.' })}</div>`,
         textField('prioritySolutions', 'Productos, soluciones o servicios que quieres priorizar (opcional)', { rows: 3, hint: 'Familias, especialidades, marcas, tecnologías, aplicaciones o servicios.' }),
-      ].join('')),
+      ].join('')}</div>`,
     ].join('')),
     section('target', '2. ¿Qué empresas buscas?', [
       checkboxGroup('targetSectors', 'Sectores objetivo *', options.sectors),
@@ -440,8 +442,14 @@ function toggleHidden(selector, visible) {
 }
 
 function connectInteractions() {
-  form.addEventListener('input', updateDerivedState);
-  form.addEventListener('change', updateDerivedState);
+  form.addEventListener('input', (event) => {
+    clearErrorForInput(event.target);
+    updateDerivedState();
+  });
+  form.addEventListener('change', (event) => {
+    clearErrorForInput(event.target);
+    updateDerivedState();
+  });
   sectionsRoot.querySelectorAll('.form-section').forEach((details) => {
     details.addEventListener('toggle', () => {
       if (!details.open) return;
@@ -544,6 +552,7 @@ function validEmail(email) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email); }
 function clearErrors() {
   form.querySelectorAll('[aria-invalid="true"]').forEach((field) => field.removeAttribute('aria-invalid'));
   form.querySelectorAll('[data-error-for]').forEach((element) => { element.hidden = true; element.textContent = ''; });
+  form.querySelectorAll('.has-error').forEach((element) => element.classList.remove('has-error'));
 }
 
 function showError(name, message) {
@@ -552,6 +561,21 @@ function showError(name, message) {
   else if (field) field.setAttribute('aria-invalid', 'true');
   const error = form.querySelector(`[data-error-for="${name}"]`);
   if (error) { error.textContent = message; error.hidden = false; }
+  const input = field instanceof RadioNodeList ? field[0] : field;
+  input?.closest('.field, .option-group, .privacy-option')?.classList.add('has-error');
+}
+
+function clearErrorForInput(input) {
+  if (!(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement)) return;
+  const { name } = input;
+  if (!name) return;
+  inputsByName(name).forEach((field) => field.removeAttribute('aria-invalid'));
+  const error = form.querySelector(`[data-error-for="${name}"]`);
+  if (error) { error.hidden = true; error.textContent = ''; }
+  const container = input.closest('.field, .option-group, .privacy-option');
+  container?.classList.remove('has-error');
+  const section = input.closest('.form-section');
+  if (section && !section.querySelector('.field.has-error, .option-group.has-error, .privacy-option.has-error')) section.classList.remove('has-error');
 }
 
 function validateForm() {
@@ -581,6 +605,7 @@ function validateForm() {
   if (selectedValues('commercialNeeds').includes(OTHER_NEED) && !fieldValue('otherNeed')) { showError('otherNeed', 'Describe la otra área de oportunidad.'); invalidSections.add('needs'); }
   if (!form.elements.privacyAccepted.checked) { showError('privacyAccepted', 'Necesitamos tu consentimiento para responderte.'); invalidSections.add('service'); }
   if (invalidSections.size) {
+    invalidSections.forEach((sectionId) => document.querySelector(`#section-${sectionId}`)?.classList.add('has-error'));
     const first = invalidSections.values().next().value;
     const details = document.querySelector(`#section-${first}`);
     details.open = true;
@@ -759,6 +784,53 @@ function resetForm() {
   document.querySelector('#formulario').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+function setContactStatus(type, message) {
+  contactStatus.hidden = false;
+  contactStatus.className = `contact-status ${type}`;
+  contactStatus.textContent = message;
+}
+
+function clearContactErrors() {
+  contactForm.querySelectorAll('[aria-invalid="true"]').forEach((field) => field.removeAttribute('aria-invalid'));
+  contactForm.querySelectorAll('.has-error').forEach((element) => element.classList.remove('has-error'));
+  contactForm.querySelectorAll('[data-contact-error-for]').forEach((element) => { element.hidden = true; element.textContent = ''; });
+}
+
+function showContactError(name, message) {
+  const field = contactForm.elements.namedItem(name);
+  if (!(field instanceof HTMLElement)) return;
+  field.setAttribute('aria-invalid', 'true');
+  field.closest('.contact-field')?.classList.add('has-error');
+  const error = contactForm.querySelector(`[data-contact-error-for="${name}"]`);
+  if (error) { error.textContent = message; error.hidden = false; }
+}
+
+function clearContactErrorForInput(input) {
+  if (!(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement)) return;
+  input.removeAttribute('aria-invalid');
+  input.closest('.contact-field')?.classList.remove('has-error');
+  const error = contactForm.querySelector(`[data-contact-error-for="${input.name}"]`);
+  if (error) { error.hidden = true; error.textContent = ''; }
+}
+
+function submitContact(event) {
+  event.preventDefault();
+  clearContactErrors();
+  contactStatus.hidden = true;
+  const name = contactForm.elements.contactName.value.trim();
+  const email = contactForm.elements.contactEmail.value.trim();
+  const message = contactForm.elements.contactMessage.value.trim();
+  let valid = true;
+  if (!name) { showContactError('contactName', 'Indica tu nombre.'); valid = false; }
+  if (!validEmail(email)) { showContactError('contactEmail', 'Indica un email válido para responderte.'); valid = false; }
+  if (!message) { showContactError('contactMessage', 'Escribe tu consulta.'); valid = false; }
+  if (!valid) return;
+  const subject = `Consulta desde induradar.com - ${name}`;
+  const body = `Nombre: ${name}\nEmail: ${email}\n\nConsulta:\n${message}`;
+  window.location.href = `mailto:info@induradar.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  setContactStatus('success', 'Se ha abierto tu aplicación de correo con la consulta preparada para enviar a info@induradar.com.');
+}
+
 async function loadCreditsCatalog() {
   try {
     const response = await fetch('assets/config/induradar_credits_v1.json', { cache: 'no-cache' });
@@ -772,4 +844,6 @@ async function loadCreditsCatalog() {
 
 renderForm();
 form.addEventListener('submit', submitLead);
+contactForm?.addEventListener('submit', submitContact);
+contactForm?.addEventListener('input', (event) => clearContactErrorForInput(event.target));
 void loadCreditsCatalog();
