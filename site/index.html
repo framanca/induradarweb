@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="InduRadar convierte señales industriales verificadas en oportunidades comerciales B2B priorizadas para empresas industriales en España y Portugal.">
-  <meta name="keywords" content="inteligencia comercial industrial, oportunidades comerciales industriales, señales industriales, ventas B2B industrial, inversiones industriales España, radar comercial industrial">
+  <meta name="description" content="InduRadar es inteligencia comercial industrial para detectar oportunidades industriales B2B a partir de inversiones, ampliaciones y señales verificadas en España y Portugal.">
+  <meta name="keywords" content="InduRadar, inteligencia comercial industrial, oportunidades industriales B2B, oportunidades comerciales industriales, señales industriales, ventas B2B industrial, inversiones industriales España, radar comercial industrial">
   <meta name="author" content="InduRadar">
   <meta name="robots" content="index,follow">
   <meta name="theme-color" content="#075a8f">
@@ -14,33 +14,50 @@
   <link rel="manifest" href="manifest.json">
   <meta property="og:locale" content="es_ES">
   <meta property="og:site_name" content="InduRadar">
-  <meta property="og:title" content="InduRadar | Inteligencia comercial industrial">
-  <meta property="og:description" content="Detecta inversiones, ampliaciones, nuevas líneas y cambios industriales que pueden convertirse en oportunidades comerciales.">
+  <meta property="og:title" content="InduRadar | Inteligencia comercial industrial y oportunidades B2B">
+  <meta property="og:description" content="Inteligencia comercial industrial para detectar inversiones, ampliaciones y cambios que pueden convertirse en oportunidades B2B.">
   <meta property="og:url" content="https://induradar.com/">
   <meta property="og:type" content="website">
   <meta property="og:image" content="https://induradar.com/icons/Icon-512.png">
   <meta property="og:image:alt" content="Logo de InduRadar">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="InduRadar | Inteligencia comercial industrial">
-  <meta name="twitter:description" content="Convierte señales industriales verificadas en oportunidades comerciales B2B priorizadas.">
+  <meta name="twitter:title" content="InduRadar | Inteligencia comercial industrial y oportunidades B2B">
+  <meta name="twitter:description" content="Inteligencia comercial industrial para detectar oportunidades industriales B2B a partir de señales verificadas.">
   <meta name="twitter:image" content="https://induradar.com/icons/Icon-512.png">
-  <title>InduRadar | Inteligencia comercial industrial y oportunidades B2B</title>
+  <title>InduRadar | Inteligencia comercial industrial y oportunidades industriales B2B</title>
   <link rel="stylesheet" href="styles.css">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
-    "@type": "Service",
-    "name": "InduRadar",
-    "url": "https://induradar.com/",
-    "description": "Inteligencia comercial industrial para detectar oportunidades B2B a partir de señales verificadas.",
-    "areaServed": ["España", "Portugal"],
-    "provider": {
-      "@type": "Organization",
-      "name": "InduRadar",
-      "url": "https://induradar.com/",
-      "logo": "https://induradar.com/assets/InduRadarLogoVertical-600.webp"
-    },
-    "serviceType": "Inteligencia comercial industrial"
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://induradar.com/#organization",
+        "name": "InduRadar",
+        "alternateName": "InduRadar Inteligencia Comercial Industrial",
+        "url": "https://induradar.com/",
+        "logo": "https://induradar.com/assets/InduRadarLogoVertical-600.webp",
+        "description": "Inteligencia comercial industrial para detectar oportunidades industriales B2B.",
+        "areaServed": ["España", "Portugal"]
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://induradar.com/#website",
+        "name": "InduRadar",
+        "url": "https://induradar.com/",
+        "inLanguage": "es-ES",
+        "publisher": { "@id": "https://induradar.com/#organization" }
+      },
+      {
+        "@type": "Service",
+        "name": "InduRadar Inteligencia Comercial Industrial",
+        "url": "https://induradar.com/",
+        "description": "Servicio de inteligencia comercial industrial para detectar oportunidades industriales B2B a partir de señales verificadas.",
+        "areaServed": ["España", "Portugal"],
+        "provider": { "@id": "https://induradar.com/#organization" },
+        "serviceType": "Inteligencia comercial industrial"
+      }
+    ]
   }
   </script>
 </head>
@@ -85,8 +102,8 @@
         </div>
 
         <div class="intro-column">
-          <h1 id="hero-title">Convierte cambios industriales en oportunidades comerciales</h1>
-          <p class="lead">Identificamos inversiones, ampliaciones, nuevas líneas, maquinaria, ayudas y otros cambios empresariales, y analizamos qué oportunidades comerciales pueden derivarse de ellos.</p>
+          <h1 id="hero-title">InduRadar convierte cambios industriales en oportunidades B2B</h1>
+          <p class="lead">InduRadar identifica inversiones, ampliaciones, nuevas líneas, maquinaria, ayudas y otros cambios empresariales, y analiza qué oportunidades comerciales pueden derivarse de ellos.</p>
           <p class="supporting-copy">Define qué vendes, qué empresas buscas y qué señales te interesan. InduRadar prioriza los resultados y conserva la evidencia que los respalda.</p>
 
           <a class="demo-card" href="assets/InduRadar_Informe_Demo_Anonimizado_Flexografia.pdf" download="InduRadar_Informe_Demo_Anonimizado_Flexografia.pdf">
@@ -155,7 +172,7 @@
     </section>
   </main>
 
-  <footer class="site-footer"><div><img src="assets/InduRadarLogoVertical-128.webp" width="48" height="38" alt="InduRadar"><span>InduRadar · Inteligencia comercial industrial</span></div><nav class="site-footer-links" aria-label="Enlaces secundarios"><a href="recursos/">Recursos</a><a href="#contacto">Contacto</a><a href="privacidad/">Política de privacidad</a></nav></footer>
+  <footer class="site-footer"><div><img src="assets/InduRadarLogoVertical-128.webp" width="48" height="38" alt="InduRadar"><span>InduRadar · Inteligencia comercial industrial</span></div><nav class="site-footer-links" aria-label="Enlaces secundarios"><a href="recursos/">Recursos</a><a href="mailto:info@induradar.com">Contacto</a><a href="privacidad/">Política de privacidad</a></nav></footer>
 
   <noscript><div class="noscript">Activa JavaScript para completar y enviar el formulario de solicitud.</div></noscript>
   <script src="config.js"></script>
