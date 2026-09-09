@@ -226,6 +226,15 @@
   padding: 62px 0 82px;
 }
 
+.resources-index__header h2 {
+  margin: 0;
+  font-size: 31px;
+}
+
+.resources-index__header--secondary {
+  margin-top: 64px;
+}
+
 .resources-index__intro {
   max-width: 730px;
   color: var(--steel);
@@ -336,6 +345,10 @@
 
   .resource-grid {
     grid-template-columns: 1fr;
+  }
+
+  .resources-index__header h2 {
+    font-size: 27px;
   }
 
   .resource-footer__inner {
