@@ -11,15 +11,15 @@ la rama `legacy/flutter-landing` y el tag `flutter-landing-2026-09-08`.
 
 ```bash
 LEAD_ENDPOINT='https://<PROJECT_REF>.supabase.co/functions/v1/submit-lead' \
+CONTACT_ENDPOINT='https://<PROJECT_REF>.supabase.co/functions/v1/submit-contact' \
   bash scripts/build_static_site.sh build/static
 python3 -m http.server 8080 --directory build/static
 ```
 
 El script genera `build/static`, que es exactamente el directorio publicado.
-`LEAD_ENDPOINT` se inyecta como configuración pública en tiempo de build. Si
-no se proporciona, la landing abre pero el formulario informa de que falta la
-configuración y no simula un envío correcto. La URL del endpoint es visible en
-el navegador y no es un secreto; nunca incluyas claves de Supabase o Resend.
+`LEAD_ENDPOINT` y `CONTACT_ENDPOINT` se inyectan como configuración pública en
+tiempo de build. Las URLs de endpoints son visibles en el navegador y no son
+secretos; nunca incluyas claves de Supabase o Resend.
 
 ## Despliegue
 
@@ -27,11 +27,36 @@ El workflow `.github/workflows/deploy-github-pages.yml` publica la landing con:
 
 ```bash
 LEAD_ENDPOINT="${{ secrets.LEAD_ENDPOINT }}" \
+CONTACT_ENDPOINT="${{ secrets.CONTACT_ENDPOINT }}" \
   bash scripts/build_static_site.sh build/site
 ```
 
-Configura `LEAD_ENDPOINT` en **GitHub → Settings → Secrets and variables →
-Actions**. No añadas claves de Supabase, Resend ni otros secretos al frontend.
+Configura `LEAD_ENDPOINT` y `CONTACT_ENDPOINT` en **GitHub → Settings →
+Secrets and variables → Actions**. `CONTACT_ENDPOINT` debe ser
+`https://<PROJECT_REF>.supabase.co/functions/v1/submit-contact`. No añadas
+claves de Supabase, Resend ni otros secretos al frontend.
+
+## Formulario de contacto
+
+El código de la Edge Function está en
+`supabase/functions/submit-contact/index.ts`. Valida los campos, limita el
+origen a los dominios autorizados y usa un campo trampa para reducir spam. No
+guarda datos en Supabase: envía el mensaje a `info@induradar.com` mediante
+Resend con el email del usuario como `reply_to`.
+
+Antes de publicar el envío directo, configura en Supabase los secretos privados
+`RESEND_API_KEY`, `CONTACT_FROM_EMAIL`, `CONTACT_TO_EMAIL` (por defecto,
+`info@induradar.com`) y `CONTACT_ALLOWED_ORIGINS` (por ejemplo,
+`https://induradar.com,https://www.induradar.com`). Después despliega la
+función pública:
+
+```bash
+supabase functions deploy submit-contact --no-verify-jwt
+```
+
+El proyecto no incluye Supabase CLI ni credenciales de despliegue. Hasta que
+`CONTACT_ENDPOINT` esté configurado en GitHub Pages, la web conserva el cliente
+de correo como fallback para no perder consultas.
 
 ## Créditos de alcance
 

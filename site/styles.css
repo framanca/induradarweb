@@ -61,7 +61,6 @@ h3 { font-size: clamp(25px, 2.5vw, 35px); line-height: 1.15; letter-spacing: 0; 
 .form-summary { position: relative; z-index: 2; display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 22px; padding: 24px 24px 15px; background: #fff; }
 .form-summary h2 { margin-bottom: 8px; font-size: 27px; }
 .form-summary p { margin-bottom: 0; color: var(--steel); font-size: 15px; line-height: 1.4; }
-.minimum-badge { display: inline-block; margin-bottom: 10px !important; padding: 5px 9px; border-radius: 4px; background: #e2f6f8; color: var(--blue) !important; font-size: 14px !important; font-weight: 800; }
 .credits { min-width: 0; padding-left: 14px; border-left: 3px solid var(--cyan); }
 .credits span { display: block; margin-bottom: 3px; color: var(--blue); font-size: 11px; font-weight: 800; text-transform: uppercase; }
 .credits strong { display: block; font-size: 23px; line-height: 1.15; }
@@ -188,8 +187,11 @@ input[aria-invalid="true"], textarea[aria-invalid="true"] { border-color: var(--
 .contact-field:first-of-type { margin-top: 0; }
 .contact-field label { display: block; margin-bottom: 6px; color: var(--ink); font-size: 14px; font-weight: 800; }
 .contact-status { margin-bottom: 14px; padding: 12px 14px; border: 1px solid #a9d8c3; border-radius: 7px; background: #eaf7f1; color: var(--success); font-size: 14px; }
+.contact-status.error { border-color: #edb6b0; background: #fff4f2; color: var(--error); }
+.contact-honeypot { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
 .contact-submit { width: 100%; min-height: 48px; margin-top: 18px; border: 1px solid var(--blue); border-radius: 8px; background: var(--blue); color: #fff; cursor: pointer; font-weight: 800; }
 .contact-submit:hover { background: var(--blue-dark); }
+.contact-submit:disabled { cursor: wait; opacity: .7; }
 .site-footer { display: flex; justify-content: space-between; gap: 24px; padding: 24px max(24px, calc((100vw - 1280px) / 2)); background: #092e47; color: #dceef3; font-size: 13px; }
 .site-footer div { display: flex; align-items: center; gap: 10px; }
 .site-footer img { display: block; border-radius: 50%; background: #fff; }

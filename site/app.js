@@ -10,6 +10,7 @@ const creditsTotal = document.querySelector('#credits-total');
 const creditsBreakdown = document.querySelector('#credits-breakdown');
 const contactForm = document.querySelector('#contact-form');
 const contactStatus = document.querySelector('#contact-status');
+const contactSubmitButton = document.querySelector('.contact-submit');
 
 const FORM_VERSION = '3.13.1';
 const CONTRACT_VERSION = '1.3.2';
@@ -739,6 +740,11 @@ function isConfiguredEndpoint() {
   try { return new URL(endpoint).protocol === 'https:'; } catch { return false; }
 }
 
+function isConfiguredContactEndpoint() {
+  const endpoint = window.INDURADAR_CONFIG?.contactEndpoint ?? '';
+  try { return new URL(endpoint).protocol === 'https:'; } catch { return false; }
+}
+
 async function submitLead(event) {
   event.preventDefault();
   if (submissionSucceeded || submitButton.disabled) return;
@@ -813,22 +819,60 @@ function clearContactErrorForInput(input) {
   if (error) { error.hidden = true; error.textContent = ''; }
 }
 
-function submitContact(event) {
+function openContactMailClient(name, email, message) {
+  const subject = `Consulta desde induradar.com - ${name}`;
+  const body = `Nombre: ${name}\nEmail: ${email}\n\nConsulta:\n${message}`;
+  window.location.href = `mailto:info@induradar.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+async function submitContact(event) {
   event.preventDefault();
+  if (contactSubmitButton?.disabled) return;
   clearContactErrors();
   contactStatus.hidden = true;
   const name = contactForm.elements.contactName.value.trim();
   const email = contactForm.elements.contactEmail.value.trim();
   const message = contactForm.elements.contactMessage.value.trim();
+  const website = contactForm.elements.contactWebsite.value.trim();
   let valid = true;
   if (!name) { showContactError('contactName', 'Indica tu nombre.'); valid = false; }
   if (!validEmail(email)) { showContactError('contactEmail', 'Indica un email válido para responderte.'); valid = false; }
   if (!message) { showContactError('contactMessage', 'Escribe tu consulta.'); valid = false; }
   if (!valid) return;
-  const subject = `Consulta desde induradar.com - ${name}`;
-  const body = `Nombre: ${name}\nEmail: ${email}\n\nConsulta:\n${message}`;
-  window.location.href = `mailto:info@induradar.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  setContactStatus('success', 'Se ha abierto tu aplicación de correo con la consulta preparada para enviar a info@induradar.com.');
+
+  if (!isConfiguredContactEndpoint()) {
+    console.debug('CONTACT_ENDPOINT is not configured. Using mail client fallback.');
+    openContactMailClient(name, email, message);
+    setContactStatus('success', 'Se ha abierto tu aplicación de correo con la consulta preparada para enviar a info@induradar.com.');
+    return;
+  }
+
+  contactSubmitButton.disabled = true;
+  contactSubmitButton.textContent = 'Enviando consulta…';
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 20000);
+  try {
+    const response = await fetch(window.INDURADAR_CONFIG.contactEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, message, website, source: 'induradar_landing', submitted_at: new Date().toISOString() }),
+      signal: controller.signal,
+    });
+    let result;
+    try { result = await response.json(); } catch { throw new Error('invalid_json_response'); }
+    console.debug('Contact submission', { httpStatus: response.status, success: result?.success === true });
+    if (!response.ok || result?.success !== true) throw new Error(`http_${response.status}`);
+    contactForm.reset();
+    setContactStatus('success', 'Consulta enviada correctamente. Te responderemos lo antes posible.');
+  } catch (error) {
+    const detail = error instanceof DOMException && error.name === 'AbortError' ? 'timeout' : error instanceof Error ? error.message : 'unknown_error';
+    console.debug('Contact submission failed', { detail });
+    setContactStatus('error', 'No hemos podido enviar la consulta. Inténtalo de nuevo en unos minutos.');
+  } finally {
+    window.clearTimeout(timeout);
+    contactSubmitButton.disabled = false;
+    contactSubmitButton.textContent = 'Enviar consulta';
+  }
 }
 
 async function loadCreditsCatalog() {

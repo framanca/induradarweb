@@ -28,6 +28,7 @@ jobs:
           node --check site/app.js
           node --test test/static_credits_test.mjs
           LEAD_ENDPOINT="${{ secrets.LEAD_ENDPOINT }}" \
+          CONTACT_ENDPOINT="${{ secrets.CONTACT_ENDPOINT }}" \
             bash scripts/build_static_site.sh build/site
 
       - name: Configure GitHub Pages

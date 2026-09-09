@@ -56,6 +56,12 @@ supabase/.branches/
 # InduRadar private/internal files
 docs/
 supabase/
+!supabase/
+supabase/*
+!supabase/functions/
+supabase/functions/*
+!supabase/functions/submit-contact/
+!supabase/functions/submit-contact/index.ts
 AGENTS.md
 DATA_MODEL.md
 .vscode/
