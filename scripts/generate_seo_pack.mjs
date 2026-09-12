@@ -244,6 +244,7 @@ function writeHub() {
         ['Nuevas empresas por CNAE', 'nuevas-empresas-por-cnae/', 'Como combinar CNAE, registros, geografia y validacion de actividad real.'],
         ['Camaras de Comercio', 'camaras-comercio-encontrar-clientes/', 'Como usar censos, directorios y redes territoriales para descubrir empresas.'],
         ['Empresas por proceso industrial', 'buscar-empresas-por-proceso-industrial/', 'Como buscar por inyeccion, extrusion, mecanizado, impresion o paletizado.'],
+        ['Fabricantes de maquinaria, OEM e integradores', 'encontrar-fabricantes-maquinaria-oem-integradores/', 'Metodos para descubrir fabricantes e integradores por sector, proceso, feria y capacidad tecnica.'],
         ['Nuevos clientes industriales', 'como-encontrar-nuevos-clientes-industriales/', 'Alternativas a una base generica para encontrar y priorizar cuentas industriales.'],
       ],
     },
@@ -253,6 +254,8 @@ function writeHub() {
       items: [
         ['Senales de inversion industrial', 'senales-empresa-industrial-va-a-invertir/', 'Permisos, ayudas, empleo, suelo, nuevas lineas y combinaciones de senales.'],
         ['Oportunidades a partir de senales', 'senales-oportunidades-negocio-industrial/', 'Como una senal cambia la prioridad comercial de una empresa.'],
+        ['Detectar inversiones industriales', 'como-detectar-inversiones-industriales/', 'Senales publicas para descubrir nuevas fabricas, ampliaciones, lineas y modernizaciones.'],
+        ['Senales de ampliacion industrial', 'senales-que-anticipan-una-ampliacion-industrial/', 'Permisos, ayudas, obra, contratacion tecnica y otros indicios de aumento de capacidad.'],
         ['Ampliaciones de fabricas', 'detectar-ampliaciones-fabricas-inversion-industrial/', 'Como detectar ampliaciones mediante fuentes territoriales, permisos y anuncios.'],
         ['Ayudas, permisos y licitaciones', 'ayudas-licitaciones-permisos-oportunidades-comerciales/', 'Como usarlos como senales sin convertir inferencias en hechos.'],
         ['Proyectos antes de RFQ', 'encontrar-proyectos-industriales-antes-de-la-peticion-de-oferta/', 'Como llegar antes de que la peticion de oferta cierre decisiones.'],
@@ -264,8 +267,12 @@ function writeHub() {
       items: [
         ['Universo vs oportunidades', 'universo-empresas-vs-oportunidades-negocio/', 'Por que una empresa que encaja no es necesariamente una oportunidad.'],
         ['Base de datos vs inteligencia comercial', 'base-datos-vs-inteligencia-comercial-industrial/', 'Que cambia cuando una lista de empresas se convierte en un mercado vivo.'],
+        ['Que es inteligencia comercial industrial', 'inteligencia-comercial-industrial/', 'Como pasar de una lista de empresas a razones concretas para actuar comercialmente.'],
         ['Donde vender automatizacion', 'donde-vender-automatizacion-industrial/', 'Como priorizar procesos, OEM, integradores y usuarios finales.'],
+        ['Oportunidades de automatizacion industrial', 'oportunidades-automatizacion-industrial/', 'Como detectar necesidades de automatizacion antes de que el proyecto este adjudicado.'],
+        ['Oportunidades para vender consumibles', 'detectar-oportunidades-consumibles-industriales/', 'Como detectar empresas que pueden aumentar consumo de materiales por nuevas lineas o produccion.'],
         ['Anticipar consumibles', 'anticipar-demanda-consumibles-industriales/', 'Como una inversion puede adelantar demanda recurrente de materiales.'],
+        ['Servicios industriales en nuevas fabricas', 'oportunidades-servicios-industriales-nuevas-fabricas/', 'Como una nueva fabrica puede abrir necesidades de mantenimiento, energia, agua y servicios.'],
       ],
     },
   ];
