@@ -94,6 +94,7 @@ function assetPath(file) {
 }
 
 let currentDepth = 0;
+let currentPageCta = null;
 function relativePrefix(depth) {
   if (depth === 0) return '';
   return '../'.repeat(depth);
@@ -103,6 +104,7 @@ function layout(page) {
   const slug = page.slug.replace(/^\/?/, '/').replace(/\/?$/, '/');
   const depth = slugToPath(slug).split('/').filter(Boolean).length;
   currentDepth = depth;
+  currentPageCta = page.cta || null;
   const prefix = relativePrefix(depth);
   const canonical = `${baseUrl}${slug}`;
   const ogImage = page.visual ? `${baseUrl}/assets/${page.visual.file}` : `${baseUrl}/assets/InduRadarLogoVertical-600.webp`;
@@ -215,7 +217,9 @@ function layout(page) {
 }
 
 function ctaBlock(prefix) {
-  return `<aside class="article-cta-box"><h2>${cta.title}</h2><p>${cta.copy}</p><div class="article-cta-actions"><a class="article-cta" href="${prefix}#formulario">Solicitar un analisis</a><a class="article-cta article-cta--secondary" href="${prefix}como-funciona-induradar/">Como funciona InduRadar</a></div></aside>`;
+  const title = currentPageCta?.title || cta.title;
+  const copy = currentPageCta?.copy || cta.copy;
+  return `<aside class="article-cta-box"><h2>${title}</h2><p>${copy}</p><div class="article-cta-actions"><a class="article-cta" href="${prefix}#formulario">Solicitar un análisis</a><a class="article-cta article-cta--secondary" href="${prefix}como-funciona-induradar/">Cómo funciona InduRadar</a></div></aside>`;
 }
 
 function relatedBlock(items) {
@@ -259,6 +263,17 @@ function writeHub() {
         ['Ampliaciones de fabricas', 'detectar-ampliaciones-fabricas-inversion-industrial/', 'Como detectar ampliaciones mediante fuentes territoriales, permisos y anuncios.'],
         ['Ayudas, permisos y licitaciones', 'ayudas-licitaciones-permisos-oportunidades-comerciales/', 'Como usarlos como senales sin convertir inferencias en hechos.'],
         ['Proyectos antes de RFQ', 'encontrar-proyectos-industriales-antes-de-la-peticion-de-oferta/', 'Como llegar antes de que la peticion de oferta cierre decisiones.'],
+      ],
+    },
+    {
+      title: 'Encontrar oportunidades según lo que vendes',
+      intro: 'Guías para interpretar cambios industriales desde la perspectiva de servicios, proveedores, compras, monitorización y nuevas fábricas.',
+      items: [
+        ['Servicios a fábricas', 'como-conseguir-clientes-servicios-fabricas/', 'Cómo encontrar fábricas que pueden necesitar mantenimiento, instalaciones, energía, ingeniería, logística, limpieza, consumibles u otros servicios industriales.'],
+        ['Nuevos proveedores', 'detectar-fabricas-necesitan-nuevos-proveedores/', 'Señales que pueden indicar que una fábrica necesitará nuevos proveedores por ampliaciones, nuevas líneas, traslados o inversiones.'],
+        ['Fase de compra', 'empresa-industrial-fase-de-compra/', 'Cómo interpretar señales de inversión, contratación, permisos y proyectos para detectar una posible ventana de compra industrial.'],
+        ['Monitorización de clientes', 'monitorizar-clientes-industriales-oportunidades/', 'Cómo vigilar una cartera de clientes industriales para detectar inversiones, ampliaciones y cambios que alteren prioridades.'],
+        ['Nueva fábrica o ampliación', 'que-compra-empresa-nueva-fabrica-ampliacion/', 'Qué categorías de proveedores pueden activarse cuando una empresa abre o amplía una fábrica.'],
       ],
     },
     {
@@ -344,8 +359,8 @@ function writeIndexPage(slug, title, description, h1, lead, groups, breadcrumbNa
 </html>`);
 }
 
-function articlePage({ slug, title, description, h1, lead, eyebrow, body, visual, related, reading = '5 min' }) {
-  return { slug, title, description, h1, lead, eyebrow, body, visual, related, reading, type: 'Article', breadcrumbs: [{ name: 'Recursos', href: '/recursos/' }, { name: stripHtml(h1), href: slug }] };
+function articlePage({ slug, title, description, h1, lead, eyebrow, body, visual, related, reading = '5 min', cta: pageCta }) {
+  return { slug, title, description, h1, lead, eyebrow, body, visual, related, reading, cta: pageCta, type: 'Article', breadcrumbs: [{ name: 'Recursos', href: '/recursos/' }, { name: stripHtml(h1), href: slug }] };
 }
 
 function simpleSections(sections) {
@@ -497,6 +512,153 @@ for (const [slug, title, description, h1, lead, visual, sections] of newArticles
       { href: '../../como-funciona-induradar/', label: 'Como funciona InduRadar' },
     ],
     body: simpleSections(sections),
+  }));
+}
+
+function conceptChainBlock() {
+  return section(
+    'De empresa objetivo a acción comercial',
+    paragraph('InduRadar interpreta la prospección industrial como una cadena de trabajo: <strong>empresa → cambio industrial → señal verificable → necesidad probable → ventana comercial → acción</strong>. La clave está en no convertir una señal aislada en una venta supuesta, sino en usarla para decidir qué investigar, qué priorizar y qué siguiente paso tiene sentido.')
+  );
+}
+
+const opportunityArticles = [
+  {
+    slug: 'como-conseguir-clientes-servicios-fabricas',
+    title: 'Cómo conseguir nuevos clientes si vendes servicios a fábricas | InduRadar',
+    description: 'Cómo encontrar fábricas que pueden necesitar mantenimiento, instalaciones, energía, ingeniería, logística, limpieza, consumibles u otros servicios industriales.',
+    h1: 'Cómo conseguir nuevos clientes si vendes servicios a fábricas',
+    lead: 'Encontrar fábricas no suele ser el problema. El reto es saber cuáles están cambiando, qué pueden necesitar y cuándo tiene sentido abordarlas comercialmente.',
+    cta: 'Indica tu oferta, territorio y sectores objetivo. InduRadar busca empresas, señales industriales y proyectos públicos para ayudarte a priorizar dónde merece la pena actuar.',
+    related: [
+      { href: '../como-encontrar-nuevos-clientes-industriales/', label: 'Cómo encontrar nuevos clientes industriales' },
+      { href: '../senales-oportunidades-negocio-industrial/', label: 'Señales para detectar oportunidades de negocio industrial' },
+      { href: '../universo-empresas-vs-oportunidades-negocio/', label: 'Universo de empresas vs oportunidades reales' },
+      { href: '../../como-funciona-induradar/', label: 'Cómo funciona InduRadar' },
+    ],
+    sections: [
+      ['Empresa objetivo no es oportunidad comercial', paragraph('Una empresa puede encajar perfectamente con lo que vendes y no tener ninguna necesidad inmediata. Puede pertenecer al sector adecuado, tener el tamaño correcto y estar situada en tu territorio, pero si no está modificando instalaciones, procesos, producción o proveedores, probablemente no exista una ventana comercial clara.') + paragraph('Por eso una prospección industrial útil necesita separar dos conceptos: empresa objetivo y oportunidad comercial. La primera responde a quién podría comprarte algún día. La segunda intenta responder a quién puede tener una necesidad concreta ahora o en los próximos meses.')],
+      ['Construir el universo de fábricas relevantes', paragraph('El primer paso sigue siendo identificar qué empresas pueden necesitar lo que vendes. Dependiendo de tu actividad, pueden ser plantas de alimentación, química, farmacéutica, automoción, metal, plástico, packaging, cerámica, papel, logística u otros sectores.') + list(['CNAE y registros empresariales.', 'Directorios industriales.', 'Cámaras de Comercio.', 'Asociaciones empresariales.', 'Polígonos y parques industriales.', 'Ferias sectoriales.', 'Referencias de fabricantes y proveedores.', 'Proyectos y ayudas públicas.', 'Procesos productivos concretos.']) + paragraph('Pero una lista de empresas solo es el principio. Una cartera comercial se vuelve mucho más útil cuando empiezas a identificar qué está cambiando en cada cuenta.')],
+      ['Cambios que pueden generar demanda de servicios', paragraph('Muchas compras industriales son consecuencia de otro acontecimiento. Una empresa que amplía capacidad puede necesitar instalaciones eléctricas, climatización, agua, mantenimiento, maquinaria, logística, almacenamiento, packaging, energía, instrumentación, limpieza industrial, seguridad, ingeniería, servicios de calidad o nuevos consumibles.') + paragraph('Por eso las señales industriales son importantes. Una ampliación, una nueva línea, una ayuda pública, una licencia, nuevas contrataciones técnicas o la construcción de una nave pueden indicar que la empresa está entrando en una fase donde aparecerán nuevas necesidades.')],
+      ['Relacionar cada señal con una necesidad probable', paragraph('Dos empresas del mismo sector pueden tener necesidades completamente diferentes. Una empresa alimentaria puede estar ampliando frío industrial. Otra puede construir un almacén. Otra puede instalar una línea de envasado. Otra puede estar buscando reducir consumo energético.') + paragraph('El enfoque puede resumirse así: <strong>cambio industrial → necesidad probable → proveedor potencial → momento comercial</strong>. Es más útil relacionar cada señal con una necesidad probable que clasificar simplemente empresas por sector.')],
+      ['La ventana comercial importa', paragraph('En mercados industriales, llegar demasiado tarde puede significar que el proveedor ya está adjudicado. Llegar demasiado pronto puede significar que todavía no existe proyecto real. El objetivo es encontrar una ventana en la que la necesidad esté tomando forma, pero todavía exista capacidad de influir en la decisión.') + paragraph('Una ampliación anunciada puede ser una señal temprana. La solicitud de licencia puede indicar avance. La contratación de ingeniería puede indicar definición. La construcción puede reducir algunas oportunidades pero abrir otras. La puesta en marcha puede generar nuevas necesidades de mantenimiento, optimización o servicios.')],
+      ['Prudencia antes de actuar', paragraph('Una noticia, una feria o una oferta de empleo no deben convertirse automáticamente en una oportunidad. Es mejor buscar convergencia: ampliación anunciada, inversión aprobada, contratación técnica, nuevo edificio o aumento de capacidad. Cuando varias señales apuntan al mismo cambio, la posibilidad de que exista un proyecto material aumenta.')],
+      ['Qué debería responder la investigación', paragraph('La investigación solo tiene valor comercial si termina respondiendo preguntas útiles: qué empresa merece atención, qué está ocurriendo, qué necesidad puede derivarse, qué parte está confirmada, qué falta por verificar, quién puede intervenir en la decisión, cuándo debería revisarse y cuál sería la siguiente acción razonable.')],
+      ['Un radar distinto para cada proveedor', paragraph('Un proveedor de mantenimiento no necesita vigilar las mismas señales que una empresa de energía. Una ingeniería no busca exactamente lo mismo que un proveedor de consumibles. Una empresa de packaging tendrá otro radar distinto. Por eso un sistema de prospección industrial debe comenzar por definir qué vende la empresa, qué sectores atiende, en qué territorio trabaja, qué tipos de cuentas busca y qué acontecimientos suelen generar demanda.')],
+    ],
+  },
+  {
+    slug: 'detectar-fabricas-necesitan-nuevos-proveedores',
+    title: 'Cómo detectar fábricas que pueden necesitar nuevos proveedores | InduRadar',
+    description: 'Señales que pueden indicar que una fábrica necesitará nuevos proveedores: ampliaciones, nuevas líneas, traslados, crecimiento, inversiones y cambios industriales.',
+    h1: 'Cómo detectar fábricas que pueden necesitar nuevos proveedores',
+    lead: 'Una empresa rara vez publica “buscamos nuevos proveedores”. Sin embargo, muchos cambios industriales dejan señales públicas antes de generar nuevas necesidades de compra.',
+    cta: 'Define qué vendes y dónde trabajas. InduRadar busca empresas y señales industriales públicas para identificar cambios que puedan generar nuevas necesidades.',
+    related: [
+      { href: '../senales-empresa-industrial-va-a-invertir/', label: 'Señales de que una empresa industrial puede invertir' },
+      { href: '../detectar-ampliaciones-fabricas-inversion-industrial/', label: 'Cómo detectar ampliaciones de fábricas e inversión industrial' },
+      { href: '../encontrar-proyectos-industriales-antes-de-la-peticion-de-oferta/', label: 'Cómo encontrar proyectos industriales antes de la petición de oferta' },
+      { href: '../universo-empresas-vs-oportunidades-negocio/', label: 'Universo de empresas vs oportunidades reales' },
+    ],
+    sections: [
+      ['Las relaciones industriales cambian cuando aparece un proyecto material', paragraph('Las relaciones industriales suelen ser estables. Una fábrica que produce los mismos productos, con las mismas instalaciones y la misma capacidad, puede mantener durante años los mismos proveedores. La situación cambia cuando aparece un proyecto material.') + paragraph('Una nueva planta, una ampliación, un traslado, una adquisición o una nueva línea pueden obligar a revisar capacidades, especificaciones, servicios y proveedores. Por eso detectar cambios puede ser más útil que buscar empresas únicamente por tamaño o sector.')],
+      ['Nueva planta: periodo excepcional de compra', paragraph('La apertura de una nueva planta crea una situación diferente a la operación ordinaria. Puede aparecer demanda de construcción, instalaciones, electricidad, energía, agua, climatización, almacenamiento, maquinaria, mantenimiento, limpieza, seguridad, calidad, servicios técnicos, logística, suministros, consumibles y personal.') + paragraph('No todos esos contratos estarán abiertos cuando la fábrica se anuncie. Pero el proyecto permite identificar una organización que entrará en un periodo excepcional de compra y cambio.')],
+      ['Ampliaciones y traslados', paragraph('Una ampliación puede consistir en aumentar superficie productiva, instalar una nueva línea, ampliar almacenes, incorporar nuevos procesos, aumentar capacidad, introducir un nuevo producto, renovar equipos o incrementar turnos. Cada cambio puede alterar necesidades existentes o crear otras nuevas.') + paragraph('Mover una actividad industrial suele desencadenar decisiones de desmontaje, transporte, obra industrial, instalaciones eléctricas, aire comprimido, agua, climatización, almacenamiento, puesta en marcha, mantenimiento, seguridad o adecuación normativa.')],
+      ['Pistas públicas antes del anuncio de compra', paragraph('Las mejores pistas no siempre son anuncios de adquisición. Compra de suelo, licencias de obra, permisos ambientales, ayudas, contratación técnica, nuevos productos, crecimiento, aumento de producción, nuevas instalaciones o adquisiciones pueden anticipar nuevas necesidades de proveedores.')],
+      ['Separar hecho, inferencia y desconocido', paragraph('Una señal sirve para investigar, no para afirmar una venta. Si una empresa recibe una ayuda para mejorar eficiencia energética, el hecho es que existe una actuación financiada. La inferencia posible es que puede existir demanda de equipos o servicios relacionados. Lo que todavía no sabemos es qué se comprará, cuándo, a quién y si el proveedor ya está seleccionado.')],
+      ['La secuencia importa', paragraph('Una única señal puede ser débil. Varias señales relacionadas pueden cambiar la situación: empresa adquiere una parcela, anuncia una inversión, obtiene licencia, contrata responsables de proyecto e inicia construcción. A medida que aparecen nuevas evidencias, el proyecto se vuelve más tangible.')],
+      ['La fase cambia el tipo de proveedor', paragraph('En una fase temprana puede haber oportunidades para ingeniería, consultoría, construcción, energía, permisos o proyecto industrial. Más adelante pueden cobrar importancia maquinaria, instalaciones, logística, almacenamiento, calidad o mantenimiento. Tras la puesta en marcha pueden aparecer optimización, consumibles, repuestos, mantenimiento, limpieza y servicios recurrentes.')],
+      ['Del universo al radar', paragraph('Una empresa puede no tener una oportunidad hoy y tenerla dentro de seis meses. Por eso merece la pena conservar un universo de cuentas relevantes y volver a comprobar periódicamente si aparece alguna señal material. La prospección industrial deja así de ser una fotografía y se convierte en un radar.')],
+    ],
+  },
+  {
+    slug: 'empresa-industrial-fase-de-compra',
+    title: 'Cómo saber si una empresa industrial está entrando en fase de compra | InduRadar',
+    description: 'Cómo interpretar señales de inversión, contratación, permisos, ampliaciones y proyectos para detectar una posible ventana de compra industrial.',
+    h1: 'Cómo saber si una empresa industrial está entrando en fase de compra',
+    lead: 'En venta industrial, conocer una empresa es útil. Saber cuándo está cambiando puede ser mucho más importante.',
+    cta: 'InduRadar analiza señales y proyectos industriales para priorizar empresas según el cambio que están experimentando y el momento de actuación.',
+    related: [
+      { href: '../../glosario/ventana-comercial/', label: 'Qué es una ventana comercial' },
+      { href: '../encontrar-proyectos-industriales-antes-de-la-peticion-de-oferta/', label: 'Cómo encontrar proyectos industriales antes de la petición de oferta' },
+      { href: '../senales-oportunidades-negocio-industrial/', label: 'Señales para detectar oportunidades de negocio industrial' },
+      { href: '../../como-funciona-induradar/', label: 'Cómo funciona InduRadar' },
+    ],
+    sections: [
+      ['La compra puede empezar antes de la RFQ', paragraph('Muchas oportunidades se detectan demasiado tarde. Cuando aparece una petición formal de oferta, gran parte de las decisiones pueden estar ya tomadas: alcance, ingeniería, especificaciones, proveedores habituales, presupuesto y calendario. La verdadera ventana comercial puede haber empezado meses antes.')],
+      ['Formación del proyecto', paragraph('La empresa identifica un problema o una oportunidad: producir más, introducir un nuevo producto, ahorrar energía, mejorar calidad, aumentar almacenamiento, reducir costes, sustituir equipos, cumplir normativa, trasladar instalaciones o responder a nuevos pedidos. En esta fase muchas veces todavía no existe una compra estructurada, pero pueden aparecer las primeras señales públicas.')],
+      ['Señales públicas de avance', paragraph('El proyecto puede comenzar a dejar huella mediante solicitudes de ayudas, permisos, contratación de ingeniería, búsqueda de personal, compra de suelo, licencias, anuncios corporativos, financiación, licitaciones o presentaciones a inversores. Una señal aislada no permite afirmar que exista una compra, pero sí puede justificar seguimiento.')],
+      ['Definición técnica y comercial', paragraph('A medida que el proyecto avanza, empiezan a tomarse decisiones que afectan directamente a proveedores: tecnología, capacidad, layout, procesos, especificaciones, presupuesto y calendario. Para muchos proveedores industriales, esta puede ser una de las fases más interesantes porque todavía existe margen para aportar soluciones, pero el proyecto ya tiene suficiente concreción.')],
+      ['Ejecución y puesta en marcha', paragraph('En ejecución aparecen adjudicaciones, pedidos, proveedores, obras, instalación, commissioning y puesta en marcha. Algunas oportunidades ya estarán cerradas. Otras pueden aparecer precisamente aquí: necesidades auxiliares, servicios de instalación, modificaciones, imprevistos, suministros, mantenimiento, repuestos o asistencia técnica.') + paragraph('La puesta en marcha no significa que desaparezcan las oportunidades. Puede generar mantenimiento, optimización, servicios recurrentes, consumibles, seguridad, calidad, eficiencia, formación, modificaciones o ampliaciones posteriores.')],
+      ['Cada proveedor interpreta una fase distinta', paragraph('Para una ingeniería, una licencia temprana puede ser interesante. Para un proveedor de mantenimiento, puede ser más útil conocer cuándo la instalación entra en operación. Para consumibles, el momento relevante puede empezar cuando aumenta producción. Por eso la fase comercial depende de qué vendes.')],
+      ['Qué debe responder la investigación', paragraph('Una investigación útil debería terminar respondiendo qué está ocurriendo, qué necesidad puede generar, qué fase parece tener el proyecto, qué información falta y qué acción tiene sentido ahora. Ese concepto es lo que InduRadar denomina ventana comercial: no una compra confirmada, sino evidencia suficiente para decidir si actuar, investigar más o seguir vigilando.')],
+    ],
+  },
+  {
+    slug: 'monitorizar-clientes-industriales-oportunidades',
+    title: 'Cómo monitorizar clientes industriales y detectar oportunidades | InduRadar',
+    description: 'Cómo vigilar una cartera de clientes industriales para detectar inversiones, ampliaciones, nuevos proyectos, contratación y cambios que puedan generar oportunidades.',
+    h1: 'Cómo monitorizar clientes industriales y detectar oportunidades',
+    lead: 'Una cartera de clientes cambia constantemente. La empresa que hoy no tiene proyecto puede anunciar una ampliación, contratar ingeniería o iniciar una inversión dentro de unos meses.',
+    cta: 'Indica tus cuentas, sectores y oferta. InduRadar puede identificar señales nuevas y cambios que alteren la prioridad comercial de cada empresa.',
+    related: [
+      { href: '../universo-empresas-vs-oportunidades-negocio/', label: 'Universo de empresas vs oportunidades reales' },
+      { href: '../base-datos-vs-inteligencia-comercial-industrial/', label: 'Base de datos vs inteligencia comercial industrial' },
+      { href: '../senales-oportunidades-negocio-industrial/', label: 'Señales para detectar oportunidades de negocio industrial' },
+      { href: '../../como-funciona-induradar/', label: 'Cómo funciona InduRadar' },
+    ],
+    sections: [
+      ['Las listas envejecen', paragraph('Muchas empresas mantienen listados de cuentas objetivo. El problema es que esas listas envejecen. Una cuenta que parecía poco interesante puede iniciar un proyecto. Otra puede haber terminado su inversión. Otra puede adquirir una compañía, cambiar de dirección o abrir una nueva fábrica.') + paragraph('Si la cartera no se actualiza, el comercial termina trabajando con una fotografía antigua del mercado.')],
+      ['Qué acontecimientos merece la pena vigilar', paragraph('No es necesario investigar exhaustivamente cada empresa cada semana. Lo útil es observar acontecimientos que puedan cambiar su prioridad.') + list(['Nueva fábrica.', 'Ampliación.', 'Nueva línea.', 'Traslado.', 'Aumento de capacidad.', 'Ayudas y permisos.', 'Nuevas contrataciones.', 'Adquisiciones.', 'Nuevos productos.', 'Expansión internacional.', 'Inversión energética.', 'Digitalización.', 'Cambios de propiedad.', 'Adjudicaciones y licitaciones.', 'Alianzas.'])],
+      ['Separar ruido de cambio material', paragraph('Una buena vigilancia comercial debe evitar ruido. Muchas publicaciones corporativas no cambian la situación comercial: una felicitación corporativa, una feria repetida o una publicación de marketing pueden no justificar ninguna acción. La clave está en detectar cambios materiales que alteran capacidad, procesos, instalaciones, inversión, estructura o actividad comercial.')],
+      ['Clasificar la cartera por prioridad', paragraph('Una cartera puede clasificarse entre oportunidades activas, señales en observación, cuentas estructuralmente relevantes y prescriptores o actores indirectos. Esta separación evita tratar todas las cuentas como si estuvieran en el mismo momento.')],
+      ['Revisar lo que ha cambiado', paragraph('Cuando ya existe un estudio inicial, la siguiente revisión debería concentrarse en nuevas señales, cambios de fase, nuevas inversiones, nuevos proyectos, empresas nuevas, señales que pierden actualidad, oportunidades que ganan prioridad, proyectos que se cierran y nuevas acciones comerciales. El objetivo no es rehacer el informe desde cero, sino actualizar la situación.')],
+      ['Ejemplo de evolución', paragraph('Una empresa puede aparecer durante meses como fabricante relevante sin proyecto conocido. Después publica una vacante de ingeniería, recibe una ayuda para nueva línea y solicita una ampliación de instalaciones. La misma empresa puede pasar de cuenta objetivo a oportunidad prioritaria. Sin vigilancia, ese cambio puede pasar desapercibido.')],
+      ['Frecuencia y uso comercial', paragraph('No todas las carteras necesitan la misma frecuencia. Mercados con muchos proyectos pueden necesitar seguimiento mensual. Sectores con ciclos largos pueden admitir revisiones más espaciadas. También puede combinarse vigilancia periódica general, revisión inmediata cuando aparece una señal material e investigación adicional de cuentas prioritarias.') + paragraph('El valor no está solo en descubrir empresas nuevas. También está en decidir a quién llamar, a quién visitar, qué cuenta investigar, qué proyecto revisar, qué empresa puede esperar y qué señal merece seguimiento.')],
+    ],
+  },
+  {
+    slug: 'que-compra-empresa-nueva-fabrica-ampliacion',
+    title: 'Qué compra una empresa cuando abre o amplía una fábrica | InduRadar',
+    description: 'Una nueva fábrica puede generar oportunidades para construcción, instalaciones, energía, maquinaria, logística, mantenimiento, agua, calidad, seguridad y servicios industriales.',
+    h1: 'Qué compra una empresa cuando abre o amplía una fábrica',
+    lead: 'Una inversión industrial no genera una sola compra. Una nueva planta o una ampliación puede activar decenas de categorías de proveedores durante varios años.',
+    cta: 'Describe qué vendes y dónde trabajas. InduRadar identifica inversiones, proyectos y señales industriales y las traduce en posibles necesidades comerciales.',
+    related: [
+      { href: '../detectar-ampliaciones-fabricas-inversion-industrial/', label: 'Cómo detectar ampliaciones de fábricas e inversión industrial' },
+      { href: '../oportunidades-servicios-industriales-nuevas-fabricas/', label: 'Oportunidades de servicios industriales en nuevas fábricas' },
+      { href: '../como-detectar-inversiones-industriales/', label: 'Cómo detectar inversiones industriales' },
+      { href: '../ayudas-licitaciones-permisos-oportunidades-comerciales/', label: 'Ayudas, licitaciones y permisos como señales comerciales' },
+    ],
+    sections: [
+      ['Mucho más que maquinaria', paragraph('Cuando una empresa anuncia una inversión industrial, es habitual fijarse únicamente en la maquinaria. Sin embargo, una fábrica necesita mucho más. Dependiendo del proyecto pueden aparecer oportunidades para múltiples proveedores antes, durante y después de la construcción. Entender esa cadena permite detectar oportunidades incluso cuando tu empresa no vende el equipo principal.')],
+      ['Ingeniería, proyecto y obra industrial', paragraph('Las primeras fases pueden requerir ingeniería, arquitectura industrial, project management, estudios técnicos, consultoría, permisos, medioambiente, seguridad y diseño de instalaciones. Muchas decisiones posteriores nacen en esta fase.') + paragraph('Una planta nueva puede necesitar estructura, cimentación, cerramientos, pavimentos, cubiertas, obra civil, urbanización y adecuación de parcelas. En ampliaciones, estas necesidades pueden concentrarse solo en una parte del complejo.')],
+      ['Instalaciones y energía', paragraph('Las instalaciones representan una parte relevante de muchos proyectos industriales: distribución eléctrica, cuadros, iluminación, centros de transformación, cableado, climatización, ventilación, aire comprimido, vapor, gases, fluidos y protección contra incendios.') + paragraph('Las inversiones industriales están cada vez más ligadas a energía: autoconsumo, almacenamiento, eficiencia, recuperación de calor, electrificación, monitorización, combustibles alternativos, aislamiento y gestión energética.')],
+      ['Agua, residuos y medioambiente', paragraph('En muchos sectores el agua forma parte del proceso. Puede ser necesario tratamiento, filtración, bombeo, reutilización, depuración, dosificación, refrigeración y gestión de vertidos. También pueden aparecer servicios de residuos, reciclaje, valorización y cumplimiento ambiental.')],
+      ['Maquinaria, logística y almacenamiento', paragraph('La compra más evidente suele ser maquinaria, pero dentro de esa categoría puede haber equipos principales, auxiliares, manipulación, packaging, inspección, laboratorios, equipos de proceso, utillajes y repuestos. Además, una planta puede adquirir parte de la maquinaria en distintas fases.') + paragraph('El crecimiento de capacidad puede exigir racks, estanterías, carretillas, almacenamiento automático, transporte interno, muelles, embalaje, expedición, software logístico y gestión de materiales. Cuando una fábrica aumenta producción, la logística suele convertirse en un cuello de botella importante.')],
+      ['Mantenimiento, calidad y seguridad', paragraph('La puesta en marcha crea otra capa de demanda: mantenimiento preventivo, predictivo, mecánica, electricidad, lubricación, calibración, reparación, asistencia técnica y contratos de servicio. Una nueva planta puede convertirse en un cliente recurrente durante años.') + paragraph('Dependiendo del sector pueden aparecer necesidades de metrología, inspección, calibración, ensayos, laboratorio, certificación, trazabilidad, validación y control de calidad. También puede requerir evaluación de riesgos, protección contra incendios, señalización, EPIs, formación, adecuación normativa e inspecciones.')],
+      ['Servicios recurrentes, personas e IT', paragraph('Alimentación, farmacéutica, química y otros sectores pueden necesitar limpieza industrial, higiene, desinfección, tratamiento de superficies, gestión de residuos y mantenimiento de áreas críticas. Una fábrica en crecimiento también puede generar demanda de selección de personal, formación, ETT, prevención, transporte, seguridad privada, restauración y facility management.') + paragraph('Una nueva instalación puede requerir redes, ciberseguridad, comunicaciones, sistemas de datos, software, ERP, MES, trazabilidad e infraestructura IT. Estas necesidades pueden aparecer antes de la puesta en marcha.')],
+      ['Después de la puesta en marcha', paragraph('Tras iniciar producción comienza una segunda etapa. La empresa puede necesitar embalajes, químicos, lubricantes, herramientas, componentes, EPIs, filtros, materiales auxiliares, productos de limpieza y suministros de mantenimiento. El valor de una nueva fábrica no termina en la inversión inicial: puede convertirse en una demanda recurrente durante décadas.')],
+      ['Interpretar la fase', paragraph('Una inversión industrial tiene fases. Primero pueden actuar ingenierías y construcción. Después instalaciones y maquinaria. Más adelante mantenimiento, servicios y consumibles. Por eso una noticia sobre una fábrica nueva debe interpretarse en función de qué vendes, en qué fase está el proyecto y qué decisiones siguen abiertas.') + paragraph('Una buena investigación debería identificar empresa, ubicación, proyecto, inversión, fase, calendario, actores implicados, necesidades probables y siguiente acción.')],
+    ],
+  },
+];
+
+for (const article of opportunityArticles) {
+  pages.push(articlePage({
+    slug: `/recursos/${article.slug}/`,
+    title: article.title,
+    description: article.description,
+    h1: article.h1,
+    lead: article.lead,
+    visual: visuals.matrix,
+    reading: '7 min',
+    cta: {
+      title: '¿Quieres priorizar oportunidades según lo que vendes?',
+      copy: article.cta,
+    },
+    related: article.related,
+    body: [conceptChainBlock(), simpleSections(article.sections)].join(''),
   }));
 }
 
