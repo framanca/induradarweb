@@ -48,10 +48,32 @@ app.*.map.json
 .env
 .env.*
 !.env.example
+*.env
+*.env.local
+*.local
+*.local.*
+*.secret
+*.secrets
+*.pem
+*.key
+*.p8
+*.p12
+*.crt
+*.cer
+*credentials*.json
+*service-account*.json
+*service_account*.json
+google-services.json
+GoogleService-Info.plist
+firebase_options.dart
+npmrc
+.npmrc
 
 # Supabase local files
 supabase/.temp/
 supabase/.branches/
+supabase/.env
+supabase/.env.*
 
 # InduRadar private/internal files
 docs/
