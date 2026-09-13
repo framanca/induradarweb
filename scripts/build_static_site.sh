@@ -20,6 +20,11 @@ cp web/CNAME web/favicon.png web/manifest.json "$output_dir/"
 cp site/robots.txt site/sitemap.xml "$output_dir/"
 cp -R web/icons "$output_dir/icons"
 
+# Keep the current static form implementation untouched while adding the SFP2
+# research-objective selector as a small pre-module bootstrap. It patches only
+# the lead payload and leaves contact/other JSON requests unchanged.
+sed -i '/<script type="module" src="app.js"><\/script>/i\  <script src="research-objective.js"></script>' "$output_dir/index.html"
+
 config_json="$(LEAD_ENDPOINT="$lead_endpoint" CONTACT_ENDPOINT="$contact_endpoint" node -e 'process.stdout.write(JSON.stringify({leadEndpoint: process.env.LEAD_ENDPOINT, contactEndpoint: process.env.CONTACT_ENDPOINT}))')"
 printf 'window.INDURADAR_CONFIG = Object.freeze(%s);\n' "$config_json" > "$output_dir/config.js"
 rm "$output_dir/config.template.js"
