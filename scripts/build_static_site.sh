@@ -23,7 +23,20 @@ cp -R web/icons "$output_dir/icons"
 # Keep the current static form implementation untouched while adding the SFP2
 # research-objective selector as a small pre-module bootstrap. It patches only
 # the lead payload and leaves contact/other JSON requests unchanged.
-sed -i '/<script type="module" src="app.js"><\/script>/i\  <script src="research-objective.js"></script>' "$output_dir/index.html"
+INDEX_HTML="$output_dir/index.html" node - <<'NODE'
+const fs = require('node:fs');
+
+const indexPath = process.env.INDEX_HTML;
+const marker = '  <script type="module" src="app.js"></script>';
+const bootstrap = '  <script src="research-objective.js"></script>\n';
+const html = fs.readFileSync(indexPath, 'utf8');
+
+if (!html.includes(marker)) {
+  throw new Error(`Missing script marker in ${indexPath}`);
+}
+
+fs.writeFileSync(indexPath, html.replace(marker, `${bootstrap}${marker}`));
+NODE
 
 config_json="$(LEAD_ENDPOINT="$lead_endpoint" CONTACT_ENDPOINT="$contact_endpoint" node -e 'process.stdout.write(JSON.stringify({leadEndpoint: process.env.LEAD_ENDPOINT, contactEndpoint: process.env.CONTACT_ENDPOINT}))')"
 printf 'window.INDURADAR_CONFIG = Object.freeze(%s);\n' "$config_json" > "$output_dir/config.js"
