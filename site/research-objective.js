@@ -7,13 +7,13 @@
       value: 'universe_discovery',
       title: 'Empresas objetivo',
       description:
-        'Encontrar cuentas industriales que encajan con tu mercado.',
+        'Ampliar el universo de fabricantes, plantas, OEM, integradores u otras cuentas que encajen en la solicitud.',
     },
     {
       value: 'signal_discovery',
       title: 'Señales activas',
       description:
-        'Localizar inversiones, ampliaciones y cambios con potencial comercial.',
+        'Buscar inversiones, ampliaciones, proyectos y otros cambios recientes que puedan generar negocio en tu sector.',
     },
     {
       value: 'balanced',
