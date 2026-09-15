@@ -5,6 +5,7 @@ const reportNode = document.querySelector('#report-root');
 const referenceNode = document.querySelector('#report-reference');
 const dateNode = document.querySelector('#report-date');
 const printButton = document.querySelector('#print-report');
+let printState = [];
 
 function setStatus(message, kind = 'info') {
   statusNode.textContent = message;
@@ -17,15 +18,13 @@ function reportReference() {
   return /^IR-[0-9]{8}-[0-9A-HJKMNP-TV-Z]{6}$/.test(value) ? value : '';
 }
 
-function getAccessToken() {
+async function getAccessToken() {
   const provider = window.INDURADAR_AUTH;
   if (provider && typeof provider.getAccessToken === 'function') {
-    const value = provider.getAccessToken();
+    const value = await provider.getAccessToken();
     if (typeof value === 'string' && value.trim()) return value.trim();
   }
-  return sessionStorage.getItem('induradar_access_token')
-    || localStorage.getItem('induradar_access_token')
-    || '';
+  return sessionStorage.getItem('induradar_access_token') || '';
 }
 
 function endpoint() {
@@ -37,7 +36,7 @@ async function fetchReport(reference) {
   const reportEndpoint = endpoint();
   if (!reportEndpoint) throw new Error('report_endpoint_not_configured');
 
-  const token = getAccessToken();
+  const token = await getAccessToken();
   if (!token) throw new Error('authentication_required');
 
   const url = new URL(reportEndpoint);
@@ -100,6 +99,15 @@ async function start() {
     setStatus(messageFor(error), 'error');
   }
 }
+
+window.addEventListener('beforeprint', () => {
+  printState = [...reportNode.querySelectorAll('details')].map((node) => [node, node.open]);
+  printState.forEach(([node]) => { node.open = true; });
+});
+window.addEventListener('afterprint', () => {
+  printState.forEach(([node, wasOpen]) => { node.open = wasOpen; });
+  printState = [];
+});
 
 printButton.addEventListener('click', () => window.print());
 start();
