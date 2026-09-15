@@ -378,7 +378,7 @@ function renderForm() {
       checkboxGroup('publicFinanceSignals', 'D. Compra pública y apoyo financiero', options.publicFinanceSignals, { selected: options.publicFinanceSignals, selectAll: true }),
     ].join('')),
     section('needs', '4. ¿Qué necesidades quieres detectar?', [
-      checkboxGroup('commercialNeeds', '¿En qué áreas de oportunidad quieres clasificar los resultados?', options.needs, { help: 'La sección 2 define en qué empresas buscar; aquí defines qué necesidades podrían encajar con tu oferta. Todas están incluidas en la tarifa.', selected: options.needs.filter((option) => option !== OTHER_NEED), selectAll: true, excludeFromSelectAll: OTHER_NEED }),
+      checkboxGroup('commercialNeeds', '¿En qué áreas de oportunidad quieres clasificar los resultados?', options.needs, { help: 'La sección 2 define en qué empresas buscar; aquí defines qué necesidades podrían encajar con tu oferta. Todas están incluidas en la tarifa.', selectAll: true, excludeFromSelectAll: OTHER_NEED }),
       `<div id="other-need" class="conditional" hidden>${textField('otherNeed', 'Otra área de oportunidad', { required: true, hint: 'Puedes separar varios valores con comas.' })}</div>`,
       textField('opportunityTriggerDescription', 'Describe una oportunidad comercial que justificaría una acción de tu equipo de ventas', { required: true, rows: 5, hint: 'Qué tendría que ocurrir para que merezca una llamada, visita, reunión o investigación adicional.' }),
       optionalFields('Referencias y exclusiones', 'Casos, clientes, cuentas y límites que nos ayudan a afinar el encaje.', [
@@ -425,7 +425,7 @@ function updateConditionalFields() {
   const hasSpain = selectedValues('geographyCountries').includes(SPAIN);
   toggleHidden('#spain-coverage', hasSpain);
   if (hasSpain && !selectedValues('spainCoverage').length) {
-    inputsByName('spainCoverage').find((input) => input.value === SPAIN_ALL).checked = true;
+    inputsByName('spainCoverage').find((input) => input.value === SPAIN_BY_PROVINCE).checked = true;
   }
   if (!hasSpain) {
     inputsByName('spainCoverage').forEach((input) => { input.checked = false; });
@@ -558,7 +558,7 @@ function isTargetComplete() {
 }
 
 function isSignalsComplete() { return ['investmentSignals', 'innovationSignals', 'growthSignals', 'publicFinanceSignals'].some((name) => selectedValues(name).length); }
-function isNeedsComplete() { return Boolean(fieldValue('opportunityTriggerDescription') && (!selectedValues('commercialNeeds').includes(OTHER_NEED) || fieldValue('otherNeed'))); }
+function isNeedsComplete() { return Boolean(selectedValues('commercialNeeds').length && fieldValue('opportunityTriggerDescription') && (!selectedValues('commercialNeeds').includes(OTHER_NEED) || fieldValue('otherNeed'))); }
 function isServiceComplete() { return Boolean(form.elements.privacyAccepted.checked); }
 function validEmail(email) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email); }
 
@@ -615,6 +615,7 @@ function validateForm() {
   if (selectedValues('targetSectors').includes(OTHER_SECTOR) && !fieldValue('otherSector')) { showError('otherSector', 'Describe los otros sectores.'); invalidSections.add('target'); }
   if (selectedValues('targetCompanyTypes').includes(OTHER_COMPANY_TYPE) && !fieldValue('otherTargetCompanyType')) { showError('otherTargetCompanyType', 'Describe el otro tipo de empresa.'); invalidSections.add('target'); }
   if (selectedValues('minimumOpportunityValue').includes(OTHER_VALUE) && !fieldValue('otherMinimumValue')) { showError('otherMinimumValue', 'Indica el valor aproximado.'); invalidSections.add('target'); }
+  if (!selectedValues('commercialNeeds').length) { showError('commercialNeeds', 'Selecciona al menos un área de oportunidad u otra.'); invalidSections.add('needs'); }
   if (selectedValues('commercialNeeds').includes(OTHER_NEED) && !fieldValue('otherNeed')) { showError('otherNeed', 'Describe la otra área de oportunidad.'); invalidSections.add('needs'); }
   if (!form.elements.privacyAccepted.checked) { showError('privacyAccepted', 'Necesitamos tu consentimiento para responderte.'); invalidSections.add('service'); }
   if (invalidSections.size) {
@@ -792,7 +793,7 @@ function resetForm() {
   form.reset();
   form.querySelectorAll('input, textarea, select, button').forEach((element) => { element.disabled = false; });
   ['investmentSignals', 'innovationSignals', 'growthSignals', 'publicFinanceSignals'].forEach((name) => inputsByName(name).forEach((input) => { input.checked = true; }));
-  inputsByName('commercialNeeds').forEach((input) => { input.checked = input.value !== OTHER_NEED; });
+  inputsByName('commercialNeeds').forEach((input) => { input.checked = false; });
   sectionsRoot.querySelectorAll('.form-section').forEach((details) => { details.open = false; });
   statusBox.hidden = true;
   clearErrors();
