@@ -23,7 +23,7 @@ a { color: inherit; }
 .skip-link:focus { transform: translateY(0); }
 
 .hero { padding: 28px max(24px, calc((100vw - 1280px) / 2)) 72px; }
-.hero-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(420px, 9fr); gap: 48px; align-items: start; }
+.hero-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 48px; align-items: start; }
 .hero-grid > *, .example-grid > *, .method-grid > * { min-width: 0; }
 .brand { display: grid; justify-items: center; margin-bottom: 30px; text-align: center; }
 .brand a { display: block; line-height: 0; }
