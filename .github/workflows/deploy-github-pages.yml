@@ -27,12 +27,19 @@ jobs:
         run: |
           node --check site/app.js
           node --check site/research-objective.js
-          node --test test/static_credits_test.mjs test/static_research_objective_test.mjs
+          node --check site/report/renderer.js
+          node --check site/report/report.js
+          node --test test/static_credits_test.mjs test/static_research_objective_test.mjs test/static_report_renderer_test.mjs
           LEAD_ENDPOINT="${{ secrets.LEAD_ENDPOINT }}" \
           CONTACT_ENDPOINT="${{ secrets.CONTACT_ENDPOINT }}" \
+          REPORT_ENDPOINT="${{ secrets.REPORT_ENDPOINT }}" \
             bash scripts/build_static_site.sh build/site
           grep -q '<script src="research-objective.js"></script>' build/site/index.html
           test -f build/site/research-objective.js
+          test -f build/site/report/index.html
+          test -f build/site/report/renderer.js
+          test -f build/site/report/report.js
+          grep -q 'reportEndpoint' build/site/config.js
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
