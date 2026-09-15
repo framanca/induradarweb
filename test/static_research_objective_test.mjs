@@ -18,6 +18,8 @@ test('research objective selector exposes all three SFP2 paths', () => {
   assert.match(selectorSource, /Empresas objetivo/);
   assert.match(selectorSource, /Señales activas/);
   assert.match(selectorSource, /Empresas \+ señales/);
+  assert.match(selectorSource, /Ampliar el universo de fabricantes, plantas, OEM, integradores u otras cuentas que encajen en la solicitud\./);
+  assert.match(selectorSource, /Buscar inversiones, ampliaciones, proyectos y otros cambios recientes que puedan generar negocio en tu sector\./);
   assert.doesNotMatch(selectorSource, /aunque todavía no exista una señal pública/);
   assert.doesNotMatch(selectorSource, /aunque esas señales descubran empresas/);
   assert.doesNotMatch(selectorSource, /Combinar la ampliación del universo/);
