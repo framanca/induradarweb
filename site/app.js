@@ -442,6 +442,17 @@ function toggleHidden(selector, visible) {
   document.querySelector(selector).hidden = !visible;
 }
 
+function focusOpenSection(details) {
+  if (!details) return;
+  window.requestAnimationFrame(() => {
+    const summary = details.querySelector('summary');
+    const top = details.getBoundingClientRect().top + window.scrollY - 16;
+    const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+    window.scrollTo({ top: Math.max(0, top), behavior });
+    summary?.focus({ preventScroll: true });
+  });
+}
+
 function connectInteractions() {
   form.addEventListener('input', (event) => {
     clearErrorForInput(event.target);
@@ -457,6 +468,7 @@ function connectInteractions() {
       sectionsRoot.querySelectorAll('.form-section[open]').forEach((openDetails) => {
         if (openDetails !== details) openDetails.open = false;
       });
+      focusOpenSection(details);
     });
   });
   sectionsRoot.querySelectorAll('[data-select-all]').forEach((button) => {
@@ -610,7 +622,7 @@ function validateForm() {
     const first = invalidSections.values().next().value;
     const details = document.querySelector(`#section-${first}`);
     details.open = true;
-    details.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    focusOpenSection(details);
     return false;
   }
   return true;
