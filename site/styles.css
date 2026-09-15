@@ -57,7 +57,7 @@ h3 { font-size: clamp(25px, 2.5vw, 35px); line-height: 1.15; letter-spacing: 0; 
 .evidence-note p { margin-bottom: 7px; }
 .evidence-note strong { color: var(--ink); font-size: 13px; }
 
-.form-card { overflow: clip; border: 1px solid var(--line); border-radius: 8px; background: var(--card); box-shadow: var(--shadow); }
+.form-card { overflow: visible; border: 1px solid var(--line); border-radius: 8px; background: var(--card); box-shadow: var(--shadow); }
 .form-summary { position: relative; z-index: 2; display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 22px; padding: 24px 24px 15px; background: #fff; }
 .form-summary h2 { margin-bottom: 8px; font-size: 27px; }
 .form-summary p { margin-bottom: 0; color: var(--steel); font-size: 15px; line-height: 1.4; }
