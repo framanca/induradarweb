@@ -226,15 +226,15 @@ declare
   v_editorial integer := 0;
   v_pass boolean := false;
 begin
-  select rv.*, rp.account_id
-    into r, v_account
+  select rv.* into r
   from public.report_versions rv
-  join public.reports rp on rp.id = rv.report_id
   where rv.id = p_report_version_id;
+  if not found then raise exception 'Report not found'; end if;
 
-  if not found then
-    raise exception 'Report not found';
-  end if;
+  select rp.account_id into v_account
+  from public.reports rp
+  where rp.id = r.report_id;
+  if v_account is null then raise exception 'Report account not found'; end if;
   if auth.uid() is not null and not public.is_account_member(v_account) then
     raise exception 'Not authorized';
   end if;
@@ -292,13 +292,15 @@ declare
   v_gate jsonb;
   v_payload jsonb;
 begin
-  select rv.*, rp.account_id
-    into r, v_account
+  select rv.* into r
   from public.report_versions rv
-  join public.reports rp on rp.id = rv.report_id
   where rv.id = p_report_version_id;
-
   if not found then raise exception 'Report not found'; end if;
+
+  select rp.account_id into v_account
+  from public.reports rp
+  where rp.id = r.report_id;
+  if v_account is null then raise exception 'Report account not found'; end if;
   if auth.uid() is not null and not public.is_account_member(v_account) then
     raise exception 'Not authorized';
   end if;
