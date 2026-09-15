@@ -5,7 +5,7 @@ set -euo pipefail
 output_dir="${1:-build/static}"
 lead_endpoint="${LEAD_ENDPOINT:-}"
 contact_endpoint="${CONTACT_ENDPOINT:-}"
-report_endpoint="${REPORT_ENDPOINT:-}"
+report_endpoint="${REPORT_ENDPOINT:-https://gwmwkxvrgctglyjmlqnb.supabase.co/functions/v1/get-report}"
 
 rm -rf "$output_dir"
 mkdir -p "$output_dir"
