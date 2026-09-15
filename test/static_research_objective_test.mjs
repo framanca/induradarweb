@@ -15,9 +15,12 @@ test('research objective selector exposes all three SFP2 paths', () => {
   for (const value of ['universe_discovery', 'signal_discovery', 'balanced']) {
     assert.match(selectorSource, new RegExp(`value: '${value}'`));
   }
-  assert.match(selectorSource, /Mapear empresas objetivo/);
-  assert.match(selectorSource, /Detectar oportunidades y señales/);
-  assert.match(selectorSource, /Mapear empresas \+ detectar oportunidades/);
+  assert.match(selectorSource, /Empresas objetivo/);
+  assert.match(selectorSource, /Señales activas/);
+  assert.match(selectorSource, /Empresas \+ señales/);
+  assert.doesNotMatch(selectorSource, /aunque todavía no exista una señal pública/);
+  assert.doesNotMatch(selectorSource, /aunque esas señales descubran empresas/);
+  assert.doesNotMatch(selectorSource, /Combinar la ampliación del universo/);
 });
 
 test('signal discovery remains the backwards-compatible default', () => {
