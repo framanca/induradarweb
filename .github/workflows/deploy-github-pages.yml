@@ -32,7 +32,7 @@ jobs:
           node --check site/research-objective.js
           node --check site/report/renderer.js
           node --check site/report/report.js
-          node --test test/static_credits_test.mjs test/static_research_objective_test.mjs test/static_report_renderer_test.mjs
+          node --test test/static_credits_test.mjs test/static_research_objective_test.mjs test/static_report_renderer_test.mjs test/editorial_pipeline_contract_test.mjs
           LEAD_ENDPOINT="${{ secrets.LEAD_ENDPOINT }}" \
           CONTACT_ENDPOINT="${{ secrets.CONTACT_ENDPOINT }}" \
           REPORT_ENDPOINT="${{ secrets.REPORT_ENDPOINT }}" \
