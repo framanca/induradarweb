@@ -5,21 +5,21 @@
   const OBJECTIVES = [
     {
       value: 'universe_discovery',
-      title: 'Mapear empresas objetivo',
+      title: 'Empresas objetivo',
       description:
-        'Encontrar fabricantes, plantas, OEM, integradores u otras cuentas que encajan con tu mercado.',
+        'Encontrar cuentas industriales que encajan con tu mercado.',
     },
     {
       value: 'signal_discovery',
-      title: 'Detectar oportunidades y señales',
+      title: 'Señales activas',
       description:
-        'Localizar inversiones, ampliaciones, proyectos y cambios que pueden generar oportunidades comerciales.',
+        'Localizar inversiones, ampliaciones y cambios con potencial comercial.',
     },
     {
       value: 'balanced',
-      title: 'Mapear empresas + detectar oportunidades',
+      title: 'Empresas + señales',
       description:
-        'Crear un universo de empresas y priorizar las que muestran señales relevantes.',
+        'Mapear cuentas y priorizar las que muestran cambios relevantes.',
     },
   ];
 
