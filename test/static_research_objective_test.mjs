@@ -24,11 +24,11 @@ test('signal discovery remains the backwards-compatible default', () => {
   assert.match(selectorSource, /const DEFAULT_OBJECTIVE = 'signal_discovery'/);
 });
 
-test('selected objective is persisted in the lead payload without adding a second budget', () => {
+test('selected objective is persisted in the lead payload', () => {
   assert.match(selectorSource, /payload\.research_objective = researchObjective/);
   assert.match(selectorSource, /payload\.request\.research_objective = researchObjective/);
   assert.match(selectorSource, /request_extensions[\s\S]*research_objective: researchObjective/);
-  assert.match(selectorSource, /no crea un presupuesto adicional de búsquedas/);
+  assert.doesNotMatch(selectorSource, /no crea un presupuesto adicional de búsquedas/);
 });
 
 test('static build loads objective bootstrap before the main form module', () => {

@@ -7,19 +7,19 @@
       value: 'universe_discovery',
       title: 'Mapear empresas objetivo',
       description:
-        'Ampliar el universo de fabricantes, plantas, OEM, integradores u otras cuentas que encajen, aunque todavía no exista una señal pública de oportunidad.',
+        'Encontrar fabricantes, plantas, OEM, integradores u otras cuentas que encajan con tu mercado.',
     },
     {
       value: 'signal_discovery',
       title: 'Detectar oportunidades y señales',
       description:
-        'Buscar inversiones, ampliaciones, proyectos y otros cambios recientes que puedan generar negocio, aunque esas señales descubran empresas que todavía no conocíamos.',
+        'Localizar inversiones, ampliaciones, proyectos y cambios que pueden generar oportunidades comerciales.',
     },
     {
       value: 'balanced',
       title: 'Mapear empresas + detectar oportunidades',
       description:
-        'Combinar la ampliación del universo de empresas con la búsqueda de señales y oportunidades en una misma investigación.',
+        'Crear un universo de empresas y priorizar las que muestran señales relevantes.',
     },
   ];
 
@@ -54,8 +54,7 @@
         font-size: 1rem;
         font-weight: 800;
       }
-      .research-objective-intro,
-      .research-objective-note {
+      .research-objective-intro {
         margin: 0;
         color: #66717c;
         font-size: .86rem;
@@ -123,7 +122,7 @@
     const intro = document.createElement('p');
     intro.className = 'research-objective-intro';
     intro.textContent =
-      'Elige el objetivo principal. InduRadar conservará también los hallazgos útiles que aparezcan en el otro camino.';
+      'Elige qué debe pesar más en la investigación.';
     fieldset.append(intro);
 
     const options = document.createElement('div');
@@ -150,12 +149,6 @@
     }
 
     fieldset.append(options);
-
-    const note = document.createElement('p');
-    note.className = 'research-objective-note';
-    note.textContent =
-      'La elección cambia la prioridad y cobertura de la búsqueda, pero no crea un presupuesto adicional de búsquedas.';
-    fieldset.append(note);
 
     wrapper.append(fieldset);
     return wrapper;
