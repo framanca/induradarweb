@@ -119,12 +119,6 @@
     legend.textContent = '¿Qué quieres priorizar en este estudio?';
     fieldset.append(legend);
 
-    const intro = document.createElement('p');
-    intro.className = 'research-objective-intro';
-    intro.textContent =
-      'Elige qué debe pesar más en la investigación.';
-    fieldset.append(intro);
-
     const options = document.createElement('div');
     options.className = 'research-objective-options';
 
