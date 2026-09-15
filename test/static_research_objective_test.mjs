@@ -23,6 +23,7 @@ test('research objective selector exposes all three SFP2 paths', () => {
   assert.doesNotMatch(selectorSource, /aunque todavía no exista una señal pública/);
   assert.doesNotMatch(selectorSource, /aunque esas señales descubran empresas/);
   assert.doesNotMatch(selectorSource, /Combinar la ampliación del universo/);
+  assert.doesNotMatch(selectorSource, /Elige qué debe pesar más en la investigación/);
 });
 
 test('signal discovery remains the backwards-compatible default', () => {
