@@ -26,28 +26,20 @@
         <p>Consulta tus solicitudes, créditos e informes disponibles.</p>
       </div>
       <div id="auth-status" class="status" hidden role="status"></div>
-      <div class="auth-tabs" role="tablist">
-        <button type="button" role="tab" aria-selected="true" data-auth-tab="sign-in">Entrar</button>
-        <button type="button" role="tab" aria-selected="false" data-auth-tab="sign-up">Crear cuenta</button>
-      </div>
       <form id="sign-in-form" class="auth-form">
         <label>Email<input name="email" type="email" autocomplete="email" required></label>
         <label>Contraseña<input name="password" type="password" autocomplete="current-password" minlength="8" required></label>
         <button class="primary" type="submit">Entrar</button>
         <button class="link-button" type="button" data-auth-action="forgot">He olvidado mi contraseña</button>
       </form>
+      <p class="auth-secondary">¿Aún no tienes cuenta? <button class="link-button" type="button" data-auth-action="sign-up">Crear cuenta</button></p>
       <form id="sign-up-form" class="auth-form" hidden>
+        <h2>Crear cuenta</h2>
         <label>Nombre<input name="full_name" type="text" autocomplete="name" maxlength="120" required></label>
         <label>Email<input name="email" type="email" autocomplete="email" required></label>
         <label>Contraseña<input name="password" type="password" autocomplete="new-password" minlength="8" required></label>
         <p class="form-note">Te enviaremos un email para confirmar tu cuenta.</p>
         <button class="primary" type="submit">Crear cuenta</button>
-      </form>
-      <form id="forgot-form" class="auth-form" hidden>
-        <h2>Restablecer contraseña</h2>
-        <label>Email<input name="email" type="email" autocomplete="email" required></label>
-        <p class="form-note">Te enviaremos un enlace para crear una contraseña nueva.</p>
-        <button class="primary" type="submit">Enviar enlace</button>
         <button class="link-button" type="button" data-auth-action="back">Volver a entrar</button>
       </form>
       <form id="new-password-form" class="auth-form" hidden>
