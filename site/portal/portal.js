@@ -8,6 +8,7 @@ const sessionActions = document.querySelector('#session-actions');
 const adminView = document.querySelector('#admin-view');
 
 let portalData = { session: null, profile: null, requests: [], reports: [], users: [], memberships: [], ledger: [], catalog: null };
+let recoveryInProgress = /[?#].*\btype=recovery\b/.test(`${window.location.search}${window.location.hash}`);
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
@@ -28,14 +29,10 @@ function errorMessage(error) {
 }
 
 function setAuthMode(mode) {
-  document.querySelectorAll('[data-auth-tab]').forEach((button) => {
-    button.setAttribute('aria-selected', String(button.dataset.authTab === mode));
-  });
   document.querySelector('#sign-in-form').hidden = mode !== 'sign-in';
   document.querySelector('#sign-up-form').hidden = mode !== 'sign-up';
-  document.querySelector('#forgot-form').hidden = mode !== 'forgot';
   document.querySelector('#new-password-form').hidden = mode !== 'new-password';
-  document.querySelector('.auth-tabs').hidden = mode === 'forgot' || mode === 'new-password';
+  document.querySelector('.auth-secondary').hidden = mode !== 'sign-in';
   setStatus(authStatus);
 }
 
@@ -247,11 +244,16 @@ async function signUp(event) {
   } catch (error) { setStatus(authStatus, errorMessage(error), 'error'); }
 }
 
-async function requestPasswordReset(event) {
-  event.preventDefault();
-  const form = event.currentTarget;
+async function requestPasswordReset() {
+  const emailInput = document.querySelector('#sign-in-form [name="email"]');
+  const email = emailInput.value.trim();
+  if (!emailInput.checkValidity()) {
+    emailInput.focus();
+    setStatus(authStatus, 'Escribe tu email para recibir el enlace de restablecimiento.', 'error');
+    return;
+  }
   try {
-    const { error } = await getSupabaseClient().auth.resetPasswordForEmail(form.elements.email.value.trim(), { redirectTo: `${window.location.origin}/portal/` });
+    const { error } = await getSupabaseClient().auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/portal/` });
     if (error) throw error;
     setStatus(authStatus, 'Si existe una cuenta con ese email, recibirás un enlace para restablecer la contraseña.');
   } catch (error) { setStatus(authStatus, errorMessage(error), 'error'); }
@@ -263,6 +265,7 @@ async function setNewPassword(event) {
     const { error } = await getSupabaseClient().auth.updateUser({ password: event.currentTarget.elements.password.value });
     if (error) throw error;
     event.currentTarget.reset();
+    recoveryInProgress = false;
     setStatus(authStatus, 'Contraseña actualizada. Ya puedes entrar.', 'success');
     setAuthMode('sign-in');
   } catch (error) { setStatus(authStatus, errorMessage(error), 'error'); }
@@ -276,11 +279,12 @@ async function showPortal(session) {
 }
 
 function wireAuth() {
-  document.querySelectorAll('[data-auth-tab]').forEach((button) => button.addEventListener('click', () => setAuthMode(button.dataset.authTab)));
-  document.querySelectorAll('[data-auth-action]').forEach((button) => button.addEventListener('click', () => setAuthMode(button.dataset.authAction === 'forgot' ? 'forgot' : 'sign-in')));
+  document.querySelectorAll('[data-auth-action]').forEach((button) => button.addEventListener('click', () => {
+    if (button.dataset.authAction === 'forgot') void requestPasswordReset();
+    else setAuthMode(button.dataset.authAction === 'sign-up' ? 'sign-up' : 'sign-in');
+  }));
   document.querySelector('#sign-in-form').addEventListener('submit', signIn);
   document.querySelector('#sign-up-form').addEventListener('submit', signUp);
-  document.querySelector('#forgot-form').addEventListener('submit', requestPasswordReset);
   document.querySelector('#new-password-form').addEventListener('submit', setNewPassword);
 }
 
@@ -289,12 +293,18 @@ async function start() {
   const supabase = getSupabaseClient();
   if (!supabase) { setStatus(authStatus, 'El portal todavía no está conectado al servicio de acceso.', 'error'); return; }
   supabase.auth.onAuthStateChange((event, session) => {
-    if (event === 'PASSWORD_RECOVERY') { authView.hidden = false; portalView.hidden = true; setAuthMode('new-password'); }
-    if (event === 'SIGNED_IN' && session) void showPortal(session);
+    if (event === 'PASSWORD_RECOVERY') {
+      recoveryInProgress = true;
+      authView.hidden = false;
+      portalView.hidden = true;
+      setAuthMode('new-password');
+    }
+    if (event === 'SIGNED_IN' && session && !recoveryInProgress) void showPortal(session);
     if (event === 'SIGNED_OUT') void signOut();
   });
   const session = await currentSession();
-  if (session) await showPortal(session);
+  if (recoveryInProgress) setAuthMode('new-password');
+  else if (session) await showPortal(session);
   else setAuthMode('sign-in');
 }
 
