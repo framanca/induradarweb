@@ -1,4 +1,5 @@
 import { buildReportViewModel, renderReport } from './renderer.js';
+import { currentSession } from '../auth-client.js';
 
 const statusNode = document.querySelector('#report-status');
 const reportNode = document.querySelector('#report-root');
@@ -24,7 +25,8 @@ async function getAccessToken() {
     const value = await provider.getAccessToken();
     if (typeof value === 'string' && value.trim()) return value.trim();
   }
-  return sessionStorage.getItem('induradar_access_token') || '';
+  const session = await currentSession();
+  return session?.access_token || sessionStorage.getItem('induradar_access_token') || '';
 }
 
 function endpoint() {

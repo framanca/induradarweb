@@ -6,6 +6,8 @@ output_dir="${1:-build/static}"
 lead_endpoint="${LEAD_ENDPOINT:-}"
 contact_endpoint="${CONTACT_ENDPOINT:-}"
 report_endpoint="${REPORT_ENDPOINT:-https://gwmwkxvrgctglyjmlqnb.supabase.co/functions/v1/get-report}"
+supabase_url="${SUPABASE_URL:-https://gwmwkxvrgctglyjmlqnb.supabase.co}"
+supabase_publishable_key="${SUPABASE_PUBLISHABLE_KEY:-sb_publishable_nd7p5sHU6Hlj5KspxhFekQ_ldhPc27I}"
 
 rm -rf "$output_dir"
 mkdir -p "$output_dir"
@@ -39,7 +41,7 @@ if (!html.includes(marker)) {
 fs.writeFileSync(indexPath, html.replace(marker, `${bootstrap}${marker}`));
 NODE
 
-config_json="$(LEAD_ENDPOINT="$lead_endpoint" CONTACT_ENDPOINT="$contact_endpoint" REPORT_ENDPOINT="$report_endpoint" node -e 'process.stdout.write(JSON.stringify({leadEndpoint: process.env.LEAD_ENDPOINT, contactEndpoint: process.env.CONTACT_ENDPOINT, reportEndpoint: process.env.REPORT_ENDPOINT}))')"
+config_json="$(LEAD_ENDPOINT="$lead_endpoint" CONTACT_ENDPOINT="$contact_endpoint" REPORT_ENDPOINT="$report_endpoint" SUPABASE_URL="$supabase_url" SUPABASE_PUBLISHABLE_KEY="$supabase_publishable_key" node -e 'process.stdout.write(JSON.stringify({leadEndpoint: process.env.LEAD_ENDPOINT, contactEndpoint: process.env.CONTACT_ENDPOINT, reportEndpoint: process.env.REPORT_ENDPOINT, supabaseUrl: process.env.SUPABASE_URL, supabasePublishableKey: process.env.SUPABASE_PUBLISHABLE_KEY}))')"
 printf 'window.INDURADAR_CONFIG = Object.freeze(%s);\n' "$config_json" > "$output_dir/config.js"
 rm "$output_dir/config.template.js"
 rm "$output_dir/package.json"
