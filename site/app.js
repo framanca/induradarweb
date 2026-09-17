@@ -28,6 +28,21 @@ const OTHER_NEED = 'Otra';
 
 let creditsCatalog = null;
 let submissionSucceeded = false;
+let clientRequestId = null;
+let portalAuthModulePromise = null;
+
+async function portalAuthModule() {
+  portalAuthModulePromise ??= import('./auth-client.js').catch((error) => {
+    console.debug('Portal authentication module could not be loaded.', { detail: error instanceof Error ? error.message : 'unknown_error' });
+    return null;
+  });
+  return portalAuthModulePromise;
+}
+
+async function portalSession() {
+  const auth = await portalAuthModule();
+  return auth ? auth.currentSession() : null;
+}
 
 const options = {
   offerCategories: [
@@ -763,22 +778,38 @@ async function submitLead(event) {
   if (submissionSucceeded || submitButton.disabled) return;
   if (!validateForm()) return;
   if (!creditsCatalog) { setStatus('error', 'No hemos podido calcular los créditos de la solicitud. Recarga la página e inténtalo de nuevo.'); return; }
-  if (!isConfiguredEndpoint()) { console.debug('LEAD_ENDPOINT is not configured.'); setStatus('error', 'Falta configurar el endpoint de recepción del formulario.'); return; }
   submitButton.disabled = true;
   submitButton.textContent = 'Enviando solicitud…';
   statusBox.hidden = true;
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 20000);
   try {
-    const response = await fetch(window.INDURADAR_CONFIG.leadEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildPayload()), signal: controller.signal });
+    const session = await portalSession();
     let result;
-    try { result = await response.json(); } catch { throw new Error('invalid_json_response'); }
-    console.debug('Lead submission', { httpStatus: response.status, success: result?.success === true, submissionId: result?.submission_id ?? null, emailSent: result?.email_sent ?? null });
-    if (!response.ok || result?.success !== true) throw new Error(`http_${response.status}`);
+    if (session) {
+      const auth = await portalAuthModule();
+      const supabase = auth?.getSupabaseClient();
+      if (!supabase) throw new Error('portal_auth_not_configured');
+      clientRequestId ??= crypto.randomUUID();
+      const { data, error } = await supabase.rpc('submit_authenticated_service_request', {
+        p_payload: buildPayload(),
+        p_client_request_id: clientRequestId,
+      });
+      if (error) throw error;
+      result = data;
+      console.debug('Authenticated portal request', { requestKey: result?.request_key ?? null, creditsCharged: result?.credits_charged ?? null });
+    } else {
+      if (!isConfiguredEndpoint()) throw new Error('lead_endpoint_not_configured');
+      const response = await fetch(window.INDURADAR_CONFIG.leadEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildPayload()), signal: controller.signal });
+      try { result = await response.json(); } catch { throw new Error('invalid_json_response'); }
+      console.debug('Lead submission', { httpStatus: response.status, success: result?.success === true, submissionId: result?.submission_id ?? null, emailSent: result?.email_sent ?? null });
+      if (!response.ok || result?.success !== true) throw new Error(`http_${response.status}`);
+    }
     submissionSucceeded = true;
     form.querySelectorAll('input, textarea, select, button').forEach((element) => { element.disabled = true; });
     submitButton.textContent = 'Solicitud recibida';
-    setStatus('success', 'Solicitud recibida correctamente. Hemos recibido tu solicitud y comenzaremos a revisarla.', true);
+    const charged = Number.isInteger(result?.credits_charged) ? ` Se han cargado ${result.credits_charged} créditos a tu saldo.` : '';
+    setStatus('success', `Solicitud recibida correctamente. Hemos recibido tu solicitud y comenzaremos a revisarla.${charged}`, true);
   } catch (error) {
     const detail = error instanceof DOMException && error.name === 'AbortError' ? 'timeout' : error instanceof Error ? error.message : 'unknown_error';
     console.debug('Lead submission failed', { detail });
@@ -790,6 +821,7 @@ async function submitLead(event) {
 
 function resetForm() {
   submissionSucceeded = false;
+  clientRequestId = null;
   form.reset();
   form.querySelectorAll('input, textarea, select, button').forEach((element) => { element.disabled = false; });
   ['investmentSignals', 'innovationSignals', 'growthSignals', 'publicFinanceSignals'].forEach((name) => inputsByName(name).forEach((input) => { input.checked = true; }));
@@ -893,6 +925,17 @@ async function loadCreditsCatalog() {
     const response = await fetch('assets/config/induradar_credits_v1.json', { cache: 'no-cache' });
     if (!response.ok) throw new Error(`catalog_http_${response.status}`);
     creditsCatalog = await response.json();
+    const session = await portalSession();
+    const auth = await portalAuthModule();
+    const supabase = auth?.getSupabaseClient();
+    if (session && supabase) {
+      const { data, error } = await supabase
+        .from('credit_pricing_catalog')
+        .select('catalog')
+        .eq('singleton', true)
+        .single();
+      if (!error && data?.catalog) creditsCatalog = data.catalog;
+    }
     updateCredits();
   } catch (error) {
     console.debug('Credits catalog could not be loaded.', { detail: error instanceof Error ? error.message : 'unknown_error' });

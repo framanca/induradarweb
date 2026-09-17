@@ -17,6 +17,12 @@ REPORT_ENDPOINT='https://<PROJECT_REF>.supabase.co/functions/v1/get-report' \
 python3 -m http.server 8080 --directory build/static
 ```
 
+## Portal de clientes
+
+El portal autenticado está disponible en `/portal/`. Su preparación de Auth,
+la primera cuenta maestra y la configuración de URLs de recuperación están en
+[docs/portal-auth-setup.md](docs/portal-auth-setup.md).
+
 El script genera `build/static`, que es exactamente el directorio publicado.
 `LEAD_ENDPOINT`, `CONTACT_ENDPOINT` y `REPORT_ENDPOINT` se inyectan como
 configuración pública en tiempo de build. Las URLs de endpoints son visibles en

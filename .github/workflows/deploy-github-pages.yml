@@ -32,6 +32,7 @@ jobs:
           node --check site/research-objective.js
           node --check site/report/renderer.js
           node --check site/report/report.js
+          node --check site/portal/portal.js
           node --test test/static_credits_test.mjs test/static_research_objective_test.mjs test/static_lead_form_defaults_test.mjs test/static_report_renderer_test.mjs test/editorial_pipeline_contract_test.mjs
           LEAD_ENDPOINT="${{ secrets.LEAD_ENDPOINT }}" \
           CONTACT_ENDPOINT="${{ secrets.CONTACT_ENDPOINT }}" \
@@ -42,6 +43,8 @@ jobs:
           test -f build/site/report/index.html
           test -f build/site/report/renderer.js
           test -f build/site/report/report.js
+          test -f build/site/portal/index.html
+          test -f build/site/portal/portal.js
           grep -q 'reportEndpoint' build/site/config.js
 
       - name: Configure GitHub Pages

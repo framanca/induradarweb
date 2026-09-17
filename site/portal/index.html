@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="theme-color" content="#075a8f">
+  <title>Portal | InduRadar</title>
+  <link rel="icon" type="image/png" href="../favicon.png">
+  <link rel="stylesheet" href="portal.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="InduRadar, inicio">
+      <img src="../assets/InduRadarLogoVertical-128.webp" width="48" height="48" alt="InduRadar">
+      <span><strong>InduRadar</strong><small>Portal de clientes</small></span>
+    </a>
+    <div id="session-actions"></div>
+  </header>
+
+  <main class="shell">
+    <section id="auth-view" class="auth-card" aria-live="polite">
+      <div class="auth-heading">
+        <p class="eyebrow">Acceso seguro</p>
+        <h1>Tu espacio InduRadar</h1>
+        <p>Consulta tus solicitudes, créditos e informes disponibles.</p>
+      </div>
+      <div id="auth-status" class="status" hidden role="status"></div>
+      <div class="auth-tabs" role="tablist">
+        <button type="button" role="tab" aria-selected="true" data-auth-tab="sign-in">Entrar</button>
+        <button type="button" role="tab" aria-selected="false" data-auth-tab="sign-up">Crear cuenta</button>
+      </div>
+      <form id="sign-in-form" class="auth-form">
+        <label>Email<input name="email" type="email" autocomplete="email" required></label>
+        <label>Contraseña<input name="password" type="password" autocomplete="current-password" minlength="8" required></label>
+        <button class="primary" type="submit">Entrar</button>
+        <button class="link-button" type="button" data-auth-action="forgot">He olvidado mi contraseña</button>
+      </form>
+      <form id="sign-up-form" class="auth-form" hidden>
+        <label>Nombre<input name="full_name" type="text" autocomplete="name" maxlength="120" required></label>
+        <label>Email<input name="email" type="email" autocomplete="email" required></label>
+        <label>Contraseña<input name="password" type="password" autocomplete="new-password" minlength="8" required></label>
+        <p class="form-note">Te enviaremos un email para confirmar tu cuenta.</p>
+        <button class="primary" type="submit">Crear cuenta</button>
+      </form>
+      <form id="forgot-form" class="auth-form" hidden>
+        <h2>Restablecer contraseña</h2>
+        <label>Email<input name="email" type="email" autocomplete="email" required></label>
+        <p class="form-note">Te enviaremos un enlace para crear una contraseña nueva.</p>
+        <button class="primary" type="submit">Enviar enlace</button>
+        <button class="link-button" type="button" data-auth-action="back">Volver a entrar</button>
+      </form>
+      <form id="new-password-form" class="auth-form" hidden>
+        <h2>Nueva contraseña</h2>
+        <label>Nueva contraseña<input name="password" type="password" autocomplete="new-password" minlength="8" required></label>
+        <button class="primary" type="submit">Guardar contraseña</button>
+      </form>
+    </section>
+
+    <section id="portal-view" hidden>
+      <div class="portal-heading">
+        <div>
+          <p class="eyebrow" id="portal-role">Portal de clientes</p>
+          <h1 id="welcome-name">Hola</h1>
+          <p id="portal-subtitle">Aquí tienes tu actividad reciente.</p>
+        </div>
+        <a class="primary new-request" href="/#formulario">Encargar un informe</a>
+      </div>
+      <div id="portal-status" class="status" hidden role="status"></div>
+      <section class="summary-grid" aria-label="Resumen">
+        <article><span>Saldo disponible</span><strong id="credit-balance">—</strong><small>Puede ser negativo mientras se regulariza.</small></article>
+        <article><span>Solicitudes</span><strong id="request-count">—</strong><small>Trabajos registrados.</small></article>
+        <article><span>Informes disponibles</span><strong id="report-count">—</strong><small>Versiones aprobadas para consultar.</small></article>
+      </section>
+
+      <section class="panel">
+        <header><div><p class="eyebrow">Créditos</p><h2>Movimientos</h2></div></header>
+        <div id="ledger-list" class="list-empty">Cargando movimientos…</div>
+      </section>
+      <section class="panel">
+        <header><div><p class="eyebrow">Trabajos</p><h2>Mis solicitudes</h2></div></header>
+        <div id="request-list" class="list-empty">Cargando solicitudes…</div>
+      </section>
+      <section class="panel">
+        <header><div><p class="eyebrow">Informes</p><h2>Informes disponibles</h2></div></header>
+        <div id="report-list" class="list-empty">Cargando informes…</div>
+      </section>
+
+      <section id="admin-view" hidden>
+        <div class="admin-divider"><span>Panel maestro</span></div>
+        <section class="panel">
+          <header><div><p class="eyebrow">Usuarios</p><h2>Saldos y ajustes</h2></div></header>
+          <div id="admin-users" class="list-empty">Cargando usuarios…</div>
+        </section>
+        <section class="panel">
+          <header><div><p class="eyebrow">Asignación</p><h2>Todos los trabajos</h2><p>Al asignar un trabajo se trasladan todos sus informes al usuario seleccionado.</p></div></header>
+          <div id="admin-requests" class="list-empty">Cargando trabajos…</div>
+        </section>
+        <section class="panel">
+          <header><div><p class="eyebrow">Tarifa</p><h2>Catálogo de créditos</h2><p>El cálculo definitivo se realiza en el servidor al crear una solicitud.</p></div></header>
+          <form id="pricing-form" class="pricing-form"></form>
+        </section>
+      </section>
+    </section>
+  </main>
+  <script src="../config.js"></script>
+  <script type="module" src="portal.js"></script>
+</body>
+</html>
