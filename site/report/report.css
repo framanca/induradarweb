@@ -88,6 +88,7 @@ p { margin: .25rem 0 .8rem; }
 .opportunity-body { padding: 1rem; }
 .editorial-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; margin: 1rem 0; }
 .fact-block { background: var(--soft); border: 1px solid var(--line); border-radius: 12px; padding: .85rem; }
+.fact-block--confirmed { grid-column: 1 / -1; }
 .fact-block p:last-child { margin-bottom: 0; }
 .signal-details { margin-top: 1rem; border-top: 1px solid var(--line); padding-top: .8rem; }
 .signal-details summary { cursor: pointer; color: var(--brand); font-weight: 800; }
