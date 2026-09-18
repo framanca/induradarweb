@@ -197,18 +197,18 @@ function addEditorial(parent, opportunity) {
   const editorial = opportunity.editorial;
   if (!editorial || editorial === EMPTY_OBJECT || Object.keys(editorial).length === 0) return false;
   const section = element('section', 'editorial-grid');
+  if (asArray(editorial.confirmed_facts).length) {
+    const block = element('div', 'fact-block fact-block--confirmed');
+    block.append(element('h4', '', 'Hechos confirmados'));
+    addList(block, editorial.confirmed_facts);
+    section.append(block);
+  }
   addLabeledText(section, 'Por qué importa ahora', editorial.why_now);
   addLabeledText(section, 'Necesidad probable', editorial.probable_need);
   addLabeledText(section, 'Encaje y rol objetivo', editorial.fit_and_role);
   addLabeledText(section, 'Actores y cadena de decisión', editorial.actor_chain);
   addLabeledText(section, 'Riesgos y cautelas', editorial.risk_cautions);
   addLabeledText(section, 'Siguiente acción', editorial.next_action);
-  if (asArray(editorial.confirmed_facts).length) {
-    const block = element('div', 'fact-block');
-    block.append(element('h4', '', 'Hechos confirmados'));
-    addList(block, editorial.confirmed_facts);
-    section.append(block);
-  }
   if (asArray(editorial.validation_gaps).length) {
     const block = element('div', 'fact-block');
     block.append(element('h4', '', 'Qué falta por validar'));
