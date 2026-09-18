@@ -30,6 +30,18 @@
       <a href="#fuentes">Fuentes</a>
     </nav>
     <div id="report-status" class="report-status" role="status" aria-live="polite"></div>
+    <section id="report-auth" class="report-auth" hidden aria-labelledby="report-auth-title">
+      <p class="eyebrow">Acceso seguro</p>
+      <h2 id="report-auth-title">Entra para ver este informe</h2>
+      <p>Usa tu cuenta de InduRadar para acceder a los informes que tienes asignados.</p>
+      <div id="report-auth-status" class="report-auth-status" hidden role="status" aria-live="polite"></div>
+      <form id="report-auth-form">
+        <label>Email<input name="email" type="email" autocomplete="email" required></label>
+        <label>Contraseña<input name="password" type="password" autocomplete="current-password" minlength="8" required></label>
+        <button type="submit">Entrar</button>
+        <button class="report-link-button" type="button" id="report-forgot-password">He olvidado mi contraseña</button>
+      </form>
+    </section>
     <div id="report-root"></div>
   </main>
 

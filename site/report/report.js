@@ -1,17 +1,38 @@
 import { buildReportViewModel, renderReport } from './renderer.js';
-import { currentSession } from '../auth-client.js';
+import { currentSession, getSupabaseClient } from '../auth-client.js';
 
 const statusNode = document.querySelector('#report-status');
 const reportNode = document.querySelector('#report-root');
 const referenceNode = document.querySelector('#report-reference');
 const dateNode = document.querySelector('#report-date');
 const printButton = document.querySelector('#print-report');
+const reportAuthNode = document.querySelector('#report-auth');
+const reportAuthStatusNode = document.querySelector('#report-auth-status');
+const reportAuthForm = document.querySelector('#report-auth-form');
 let printState = [];
 
 function setStatus(message, kind = 'info') {
   statusNode.textContent = message;
   statusNode.dataset.kind = kind;
   statusNode.hidden = !message;
+}
+
+function setAuthStatus(message = '', kind = 'error') {
+  reportAuthStatusNode.textContent = message;
+  reportAuthStatusNode.dataset.kind = kind;
+  reportAuthStatusNode.hidden = !message;
+}
+
+function authErrorMessage(error) {
+  const message = error?.message ?? '';
+  if (message.includes('Invalid login credentials')) return 'El email o la contraseña no son correctos.';
+  if (message.includes('Email not confirmed')) return 'Confirma tu email antes de entrar.';
+  return 'No se ha podido completar el acceso. Inténtalo de nuevo.';
+}
+
+function showReportLogin() {
+  reportAuthNode.hidden = false;
+  reportAuthForm.elements.email.focus();
 }
 
 function reportReference() {
@@ -87,6 +108,8 @@ async function start() {
   referenceNode.textContent = reference;
   document.title = `${reference} | InduRadar`;
   setStatus('Cargando informe…');
+  reportAuthNode.hidden = true;
+  setAuthStatus();
 
   try {
     const data = await fetchReport(reference);
@@ -99,6 +122,36 @@ async function start() {
   } catch (error) {
     console.error('InduRadar report viewer error', error?.message ?? error);
     setStatus(messageFor(error), 'error');
+    if (error?.message === 'authentication_required') showReportLogin();
+  }
+}
+
+async function signInToReport(event) {
+  event.preventDefault();
+  const email = reportAuthForm.elements.email.value.trim();
+  const password = reportAuthForm.elements.password.value;
+  try {
+    const { error } = await getSupabaseClient().auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    await start();
+  } catch (error) {
+    setAuthStatus(authErrorMessage(error));
+  }
+}
+
+async function requestReportPasswordReset() {
+  const emailInput = reportAuthForm.elements.email;
+  if (!emailInput.checkValidity()) {
+    emailInput.focus();
+    setAuthStatus('Escribe tu email para recibir el enlace de restablecimiento.');
+    return;
+  }
+  try {
+    const { error } = await getSupabaseClient().auth.resetPasswordForEmail(emailInput.value.trim(), { redirectTo: `${window.location.origin}/portal/` });
+    if (error) throw error;
+    setAuthStatus('Si existe una cuenta con ese email, recibirás un enlace para restablecer la contraseña.', 'success');
+  } catch (error) {
+    setAuthStatus(authErrorMessage(error));
   }
 }
 
@@ -112,4 +165,6 @@ window.addEventListener('afterprint', () => {
 });
 
 printButton.addEventListener('click', () => window.print());
+reportAuthForm.addEventListener('submit', signInToReport);
+document.querySelector('#report-forgot-password').addEventListener('click', () => void requestReportPasswordReset());
 start();
