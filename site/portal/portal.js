@@ -213,12 +213,23 @@ async function savePricing(event) {
   } catch (error) { setStatus(portalStatus, errorMessage(error), 'error'); }
 }
 
-async function signOut() {
-  await getSupabaseClient().auth.signOut();
+function showSignedOut() {
   portalData = { session: null, profile: null, requests: [], reports: [], users: [], memberships: [], ledger: [], catalog: null };
   portalView.hidden = true;
   authView.hidden = false;
+  sessionActions.replaceChildren();
   setAuthMode('sign-in');
+}
+
+async function signOut() {
+  try {
+    const { error } = await getSupabaseClient().auth.signOut();
+    if (error) throw error;
+  } catch (error) {
+    setStatus(portalStatus, 'No se ha podido cerrar la sesión. Inténtalo de nuevo.', 'error');
+    return;
+  }
+  showSignedOut();
 }
 
 async function signIn(event) {
@@ -300,7 +311,7 @@ async function start() {
       setAuthMode('new-password');
     }
     if (event === 'SIGNED_IN' && session && !recoveryInProgress) void showPortal(session);
-    if (event === 'SIGNED_OUT') void signOut();
+    if (event === 'SIGNED_OUT') showSignedOut();
   });
   const session = await currentSession();
   if (recoveryInProgress) setAuthMode('new-password');
