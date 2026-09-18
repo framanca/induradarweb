@@ -43,6 +43,17 @@ button, input { font: inherit; }
 .report-status { padding: 1rem; border-radius: 12px; background: var(--accent); border: 1px solid #bad8e8; margin-bottom: 1rem; }
 .report-status:empty, .report-status[hidden] { display: none; }
 .report-status[data-kind="error"] { background: #fff3f1; border-color: #efc6bd; color: #7b291c; }
+.report-auth { width: min(480px, 100%); margin: 2rem auto; padding: clamp(1.25rem, 4vw, 2rem); border: 1px solid var(--line); border-radius: 18px; background: var(--white); box-shadow: 0 8px 24px rgba(16, 35, 51, .04); }
+.report-auth h2 { margin-bottom: .5rem; font-size: clamp(1.4rem, 3vw, 1.85rem); }
+.report-auth > p:not(.eyebrow) { margin: 0; color: var(--muted); }
+.report-auth form { display: grid; gap: .9rem; margin-top: 1.35rem; }
+.report-auth label { display: grid; gap: .35rem; color: var(--ink); font-size: .88rem; font-weight: 750; }
+.report-auth input { width: 100%; padding: .7rem .8rem; border: 1px solid var(--line); border-radius: 8px; background: var(--white); color: var(--ink); }
+.report-auth input:focus { outline: 3px solid rgba(24,191,215,.17); border-color: var(--brand); }
+.report-auth form > button[type="submit"] { min-height: 44px; border: 1px solid var(--brand); border-radius: 8px; background: var(--brand); color: white; cursor: pointer; font-weight: 800; }
+.report-link-button { justify-self: start; padding: 0; border: 0; background: none; color: var(--brand); cursor: pointer; font-weight: 750; text-decoration: underline; }
+.report-auth-status { padding: .75rem .85rem; border: 1px solid #efc6bd; border-radius: 8px; background: #fff3f1; color: #7b291c; font-size: .9rem; }
+.report-auth-status[data-kind="success"] { border-color: #a9d8c3; background: #eaf7f1; color: #136c4b; }
 
 .report-section { background: var(--white); border: 1px solid var(--line); border-radius: 18px; padding: clamp(1rem, 3vw, 2rem); margin-bottom: 1rem; box-shadow: 0 8px 24px rgba(16, 35, 51, .04); }
 .eyebrow { color: var(--brand); font-size: .78rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; margin: 0 0 .4rem; }
