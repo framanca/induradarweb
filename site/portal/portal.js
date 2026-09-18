@@ -310,7 +310,9 @@ async function start() {
       portalView.hidden = true;
       setAuthMode('new-password');
     }
-    if (event === 'SIGNED_IN' && session && !recoveryInProgress) void showPortal(session);
+    if (event === 'SIGNED_IN' && session && !recoveryInProgress) {
+      window.setTimeout(() => { void showPortal(session); }, 0);
+    }
     if (event === 'SIGNED_OUT') showSignedOut();
   });
   const session = await currentSession();
