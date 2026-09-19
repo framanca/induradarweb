@@ -77,7 +77,7 @@ async function reportRequest(reference, format, accept) {
 
   if (response.status === 401 || response.status === 403) throw new Error('authentication_required');
   if (response.status === 404) throw new Error('report_not_available');
-  if (response.status === 409 && format === 'html') throw new Error('canonical_html_not_materialized');
+  if (response.status === 409 && format === 'html') throw new Error('legacy_report');
   if (!response.ok) throw new Error('report_load_failed');
   return response;
 }
@@ -134,7 +134,7 @@ async function start() {
     document.close();
     return;
   } catch (error) {
-    if (error?.message !== 'canonical_html_not_materialized') {
+    if (error?.message !== 'legacy_report') {
       console.error('InduRadar canonical report viewer error', error?.message ?? error);
       setStatus(messageFor(error), 'error');
       if (error?.message === 'authentication_required') showReportLogin();
@@ -142,8 +142,8 @@ async function start() {
     }
   }
 
-  // Legacy reports are intentionally not backfilled. Keep the pre-cutover
-  // browser renderer only for those existing report versions.
+  // Only reports finalized before the canonical-HTML cutover may take this
+  // legacy path. Post-cutover missing HTML fails closed at the server.
   try {
     const data = await fetchLegacyReport(reference);
     const model = buildReportViewModel(data);
