@@ -55,7 +55,7 @@ function endpoint() {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-async function fetchReport(reference) {
+async function reportRequest(reference, format, accept) {
   const reportEndpoint = endpoint();
   if (!reportEndpoint) throw new Error('report_endpoint_not_configured');
 
@@ -64,10 +64,11 @@ async function fetchReport(reference) {
 
   const url = new URL(reportEndpoint);
   url.searchParams.set('ref', reference);
+  url.searchParams.set('format', format);
   const response = await fetch(url, {
     method: 'GET',
     headers: {
-      Accept: 'application/json',
+      Accept: accept,
       Authorization: `Bearer ${token}`,
     },
     cache: 'no-store',
@@ -76,8 +77,20 @@ async function fetchReport(reference) {
 
   if (response.status === 401 || response.status === 403) throw new Error('authentication_required');
   if (response.status === 404) throw new Error('report_not_available');
+  if (response.status === 409 && format === 'html') throw new Error('canonical_html_not_materialized');
   if (!response.ok) throw new Error('report_load_failed');
+  return response;
+}
 
+async function fetchCanonicalHtml(reference) {
+  const response = await reportRequest(reference, 'html', 'text/html');
+  const html = await response.text();
+  if (!/^\s*<!doctype html>/i.test(html)) throw new Error('invalid_canonical_html');
+  return html;
+}
+
+async function fetchLegacyReport(reference) {
+  const response = await reportRequest(reference, 'json', 'application/json');
   const body = await response.json();
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('invalid_report_payload');
   return body;
@@ -92,6 +105,7 @@ function messageFor(error) {
     case 'report_endpoint_not_configured':
       return 'El visor de informes todavía no está conectado al portal.';
     case 'invalid_report_payload':
+    case 'invalid_canonical_html':
       return 'La respuesta del informe no cumple el formato esperado.';
     default:
       return 'No se ha podido cargar el informe. Inténtalo de nuevo desde el portal.';
@@ -112,7 +126,26 @@ async function start() {
   setAuthStatus();
 
   try {
-    const data = await fetchReport(reference);
+    // Future reports: the exact persisted canonical HTML becomes the document
+    // shown in the browser. There is no second client-side rendering path.
+    const html = await fetchCanonicalHtml(reference);
+    document.open();
+    document.write(html);
+    document.close();
+    return;
+  } catch (error) {
+    if (error?.message !== 'canonical_html_not_materialized') {
+      console.error('InduRadar canonical report viewer error', error?.message ?? error);
+      setStatus(messageFor(error), 'error');
+      if (error?.message === 'authentication_required') showReportLogin();
+      return;
+    }
+  }
+
+  // Legacy reports are intentionally not backfilled. Keep the pre-cutover
+  // browser renderer only for those existing report versions.
+  try {
+    const data = await fetchLegacyReport(reference);
     const model = buildReportViewModel(data);
     referenceNode.textContent = model.reference || reference;
     dateNode.textContent = model.asOf ? `Fecha de corte: ${model.asOf}` : '';
@@ -120,7 +153,7 @@ async function start() {
     setStatus('');
     printButton.hidden = false;
   } catch (error) {
-    console.error('InduRadar report viewer error', error?.message ?? error);
+    console.error('InduRadar legacy report viewer error', error?.message ?? error);
     setStatus(messageFor(error), 'error');
     if (error?.message === 'authentication_required') showReportLogin();
   }

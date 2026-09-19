@@ -72,7 +72,10 @@ el cliente de correo como fallback para no perder consultas.
 sustantiva es exclusivamente el **Report JSON lossless aprobado** de
 `report_versions.report_payload` (Report Schema 2.0.0). El navegador no llama a
 un modelo de IA, no reinvestiga y no puede añadir ni omitir contenido
-sustantivo.
+sustantivo. Desde el corte del pipeline canónico, la vista web y cualquier
+exportación HTML reutilizan exactamente el mismo HTML persistido; no existen
+dos renderizadores para los informes nuevos. Los informes anteriores conservan
+el visor legado hasta que se actualicen expresamente.
 
 Flujo:
 
@@ -81,13 +84,15 @@ investigación + síntesis una vez
           ↓
 Report JSON aprobado e inmutable
           ↓
-get_web_report_payload_by_reference_v1
+Web Document cliente-seguro materializado una vez
+          ↓
+HTML canónico autocontenido materializado una vez
+          ↓
+get_web_report_html_by_reference_v1
           ↓
 Edge Function get-report (JWT obligatorio)
           ↓
-renderer.js
-          ↓
-HTML interactivo / impresión-PDF
+el navegador muestra exactamente esos mismos bytes HTML
 ```
 
 La cartera web usa como colección principal

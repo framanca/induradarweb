@@ -5,12 +5,12 @@ const allowedOrigins = new Set(
     .filter(Boolean),
 );
 
-function headersFor(origin: string | null) {
+function headersFor(origin: string | null, contentType = 'application/json; charset=utf-8') {
   const headers = new Headers({
     'Access-Control-Allow-Headers': 'authorization, content-type',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Cache-Control': 'private, no-store, max-age=0',
-    'Content-Type': 'application/json; charset=utf-8',
+    'Content-Type': contentType,
     Vary: 'Origin',
     'X-Content-Type-Options': 'nosniff',
   });
@@ -46,7 +46,9 @@ Deno.serve(async (request) => {
 
   const url = new URL(request.url);
   const reference = (url.searchParams.get('ref') ?? '').trim().toUpperCase();
+  const format = (url.searchParams.get('format') ?? 'json').trim().toLowerCase();
   if (!isReference(reference)) return json({ success: false, error: 'invalid_reference' }, 400, origin);
+  if (!['json', 'html'].includes(format)) return json({ success: false, error: 'invalid_format' }, 400, origin);
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
@@ -55,9 +57,13 @@ Deno.serve(async (request) => {
     return json({ success: false, error: 'service_unavailable' }, 503, origin);
   }
 
+  const rpc = format === 'html'
+    ? 'get_web_report_html_by_reference_v1'
+    : 'get_web_report_payload_by_reference_v1';
+
   let upstream: Response;
   try {
-    upstream = await fetch(`${supabaseUrl}/rest/v1/rpc/get_web_report_payload_by_reference_v1`, {
+    upstream = await fetch(`${supabaseUrl}/rest/v1/rpc/${rpc}`, {
       method: 'POST',
       headers: {
         apikey: anonKey,
@@ -75,8 +81,7 @@ Deno.serve(async (request) => {
     return json({ success: false, error: 'authentication_required' }, 403, origin);
   }
   if (!upstream.ok) {
-    // Do not expose database/RLS details or reveal whether another tenant owns a reference.
-    console.error('Report RPC rejected request.', { status: upstream.status, reference });
+    console.error('Report RPC rejected request.', { status: upstream.status, reference, format });
     return json({ success: false, error: 'report_not_available' }, 404, origin);
   }
 
@@ -84,9 +89,23 @@ Deno.serve(async (request) => {
   try {
     payload = await upstream.json();
   } catch {
-    console.error('Report RPC returned invalid JSON.', { reference });
+    console.error('Report RPC returned invalid JSON.', { reference, format });
     return json({ success: false, error: 'service_unavailable' }, 503, origin);
   }
 
+  if (format === 'html') {
+    if (typeof payload !== 'string' || !payload.trim()) {
+      // Legacy report versions are deliberately not backfilled automatically.
+      return json({ success: false, error: 'canonical_html_not_materialized' }, 409, origin);
+    }
+    return new Response(payload, {
+      status: 200,
+      headers: headersFor(origin, 'text/html; charset=utf-8'),
+    });
+  }
+
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return json({ success: false, error: 'invalid_report_payload' }, 503, origin);
+  }
   return new Response(JSON.stringify(payload), { status: 200, headers: headersFor(origin) });
 });
