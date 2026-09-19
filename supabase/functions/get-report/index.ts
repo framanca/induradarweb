@@ -58,7 +58,7 @@ Deno.serve(async (request) => {
   }
 
   const rpc = format === 'html'
-    ? 'get_web_report_html_by_reference_v1'
+    ? 'get_web_report_html_delivery_by_reference_v1'
     : 'get_web_report_payload_by_reference_v1';
 
   let upstream: Response;
@@ -94,11 +94,21 @@ Deno.serve(async (request) => {
   }
 
   if (format === 'html') {
-    if (typeof payload !== 'string' || !payload.trim()) {
-      // Legacy report versions are deliberately not backfilled automatically.
-      return json({ success: false, error: 'canonical_html_not_materialized' }, 409, origin);
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      return json({ success: false, error: 'invalid_html_delivery_payload' }, 503, origin);
     }
-    return new Response(payload, {
+    const delivery = payload as { mode?: unknown; html?: unknown; reason?: unknown };
+    if (delivery.mode === 'legacy') {
+      return json({ success: false, error: 'legacy_report' }, 409, origin);
+    }
+    if (delivery.mode === 'blocked') {
+      console.error('Post-cutover report is missing canonical HTML.', { reference, reason: delivery.reason });
+      return json({ success: false, error: 'canonical_html_required' }, 503, origin);
+    }
+    if (delivery.mode !== 'canonical' || typeof delivery.html !== 'string' || !delivery.html.trim()) {
+      return json({ success: false, error: 'invalid_canonical_html' }, 503, origin);
+    }
+    return new Response(delivery.html, {
       status: 200,
       headers: headersFor(origin, 'text/html; charset=utf-8'),
     });
