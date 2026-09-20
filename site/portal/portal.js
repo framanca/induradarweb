@@ -64,7 +64,7 @@ async function loadPortal() {
     const [profile, memberships, requests, reports, ledger, catalogRows] = await Promise.all([
       requireData(supabase.from('user_profiles').select('user_id,email,display_name,is_platform_admin').eq('user_id', userId).single()),
       requireData(supabase.from('memberships').select('account_id,user_id,role').eq('user_id', userId)),
-      requireData(supabase.from('service_requests').select('id,account_id,request_key,title,status,received_at,delivered_at,credits_charged,created_by').order('received_at', { ascending: false })),
+      requireData(supabase.from('service_requests').select('id,submission_id,account_id,request_key,title,status,received_at,delivered_at,credits_charged,created_by').order('received_at', { ascending: false })),
       requireData(supabase.rpc('portal_list_available_reports')),
       requireData(supabase.from('credit_ledger').select('id,account_id,user_id,service_request_id,entry_type,credits_delta,catalog_version,description,created_at').order('created_at', { ascending: false })),
       requireData(supabase.from('credit_pricing_catalog').select('catalog').eq('singleton', true).single()),
@@ -137,8 +137,11 @@ function renderAdmin() {
     return `<article class="row"><div><strong>${escapeHtml(user.display_name || user.email)}</strong><span class="meta">${escapeHtml(user.email)} · Saldo: ${balance} créditos</span>${user.is_platform_admin ? '<span class="badge">Maestro</span>' : ''}</div>${user.is_platform_admin ? '' : `<form class="adjust-form" data-adjust-user="${user.user_id}"><label>Créditos<input name="credits" type="number" required step="1" placeholder="Ej. 100"></label><label>Motivo<input name="description" type="text" required maxlength="240" placeholder="Recarga o ajuste"></label><button type="submit">Aplicar</button></form>`}</article>`;
   }).join('')}</div>` : 'Todavía no hay usuarios registrados.';
   requestRoot.innerHTML = portalData.requests.length ? `<div class="row-list admin-requests">${portalData.requests.map((request) => {
-    const currentUser = portalData.users.find((user) => userAccount(user.user_id) === request.account_id);
-    return `<article class="row"><div><strong>${escapeHtml(request.title || request.request_key)}</strong><span class="meta">${escapeHtml(request.request_key)} · ${escapeHtml(statusLabel(request.status))} · ${escapeHtml(currentUser?.email || 'Sin usuario asignado')}</span></div><form class="assignment" data-request-id="${request.id}"><select name="user_id" aria-label="Asignar trabajo"><option value="">Asignar a usuario…</option>${assignableUsers.map((user) => `<option value="${user.user_id}" ${userAccount(user.user_id) === request.account_id ? 'selected' : ''}>${escapeHtml(user.display_name || user.email)}</option>`).join('')}</select><button class="assign-button" type="submit">Asignar</button></form></article>`;
+    const creator = request.created_by ? portalData.users.find((user) => user.user_id === request.created_by) : null;
+    const accountUser = portalData.users.find((user) => userAccount(user.user_id) === request.account_id);
+    const currentUser = creator ?? accountUser;
+    const identity = creator ? `Autenticada: ${creator.email}` : (currentUser ? `Cuenta: ${currentUser.email}` : 'Sin usuario identificado');
+    return `<article class="row"><div><strong>${escapeHtml(request.title || request.request_key)}</strong><span class="meta">${escapeHtml(request.request_key)} · ${escapeHtml(request.submission_id || 'Sin Submission ID')} · ${escapeHtml(statusLabel(request.status))} · ${escapeHtml(identity)}</span></div><form class="assignment" data-request-id="${request.id}"><select name="user_id" aria-label="Asignar trabajo"><option value="">Asignar a usuario…</option>${assignableUsers.map((user) => `<option value="${user.user_id}" ${userAccount(user.user_id) === request.account_id ? 'selected' : ''}>${escapeHtml(user.display_name || user.email)}</option>`).join('')}</select><button class="assign-button" type="submit">Asignar</button></form></article>`;
   }).join('')}</div>` : 'No hay trabajos disponibles.';
   userRoot.querySelectorAll('.adjust-form').forEach((form) => form.addEventListener('submit', adjustCredits));
   requestRoot.querySelectorAll('.assignment').forEach((form) => form.addEventListener('submit', assignRequest));
