@@ -56,12 +56,13 @@ dos valores.
 
 Las notificaciones administrativas ya no dependen del canal de entrada. Un
 trigger común crea una entrada idempotente en
-`private.service_request_notification_outbox`; la Edge Function
-`notify-service-request` reclama esa entrada, envía el aviso con Resend y
-persiste el receipt del proveedor. Los fallos de correo no revierten la
-solicitud: quedan pendientes y un cron de base de datos reintenta de forma
-acotada. `submit-lead` utiliza este mismo camino y no mantiene un segundo
-envío paralelo.
+`private.service_request_notification_outbox`; PostgreSQL genera un token de
+despacho de un solo uso (solo se conserva su hash) y llama a la Edge Function
+`notify-service-request`. La función solo puede reclamar la entrada con ese
+token, envía el aviso con Resend y persiste el receipt del proveedor. Los fallos
+de correo no revierten la solicitud: quedan pendientes y un cron de base de
+datos reintenta de forma acotada. `submit-lead` utiliza este mismo camino y no
+mantiene un segundo envío paralelo.
 
 El panel maestro muestra el usuario exacto de `created_by` cuando la solicitud
 es autenticada y conserva también el `Submission ID`, de modo que solicitud,
