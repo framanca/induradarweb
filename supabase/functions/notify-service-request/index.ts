@@ -49,7 +49,7 @@ function uuid(value: unknown) {
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ success: false, error: "method_not_allowed" }, 405);
 
-  let body: { notification_id?: unknown };
+  let body: { notification_id?: unknown; dispatch_token?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -67,9 +67,16 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, serviceRoleKey);
   const notificationId = body.notification_id as string;
 
-  const { data, error } = await supabase.rpc("claim_service_request_notification_v1", {
-    p_notification_id: notificationId,
-  });
+  const dispatchToken = typeof body.dispatch_token === "string" ? body.dispatch_token : null;
+  const claimCall = dispatchToken
+    ? supabase.rpc("claim_service_request_notification_token_v1", {
+        p_notification_id: notificationId,
+        p_dispatch_token: dispatchToken,
+      })
+    : supabase.rpc("claim_service_request_notification_v1", {
+        p_notification_id: notificationId,
+      });
+  const { data, error } = await claimCall;
   if (error) return json({ success: false, error: "claim_failed" }, 500);
 
   const claim = (data ?? {}) as Claim;
