@@ -45,6 +45,28 @@ Actions**. `CONTACT_ENDPOINT` debe apuntar a `submit-contact` y
 `REPORT_ENDPOINT` a `get-report`. No añadas claves de Supabase, Resend ni otros
 secretos al frontend.
 
+## Identidad y notificación de nuevas solicitudes
+
+Cada `service_request` captura una relación durable con su remitente. Si la
+solicitud se crea con sesión iniciada, se conservan el `auth_user_id`,
+`account_id`, rol de membresía, `client_request_id`, email autenticado y una
+instantánea del contacto enviado en el formulario. La coincidencia entre email
+autenticado y email del formulario queda registrada sin sustituir ninguno de los
+dos valores.
+
+Las notificaciones administrativas ya no dependen del canal de entrada. Un
+trigger común crea una entrada idempotente en
+`private.service_request_notification_outbox`; la Edge Function
+`notify-service-request` reclama esa entrada, envía el aviso con Resend y
+persiste el receipt del proveedor. Los fallos de correo no revierten la
+solicitud: quedan pendientes y un cron de base de datos reintenta de forma
+acotada. `submit-lead` utiliza este mismo camino y no mantiene un segundo
+envío paralelo.
+
+El panel maestro muestra el usuario exacto de `created_by` cuando la solicitud
+es autenticada y conserva también el `Submission ID`, de modo que solicitud,
+usuario, cuenta e investigación pueden trazarse con identificadores estables.
+
 ## Formulario de contacto
 
 El código de la Edge Function está en
