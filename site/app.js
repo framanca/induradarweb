@@ -797,7 +797,13 @@ async function submitLead(event) {
       });
       if (error) throw error;
       result = data;
-      console.debug('Authenticated portal request', { requestKey: result?.request_key ?? null, creditsCharged: result?.credits_charged ?? null });
+      console.debug('Authenticated portal request', {
+        requestKey: result?.request_key ?? null,
+        submissionId: result?.submission_id ?? null,
+        creditsCharged: result?.credits_charged ?? null,
+        identityLinked: result?.identity_linked === true,
+        identityMatch: result?.identity_match ?? null,
+      });
     } else {
       if (!isConfiguredEndpoint()) throw new Error('lead_endpoint_not_configured');
       const response = await fetch(window.INDURADAR_CONFIG.leadEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildPayload()), signal: controller.signal });
