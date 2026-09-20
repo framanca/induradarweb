@@ -35,8 +35,10 @@ test('public submit-lead no longer sends a parallel Resend email', () => {
 });
 
 test('notification edge function claims, sends and persists a provider receipt', () => {
-  assert.match(notifierSource, /claim_service_request_notification_v1/);
+  assert.match(notifierSource, /claim_service_request_notification_token_v1/);
+  assert.match(notifierSource, /dispatch_token/);
   assert.match(notifierSource, /complete_service_request_notification_v1/);
   assert.match(notifierSource, /REQUEST_NOTIFICATION_TO_EMAIL/);
   assert.match(notifierSource, /provider_message_id/);
+  assert.match(notificationMigration, /service_request_notification_outbox/);
 });
