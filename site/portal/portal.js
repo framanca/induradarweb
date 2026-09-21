@@ -117,10 +117,42 @@ function renderRequests(requests) {
     <article class="row"><div><strong>${escapeHtml(request.title || request.request_key)}</strong><span class="meta">${escapeHtml(request.request_key)} · ${formatDate(request.received_at)}${request.credits_charged == null ? '' : ` · ${request.credits_charged} créditos`}</span></div><span class="badge ${escapeHtml(request.status)}">${escapeHtml(statusLabel(request.status))}</span></article>`).join('')}</div>` : 'Todavía no has encargado ningún trabajo.';
 }
 
+async function emailReportLink(event) {
+  const button = event.currentTarget;
+  const reference = button.dataset.reportRef;
+  const endpoint = window.INDURADAR_CONFIG?.reportEndpoint;
+  const token = portalData.session?.access_token;
+  if (!reference || !endpoint || !token) {
+    setStatus(portalStatus, 'No se ha podido preparar el envío del enlace.', 'error');
+    return;
+  }
+  button.disabled = true;
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ref: reference, action: 'email_download_link', format: 'xlsx' }),
+      cache: 'no-store',
+    });
+    if (!response.ok) throw new Error('report_email_failed');
+    const body = await response.json();
+    setStatus(portalStatus, `Enlace de descarga enviado a ${body.recipient || portalData.session.user.email}.`, 'success');
+  } catch (error) {
+    console.error('Report link email failed', error);
+    setStatus(portalStatus, 'No se ha podido enviar el enlace de descarga. Inténtalo de nuevo.', 'error');
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function renderReports(reports) {
   const root = document.querySelector('#report-list');
   root.innerHTML = reports.length ? `<div class="row-list">${reports.map((report) => `
-    <article class="row"><div><strong>${escapeHtml(report.title)}</strong><span class="meta">${escapeHtml(report.report_reference)} · ${formatDate(report.delivered_at || report.generated_at)}</span></div><a class="report-link" href="/report/?ref=${encodeURIComponent(report.report_reference)}">Abrir informe</a></article>`).join('')}</div>` : 'Aún no hay informes aprobados para consultar.';
+    <article class="row"><div><strong>${escapeHtml(report.title)}</strong><span class="meta">${escapeHtml(report.report_reference)} · ${formatDate(report.delivered_at || report.generated_at)}</span></div><div class="report-actions"><a class="report-link" href="/report/?ref=${encodeURIComponent(report.report_reference)}">Abrir informe</a><a class="report-link report-link-secondary" href="/report/?ref=${encodeURIComponent(report.report_reference)}&download=xlsx">Descargar Excel</a><button class="report-link report-link-secondary report-email-link" type="button" data-report-ref="${escapeHtml(report.report_reference)}">Enviar enlace Excel</button></div></article>`).join('')}</div>` : 'Aún no hay informes aprobados para consultar.';
+  root.querySelectorAll('.report-email-link').forEach((button) => button.addEventListener('click', emailReportLink));
 }
 
 function userAccount(userId) {
