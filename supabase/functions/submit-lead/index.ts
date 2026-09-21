@@ -6,19 +6,19 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const CONTRACT_VERSION = "1.4.1";
+const CONTRACT_VERSION = "1.4.2";
 const WORKFLOW_VERSION = "3.14.0";
 const RUNTIME_CONFIGURATION_VERSION = "permanent-v3.14.0";
-const EXECUTION_CONTRACT_VERSION = "1.13.1";
-const HEURISTICS_VERSION = "1.12.1";
-const TOOL_REGISTRY_VERSION = "1.11.1";
-const GOLDEN_TEST_VERSION = "1.13.1";
+const EXECUTION_CONTRACT_VERSION = "1.13.2";
+const HEURISTICS_VERSION = "1.12.2";
+const TOOL_REGISTRY_VERSION = "1.11.2";
+const GOLDEN_TEST_VERSION = "1.13.2";
 const SOURCE_CATALOG_VERSION = "2.6.6";
-const DATA_DICTIONARY_VERSION = "1.11.1";
-const EXAMPLE_REQUEST_VERSION = "1.4.1";
-const REPORT_TEMPLATE_VERSION = "1.11.1";
-const EXCEL_TEMPLATE_VERSION = "1.0.5";
-const DOCUMENT_MANIFEST_VERSION = "1.12.1";
+const DATA_DICTIONARY_VERSION = "1.11.2";
+const EXAMPLE_REQUEST_VERSION = "1.4.2";
+const REPORT_TEMPLATE_VERSION = "1.11.2";
+const EXCEL_TEMPLATE_VERSION = "1.0.6";
+const DOCUMENT_MANIFEST_VERSION = "1.12.2";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
         config_name: "InduRadar Q0-STACK and runtime defaults",
         config_version: WORKFLOW_VERSION,
         runtime_configuration_version: RUNTIME_CONFIGURATION_VERSION,
-        effective_date: "2026-09-13",
+        effective_date: "2026-09-21",
         expected_versions: {
           contract_version: CONTRACT_VERSION,
           workflow_version: WORKFLOW_VERSION,

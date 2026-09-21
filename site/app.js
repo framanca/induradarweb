@@ -12,9 +12,9 @@ const contactForm = document.querySelector('#contact-form');
 const contactStatus = document.querySelector('#contact-status');
 const contactSubmitButton = document.querySelector('.contact-submit');
 
-const FORM_VERSION = '3.13.1';
-const CONTRACT_VERSION = '1.3.2';
-const EXECUTION_CONTRACT_VERSION = '1.12.3';
+const FORM_VERSION = '3.14.0';
+const CONTRACT_VERSION = '1.4.2';
+const EXECUTION_CONTRACT_VERSION = '1.13.2';
 const SPAIN = 'España';
 const PORTUGAL = 'Portugal';
 const SPAIN_ALL = 'Toda España';
@@ -717,8 +717,9 @@ function buildPayload() {
   const quote = creditsQuote();
   const submittedAt = new Date().toISOString();
   const stackConfiguration = {
-    config_name: 'InduRadar Q0-STACK and runtime defaults', config_version: '3.13.1', effective_date: '2026-09-02',
-    expected_versions: { workflow_version: '3.13.1', contract_version: '1.3.2', execution_contract_version: '1.12.3', heuristics_version: '1.11.3', tool_registry_version: '1.10.3', golden_test_version: '1.12.3', data_dictionary_version: '1.10.3', document_manifest_version: '1.11.3', report_template_version: '1.10.3', example_request_version: '1.3.2', source_catalog_version: '2.6.1' },
+    config_name: 'InduRadar Q0-STACK and runtime defaults', config_version: '3.14.0', effective_date: '2026-09-21',
+    runtime_configuration_version: 'permanent-v3.14.0',
+    expected_versions: { workflow_version: '3.14.0', contract_version: '1.4.2', execution_contract_version: '1.13.2', heuristics_version: '1.12.2', tool_registry_version: '1.11.2', golden_test_version: '1.13.2', data_dictionary_version: '1.11.2', document_manifest_version: '1.12.2', report_template_version: '1.11.2', example_request_version: '1.4.2', source_catalog_version: '2.6.6', excel_template_version: '1.0.6' },
     runtime_defaults: { baseline_mode: 'canonical_fresh', canonical_output: 'report_json_lossless', client_default_output: 'light_report', artifact_default: [], artifacts_explicit_only: ['docx', 'xlsx', 'pdf'], docx_render_mode: 'complete_inventory_with_controlled_synthesis', docx_render_manifest_required: true, renderer_may_omit_inventory_items: false, client_completeness_review_allowed: false },
   };
   const requestExtensions = {
@@ -729,7 +730,7 @@ function buildPayload() {
     recent_case_description: fieldValue('recentCaseDescription'), current_clients: currentClients,
     ideal_clients: idealClients, watchlist_accounts: watchlistAccounts, competitors,
     excluded_companies: excludedCompanies, no_buy_reason: noBuyReason, service_types: serviceTypes,
-    service_comments: fieldValue('serviceComments'),
+    service_comments: fieldValue('serviceComments'), research_objective: 'signal_discovery', research_objective_version: '1.0.0',
     taxonomy_labels: { sectors: targetSectors, target_company_types: targetCompanyTypes, signal_types: rawSignalTypes, opportunity_areas: commercialNeeds, technologies: rawTechnologies },
     research_scope_units: scope.units, research_scope_level: scope.level,
     research_scope_model_version: 'InduRadar_Calculadora_Alcance_RU_v1', estimated_credits: quote,
@@ -737,13 +738,13 @@ function buildPayload() {
   return {
     source: 'induradar_landing', form_version: FORM_VERSION, contract_version: CONTRACT_VERSION,
     execution_contract_version: EXECUTION_CONTRACT_VERSION, stack_configuration: stackConfiguration,
-    intake_metadata: { normalization_target: CONTRACT_VERSION, submission_id_owner: 'supabase_edge_function_submit_lead', baseline_mode: 'canonical_fresh', canonical_output: 'report_json_lossless', client_default_output: 'light_report' },
+    intake_metadata: { normalization_target: CONTRACT_VERSION, submission_id_owner: 'supabase_edge_function_submit_lead', baseline_mode: 'canonical_fresh', canonical_output: 'report_json_lossless', client_default_output: 'light_report', research_objective: 'signal_discovery' },
     research_scope_units: scope.units, research_scope_level: scope.level, research_scope_model_version: 'InduRadar_Calculadora_Alcance_RU_v1',
     channel: 'web_form', submitted_at: submittedAt, credits: quote,
     contact: { first_name: firstName, last_name: lastName, company_name: company, job_title: nullIfBlank(fieldValue('jobTitle')), email: fieldValue('email'), phone: nullIfBlank(fieldValue('phone')), country: null, region_city: nullIfBlank(fieldValue('address')), website: nullIfBlank(fieldValue('website')), linkedin: null },
     organization_profile: { company_type: null, employee_range: 'unknown', team_name: null },
     seller_profile: { generic_supplier_label: fieldValue('offerDescription'), offer: fieldValue('offerDescription'), value_proposition: null, problems_solved: problemsSolved, industrial_processes: [], target_buyer_roles: [], technologies: canonicalCodes(rawTechnologies, technologyCodes, rawTechnologies.length ? 'other_technology' : null), minimum_ticket_eur: null, must_have: targetCompanyDescription ? [targetCompanyDescription] : [], exclusions: excludedCompanies, negative_signals: noBuyReason ? [noBuyReason] : [], competitors_or_installed_base: competitors, offer_categories: offerCategories, priority_solutions: prioritySolutions, technologies_free_text: rawTechnologies },
-    request: { title: `Solicitud de radar comercial - ${company}`, sectors: canonicalCodes(targetSectors, sectorCodes, 'other_sector'), target_company_types: canonicalCodes(targetCompanyTypes, companyTypeCodes, 'other_company_type'), opportunity_areas: canonicalCodes(commercialNeeds, needCodes), signal_types: canonicalCodes(rawSignalTypes, signalCodes, 'other_signal'), technologies: canonicalCodes(rawTechnologies, technologyCodes, rawTechnologies.length ? 'other_technology' : null), geographies, description: fieldValue('opportunityTriggerDescription'), cutoff_date: null, delivery_format: [], frequency, neutral_output: true, internal_output_authorized: false, subsectors: [], capabilities: [] },
+    request: { title: `Solicitud de radar comercial - ${company}`, sectors: canonicalCodes(targetSectors, sectorCodes, 'other_sector'), target_company_types: canonicalCodes(targetCompanyTypes, companyTypeCodes, 'other_company_type'), opportunity_areas: canonicalCodes(commercialNeeds, needCodes), signal_types: canonicalCodes(rawSignalTypes, signalCodes, 'other_signal'), technologies: canonicalCodes(rawTechnologies, technologyCodes, rawTechnologies.length ? 'other_technology' : null), geographies, description: fieldValue('opportunityTriggerDescription'), cutoff_date: null, delivery_format: [], frequency, neutral_output: true, internal_output_authorized: false, subsectors: [], capabilities: [], research_objective: 'signal_discovery', research_options: { research_mode: 'signal_first', deep_research_company_ids: [], financial_company_ids: [], enrichment_modules: [], named_contacts_authorized: false } },
     request_extensions: requestExtensions,
     privacy: { privacy_notice_accepted: true, commercial_contact_consent: form.elements.marketingConsent.checked, accepted_at: submittedAt },
     first_name: firstName, last_name: lastName, full_name: fullName, company, job_title: fieldValue('jobTitle'), email: fieldValue('email'), phone: fieldValue('phone'), website: fieldValue('website'), address: fieldValue('address'), city_province: fieldValue('address'), offer_description: fieldValue('offerDescription'), offer: fieldValue('offerDescription'), offer_categories: offerCategories, problems_solved: problemsSolved, priority_solutions: prioritySolutions, target_sectors: targetSectors, target_company_types: targetCompanyTypes, geography_countries: countries, geography_spain_scope: spainCoverage, geography_regions: [], geography_provinces: provinces, geography_free_zone: '', target_revenue_range: requestExtensions.target_revenue_range, target_employee_range: requestExtensions.target_employee_range, minimum_opportunity_value: requestExtensions.minimum_opportunity_value, target_company_description: targetCompanyDescription, investment_capacity_signals: investmentSignals, innovation_product_signals: innovationSignals, organization_growth_signals: growthSignals, public_finance_signals: publicFinanceSignals, signal_types: rawSignalTypes, canonical_sector_codes: canonicalCodes(targetSectors, sectorCodes, 'other_sector'), canonical_target_company_type_codes: canonicalCodes(targetCompanyTypes, companyTypeCodes, 'other_company_type'), canonical_signal_type_codes: canonicalCodes(rawSignalTypes, signalCodes, 'other_signal'), canonical_opportunity_area_codes: canonicalCodes(commercialNeeds, needCodes), canonical_technology_codes: canonicalCodes(rawTechnologies, technologyCodes, rawTechnologies.length ? 'other_technology' : null), commercial_needs: commercialNeeds, probable_needs: commercialNeeds, opportunity_trigger_description: fieldValue('opportunityTriggerDescription'), recent_case_description: fieldValue('recentCaseDescription'), current_clients: currentClients, ideal_clients: idealClients, watchlist_accounts: watchlistAccounts, competitors, excluded_companies: excludedCompanies, no_buy_reason: noBuyReason, service_types: serviceTypes, service_comments: fieldValue('serviceComments'), privacy_accepted: true, marketing_consent: form.elements.marketingConsent.checked,
