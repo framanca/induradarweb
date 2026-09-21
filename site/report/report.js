@@ -6,6 +6,7 @@ const reportNode = document.querySelector('#report-root');
 const referenceNode = document.querySelector('#report-reference');
 const dateNode = document.querySelector('#report-date');
 const printButton = document.querySelector('#print-report');
+const excelButton = document.querySelector('#download-xlsx');
 const reportAuthNode = document.querySelector('#report-auth');
 const reportAuthStatusNode = document.querySelector('#report-auth-status');
 const reportAuthForm = document.querySelector('#report-auth-form');
@@ -89,6 +90,34 @@ async function fetchCanonicalHtml(reference) {
   return html;
 }
 
+function attachmentName(response, fallback) {
+  const disposition = response.headers.get('content-disposition') ?? '';
+  const match = disposition.match(/filename="([^"]+)"/i);
+  return match?.[1] || fallback;
+}
+
+async function downloadXlsx(reference) {
+  const response = await reportRequest(
+    reference,
+    'xlsx',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  );
+  const blob = await response.blob();
+  const name = attachmentName(response, `InduRadar_Datos_${reference}.xlsx`);
+  const url = URL.createObjectURL(blob);
+  try {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    link.style.display = 'none';
+    document.body.append(link);
+    link.click();
+    link.remove();
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+}
+
 async function fetchLegacyReport(reference) {
   const response = await reportRequest(reference, 'json', 'application/json');
   const body = await response.json();
@@ -125,6 +154,25 @@ async function start() {
   reportAuthNode.hidden = true;
   setAuthStatus();
 
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('download') === 'xlsx') {
+    try {
+      setStatus('Preparando Excel…');
+      await downloadXlsx(reference);
+      params.delete('download');
+      const cleaned = params.toString();
+      history.replaceState(null, '', `${window.location.pathname}${cleaned ? `?${cleaned}` : ''}`);
+    } catch (error) {
+      console.error('InduRadar XLSX download error', error?.message ?? error);
+      if (error?.message === 'authentication_required') {
+        setStatus(messageFor(error), 'error');
+        showReportLogin();
+        return;
+      }
+      setStatus('No se ha podido preparar el Excel. El informe sigue disponible.', 'error');
+    }
+  }
+
   try {
     // Future reports: the exact persisted canonical HTML becomes the document
     // shown in the browser. There is no second client-side rendering path.
@@ -152,6 +200,7 @@ async function start() {
     renderReport(reportNode, model);
     setStatus('');
     printButton.hidden = false;
+    if (excelButton) excelButton.hidden = false;
   } catch (error) {
     console.error('InduRadar legacy report viewer error', error?.message ?? error);
     setStatus(messageFor(error), 'error');
@@ -198,6 +247,19 @@ window.addEventListener('afterprint', () => {
 });
 
 printButton.addEventListener('click', () => window.print());
+excelButton?.addEventListener('click', async () => {
+  const reference = reportReference();
+  if (!reference) return;
+  excelButton.disabled = true;
+  try {
+    await downloadXlsx(reference);
+  } catch (error) {
+    setStatus(messageFor(error), 'error');
+    if (error?.message === 'authentication_required') showReportLogin();
+  } finally {
+    excelButton.disabled = false;
+  }
+});
 reportAuthForm.addEventListener('submit', signInToReport);
 document.querySelector('#report-forgot-password').addEventListener('click', () => void requestReportPasswordReset());
 start();
