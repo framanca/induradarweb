@@ -51,3 +51,13 @@ test('thumb selections can be undone in place', () => {
   assert.match(reportJs, /Solicitar profundización/);
   assert.match(reportJs, /Excluir empresa/);
 });
+
+
+test('canonical report navigation stays inside the iframe without nesting the viewer', () => {
+  assert.match(reportJs, /wireCanonicalFrameNavigation/);
+  assert.match(reportJs, /rawHref\.startsWith\('#'\)/);
+  assert.match(reportJs, /scrollIntoView\(\{ behavior: 'smooth'/);
+  assert.match(reportJs, /sameReportDownload/);
+  assert.match(reportJs, /reportNav\.hidden = true/);
+  assert.doesNotMatch(reportHtml, /id="open-feedback"/);
+});
