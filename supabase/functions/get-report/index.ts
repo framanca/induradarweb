@@ -110,33 +110,23 @@ Deno.serve(async(req)=>{
 
   if(!["json","html","xlsx"].includes(format))return respond({success:false,error:"invalid_format"},400,origin);
   if(format==="xlsx"){
-    if(!service)return respond({success:false,error:"service_unavailable"},503,origin);
     const pr=await rpc(url,anon,auth,"get_xlsx_export_payload_by_reference_v1",{p_report_reference:ref});
     if(pr.status===401||pr.status===403)return respond({success:false,error:"authentication_required"},403,origin);
-    if(!pr.ok)return respond({success:false,error:"report_not_available"},404,origin);
-    const env=obj(await pr.json()),svc=createClient(url,service);
-    const sr=await rpc(url,anon,auth,"get_report_xlsx_export_state_v1",{p_report_reference:ref});
-    const st=sr.ok?obj(await sr.json()):{};
-    let bytes:Uint8Array|null=null,filename=txt(st.artifact_filename)||txt(env.artifact_filename)||("InduRadar_Datos_"+ref+".xlsx");
-    if(st.materialized&&st.storage_path){
-      const d=await svc.storage.from("report-exports").download(st.storage_path);
-      if(!d.error&&d.data){const b=new Uint8Array(await d.data.arrayBuffer());if(!st.checksum||await sha(b)===st.checksum)bytes=b;}
+    if(!pr.ok){
+      let detail:any=null;try{detail=await pr.json();}catch{}
+      return respond({success:false,error:"xlsx_payload_unavailable",detail:obj(detail)},503,origin);
     }
-    if(!bytes){
-      bytes=workbook(env);const sum=await sha(bytes),source=txt(env.source_payload_hash),path=ref+"/"+(source.slice(0,16)||"approved")+"-"+filename;
-      const up=await svc.storage.from("report-exports").upload(path,bytes,{contentType:XLSX_MIME,cacheControl:"31536000",upsert:true});
-      if(up.error)return respond({success:false,error:"xlsx_materialization_failed"},503,origin);
-      const reg=await svc.rpc("register_report_xlsx_export_v1",{p_report_version_id:env.report_version_id,p_storage_path:path,p_checksum:sum,p_artifact_filename:filename,p_audit:{format:"xlsx",renderer:"xlsx-deterministic-v2.0.0",source_payload_hash:source,inventory_hash:env.inventory_hash,sheets:["Resumen","Oportunidades","Señales","Universo","Ecosistema","Fuentes"]}});
-      if(reg.error)return respond({success:false,error:"xlsx_registration_failed"},503,origin);
-      const rr=obj(reg.data);
-      if(rr.reused===true&&rr.storage_path&&rr.storage_path!==path){
-        await svc.storage.from("report-exports").remove([path]);
-        const d=await svc.storage.from("report-exports").download(rr.storage_path);
-        if(!d.error&&d.data){const b=new Uint8Array(await d.data.arrayBuffer());if(!rr.checksum||await sha(b)===rr.checksum)bytes=b;}
-        filename=txt(rr.artifact_filename)||filename;
-      }
+    let env:any;
+    try{env=obj(await pr.json());}catch{return respond({success:false,error:"xlsx_payload_invalid"},503,origin);}
+    let bytes:Uint8Array;
+    try{bytes=workbook(env);}catch(e){
+      return respond({success:false,error:"xlsx_render_failed",detail:String(e?.message||e||"render_failed")},503,origin);
     }
-    const h=headers(origin,XLSX_MIME);h.set("Content-Disposition","attachment; filename=\""+filename.replaceAll("\"","")+"\"");h.set("Content-Length",String(bytes.byteLength));
+    const filename=txt(env.artifact_filename)||("InduRadar_Datos_"+ref+".xlsx");
+    const h=headers(origin,XLSX_MIME);
+    h.set("Content-Disposition","attachment; filename=\""+filename.replaceAll("\"","")+"\"");
+    h.set("Content-Length",String(bytes.byteLength));
+    h.set("X-InduRadar-XLSX-Mode","direct-deterministic-v2");
     return new Response(bytes,{status:200,headers:h});
   }
 
