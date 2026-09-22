@@ -13,6 +13,18 @@ rm -rf "$output_dir"
 mkdir -p "$output_dir"
 
 cp -R site/. "$output_dir/"
+
+# HMI NX is isolated from the InduRadar portal and has no cloud/backend dependency.
+# Publish only the static editor files; keep tests and engineering notes in Git.
+for source in core.js runtime.js panels.js app.js; do
+  node --check "HMI_NX/$source"
+done
+node --test HMI_NX/tests/core.test.cjs
+mkdir -p "$output_dir/HMI_NX"
+for source in index.html style.css core.js runtime.js panels.js app.js; do
+  cp "HMI_NX/$source" "$output_dir/HMI_NX/$source"
+done
+
 mkdir -p "$output_dir/assets/config"
 cp assets/InduRadarLogoVertical-600.webp "$output_dir/assets/"
 cp assets/InduRadarLogoVertical-128.webp "$output_dir/assets/"
