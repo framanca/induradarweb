@@ -181,3 +181,6 @@ p { margin: .25rem 0 .8rem; }
 .canonical-full-page #report-status:empty,
 .canonical-full-page #report-status[hidden]{display:none!important}
 .canonical-full-page .report-auth{display:none!important}
+
+.induradar-xlsx-status{display:inline-flex;align-items:center;margin-left:.45rem;padding:.3rem .55rem;border-radius:999px;background:#fff3f1;color:#8f2d20;border:1px solid #efc6bd;font-size:.78rem;font-weight:750}
+.nav a[aria-busy="true"]{opacity:.72;cursor:wait;pointer-events:none}
