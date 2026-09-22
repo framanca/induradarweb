@@ -14,6 +14,7 @@ const updateButton = document.querySelector('#request-update');
 const updateDialog = document.querySelector('#report-update-dialog');
 const updateForm = document.querySelector('#report-update-form');
 const updateStatusNode = document.querySelector('#report-update-status');
+const reportNav = document.querySelector('.report-nav');
 let printState = [];
 let canonicalFrame = null;
 let canonicalObserver = null;
@@ -491,6 +492,51 @@ function observeCanonicalRender(frame) {
   if (companyRows) canonicalObserver.observe(companyRows, { childList: true });
 }
 
+function wireCanonicalFrameNavigation(frame, reference) {
+  const doc = frame.contentDocument;
+  if (!doc) return;
+
+  doc.addEventListener('click', (event) => {
+    const target = event.target && typeof event.target.closest === 'function'
+      ? event.target.closest('a[href]')
+      : null;
+    if (!target) return;
+
+    const rawHref = target.getAttribute('href')?.trim() || '';
+    if (!rawHref) return;
+
+    if (rawHref.startsWith('#')) {
+      event.preventDefault();
+      event.stopPropagation();
+      const id = decodeURIComponent(rawHref.slice(1));
+      const section = id ? doc.getElementById(id) : null;
+      if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+
+    let url;
+    try {
+      url = new URL(rawHref, window.location.origin);
+    } catch {
+      return;
+    }
+
+    const sameReportDownload = url.origin === window.location.origin
+      && url.pathname.replace(/\/+$/, '/') === '/report/'
+      && (url.searchParams.get('ref') || '').toUpperCase() === reference
+      && url.searchParams.get('download') === 'xlsx';
+
+    if (sameReportDownload) {
+      event.preventDefault();
+      event.stopPropagation();
+      void downloadXlsx(reference).catch((error) => {
+        console.error('InduRadar XLSX download error', error?.message ?? error);
+        setStatus(messageFor(error), 'error');
+      });
+    }
+  }, true);
+}
+
 function showCanonicalHtml(html, reference) {
   canonicalObserver?.disconnect();
   canonicalFrame = document.createElement('iframe');
@@ -498,6 +544,7 @@ function showCanonicalHtml(html, reference) {
   canonicalFrame.title = 'Informe ' + reference;
   canonicalFrame.srcdoc = html;
   canonicalFrame.addEventListener('load', () => {
+    wireCanonicalFrameNavigation(canonicalFrame, reference);
     injectInlineInteractions(canonicalFrame);
     observeCanonicalRender(canonicalFrame);
   });
@@ -570,6 +617,7 @@ async function start() {
   reportAuthNode.hidden = true;
   setAuthStatus();
   updateButton.hidden = true;
+  if (reportNav) reportNav.hidden = false;
   printButton.hidden = true;
   if (excelButton) excelButton.hidden = true;
   interactionData = null;
@@ -607,6 +655,7 @@ async function start() {
     }
     showCanonicalHtml(html, reference);
     setStatus('');
+    if (reportNav) reportNav.hidden = true;
     printButton.hidden = false;
     if (excelButton) excelButton.hidden = false;
     updateButton.hidden = false;
@@ -636,6 +685,7 @@ async function start() {
       interactionData = null;
     }
     setStatus('');
+    if (reportNav) reportNav.hidden = false;
     printButton.hidden = false;
     if (excelButton) excelButton.hidden = false;
     updateButton.hidden = false;
