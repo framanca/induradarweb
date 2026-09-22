@@ -16,11 +16,15 @@ test('portal keeps credit movements collapsed and orders reports before requests
   assert.match(portalJs, /ledger-scroll/);
 });
 
-test('report viewer exposes private opportunity and company feedback', () => {
-  assert.match(reportHtml, /id="open-feedback"/);
+test('report viewer keeps opportunity and company feedback inline', () => {
+  assert.doesNotMatch(reportHtml, /id="open-feedback"/);
+  assert.doesNotMatch(reportHtml, /interaction-drawer/);
   assert.match(reportJs, /portal_get_report_interactions_v1/);
   assert.match(reportJs, /portal_submit_feedback_v1/);
   assert.match(reportJs, /portal_set_company_preference_v1/);
+  assert.match(reportJs, /induradar-feedback-actions/);
+  assert.match(reportJs, /card\.querySelector\('h3'\)/);
+  assert.match(reportJs, /cell\.append\(companyButtons/);
   assert.match(reportJs, /Ayúdanos a entender qué es interesante para tus informes/);
   assert.match(reportJs, /showCanonicalHtml/);
   assert.doesNotMatch(reportJs, /document\.write\(html\)/);
@@ -36,9 +40,14 @@ test('report updates are explicit authenticated follow-up requests', () => {
   assert.match(notifier, /Qué quiere actualizar:/);
 });
 
-test('company thumbs distinguish exclusion from deep research', () => {
-  assert.match(reportJs, /preference === 'preferred'/);
-  assert.match(reportJs, /preference === 'excluded'/);
+test('thumb selections can be undone in place', () => {
+  assert.match(reportJs, /item\.useful === true \? null : true/);
+  assert.match(reportJs, /saveOpportunityFeedback\(item, null/);
+  assert.match(reportJs, /saveCompanyPreference\(item, 'neutral'/);
+  assert.match(reportJs, /Deshacer valoración positiva/);
+  assert.match(reportJs, /Deshacer valoración negativa/);
+  assert.match(reportJs, /Deshacer interés por esta empresa/);
+  assert.match(reportJs, /Deshacer exclusión de esta empresa/);
   assert.match(reportJs, /Solicitar profundización/);
-  assert.match(reportJs, /Excluida de futuros informes/);
+  assert.match(reportJs, /Excluir empresa/);
 });
