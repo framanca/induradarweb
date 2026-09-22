@@ -19,7 +19,12 @@
       <strong id="report-reference">Informe</strong>
       <span id="report-date"></span>
     </div>
-    <div class="report-toolbar-actions"><button id="download-xlsx" type="button" hidden>Descargar Excel</button><button id="print-report" type="button" hidden>Imprimir / PDF</button></div>
+    <div class="report-toolbar-actions">
+      <button id="open-feedback" type="button" hidden>Valorar informe</button>
+      <button id="request-update" type="button" hidden>Solicitar actualización</button>
+      <button id="download-xlsx" type="button" hidden>Descargar Excel</button>
+      <button id="print-report" type="button" hidden>Imprimir / PDF</button>
+    </div>
   </header>
 
   <main class="report-shell">
@@ -44,6 +49,47 @@
     </section>
     <div id="report-root"></div>
   </main>
+
+  <div id="interaction-backdrop" class="interaction-backdrop" hidden></div>
+  <aside id="interaction-drawer" class="interaction-drawer" hidden aria-labelledby="interaction-title">
+    <header class="interaction-header">
+      <div>
+        <p class="eyebrow">Tu feedback</p>
+        <h2 id="interaction-title">Ayúdanos a afinar InduRadar</h2>
+        <p>Estas preferencias son privadas de tu cuenta y no modifican los hechos del informe.</p>
+      </div>
+      <button id="close-feedback" class="icon-button" type="button" aria-label="Cerrar">×</button>
+    </header>
+    <div id="interaction-status" class="interaction-status" hidden role="status"></div>
+    <div class="interaction-tabs" role="tablist">
+      <button type="button" class="interaction-tab is-active" data-interaction-tab="opportunities">Oportunidades</button>
+      <button type="button" class="interaction-tab" data-interaction-tab="companies">Empresas</button>
+    </div>
+    <div id="interaction-company-search-wrap" class="interaction-search-wrap" hidden>
+      <input id="interaction-company-search" type="search" placeholder="Buscar empresa…" autocomplete="off">
+    </div>
+    <div id="interaction-list" class="interaction-list"></div>
+  </aside>
+
+  <dialog id="report-update-dialog" class="report-dialog">
+    <form id="report-update-form">
+      <div class="dialog-heading">
+        <div>
+          <p class="eyebrow">Actualizar informe</p>
+          <h2>¿Qué quieres que actualicemos?</h2>
+        </div>
+        <button id="close-update-dialog" class="icon-button" type="button" aria-label="Cerrar">×</button>
+      </div>
+      <p class="dialog-copy">Indica qué debe cambiar o revisarse respecto al informe actual.</p>
+      <label for="report-update-note">Petición de actualización</label>
+      <textarea id="report-update-note" name="note" required minlength="3" maxlength="3000" rows="6" placeholder="Por ejemplo: buscar novedades desde la fecha de corte, profundizar una empresa concreta, ampliar el territorio o sector, o revisar una señal determinada."></textarea>
+      <div id="report-update-status" class="interaction-status" hidden role="status"></div>
+      <div class="dialog-actions">
+        <button id="cancel-update-dialog" class="secondary-action" type="button">Cancelar</button>
+        <button class="primary-action" type="submit">Enviar solicitud</button>
+      </div>
+    </form>
+  </dialog>
 
   <footer class="report-footer">
     <span>induradar.com</span>

@@ -49,6 +49,19 @@ function balanceFor(accountId) {
   return portalData.ledger.filter((entry) => entry.account_id === accountId).reduce((total, entry) => total + Number(entry.credits_delta ?? 0), 0);
 }
 
+function wireCreditToggle() {
+  const toggle = document.querySelector('#credit-summary-toggle');
+  const panel = document.querySelector('#credit-ledger-panel');
+  if (!toggle || !panel) return;
+  toggle.onclick = () => {
+    const expand = panel.hidden;
+    panel.hidden = !expand;
+    toggle.setAttribute('aria-expanded', String(expand));
+    toggle.classList.toggle('is-expanded', expand);
+    if (expand) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  };
+}
+
 async function requireData(query) {
   const { data, error } = await query;
   if (error) throw error;
@@ -97,6 +110,7 @@ function renderPortal() {
   document.querySelector('#report-count').textContent = String(reports.length);
   sessionActions.innerHTML = `<span class="session-email">${escapeHtml(session.user.email)}</span><button type="button" id="sign-out">Salir</button>`;
   document.querySelector('#sign-out').addEventListener('click', signOut);
+  wireCreditToggle();
   renderLedger(ownMembership?.account_id);
   renderRequests(requests);
   renderReports(reports);
@@ -107,7 +121,7 @@ function renderPortal() {
 function renderLedger(accountId) {
   const entries = portalData.ledger.filter((entry) => entry.account_id === accountId);
   const root = document.querySelector('#ledger-list');
-  root.innerHTML = entries.length ? `<div class="row-list">${entries.map((entry) => `
+  root.innerHTML = entries.length ? `<div class="row-list ledger-scroll">${entries.map((entry) => `
     <article class="row"><div><strong>${escapeHtml(entry.description)}</strong><span class="meta">${formatDate(entry.created_at)}</span></div><strong class="${Number(entry.credits_delta) < 0 ? 'negative' : 'positive'}">${Number(entry.credits_delta) > 0 ? '+' : ''}${entry.credits_delta} créditos</strong></article>`).join('')}</div>` : 'Aún no hay movimientos de créditos.';
 }
 
@@ -253,6 +267,13 @@ function showSignedOut() {
   portalView.hidden = true;
   authView.hidden = false;
   sessionActions.replaceChildren();
+  const creditPanel = document.querySelector('#credit-ledger-panel');
+  const creditToggle = document.querySelector('#credit-summary-toggle');
+  if (creditPanel) creditPanel.hidden = true;
+  if (creditToggle) {
+    creditToggle.setAttribute('aria-expanded', 'false');
+    creditToggle.classList.remove('is-expanded');
+  }
   setAuthMode('sign-in');
 }
 

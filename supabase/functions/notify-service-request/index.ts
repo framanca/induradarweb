@@ -4,9 +4,11 @@ type Claim = {
   pass?: boolean;
   reason?: string;
   notification_id?: string;
+  notification_kind?: string;
   request_id?: string;
   submission_id?: string;
   request_key?: string;
+  channel?: string;
   title?: string;
   status?: string;
   credits_charged?: number | null;
@@ -23,6 +25,11 @@ type Claim = {
   form_contact_name?: string | null;
   form_company_name?: string | null;
   identity_match?: boolean | null;
+  follow_up_kind?: string | null;
+  source_report_reference?: string | null;
+  follow_up_note?: string | null;
+  requested_company_id?: string | null;
+  requested_company_name?: string | null;
 };
 
 function json(body: Record<string, unknown>, status = 200) {
@@ -44,6 +51,18 @@ function escapeHtml(value: unknown) {
 function uuid(value: unknown) {
   return typeof value === "string" &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function sourceLabelFor(claim: Claim) {
+  if (claim.notification_kind === "internal_automation") return "Automatización interna";
+  if (claim.notification_kind === "internal_request") return "Solicitud interna";
+  if (claim.authenticated) return "Portal autenticado";
+  const channel = (claim.channel ?? claim.source ?? "").toLowerCase();
+  if (channel === "web_form") return "Formulario web";
+  if (channel === "api") return "API no autenticada";
+  if (channel === "email") return "Email";
+  if (channel === "manual") return "Registro manual";
+  return channel ? `Canal no autenticado: ${channel}` : "Canal no autenticado";
 }
 
 Deno.serve(async (req) => {
@@ -94,7 +113,14 @@ Deno.serve(async (req) => {
     return json({ success: false, error: "email_not_configured" }, 500);
   }
 
-  const sourceLabel = claim.authenticated ? "Portal autenticado" : "Formulario / canal no autenticado";
+  const kind = claim.notification_kind ?? "admin_new_request";
+  const isAutomation = kind === "internal_automation";
+  const isInternalRequest = kind === "internal_request";
+  const isInternal = isAutomation || isInternalRequest;
+  const followUpKind = claim.follow_up_kind ?? null;
+  const isReportUpdate = followUpKind === "report_update";
+  const isCompanyDeepDive = followUpKind === "company_deep_dive";
+  const sourceLabel = sourceLabelFor(claim);
   const identityName = claim.authenticated_display_name || claim.form_contact_name || "—";
   const identityEmail = claim.authenticated_email || claim.form_contact_email || "—";
   const company = claim.form_company_name || claim.account_name || "—";
@@ -102,49 +128,160 @@ Deno.serve(async (req) => {
     ? (claim.identity_match ? "Sí" : "No")
     : "No aplica";
 
-  const subject = `Nueva solicitud InduRadar - ${company}`;
-  const textBody = [
-    "Nueva solicitud InduRadar",
-    "",
-    `Origen: ${sourceLabel}`,
-    `Empresa / cuenta: ${company}`,
-    `Usuario identificado: ${identityName}`,
-    `Email identificado: ${identityEmail}`,
-    `Email del formulario: ${claim.form_contact_email ?? "—"}`,
-    `Identidad coincide con formulario: ${identityMatch}`,
-    `Rol de cuenta: ${claim.membership_role ?? "—"}`,
-    "",
-    `Título: ${claim.title ?? "—"}`,
-    `Estado: ${claim.status ?? "—"}`,
-    `Créditos cargados: ${claim.credits_charged ?? "—"}`,
-    "",
-    `Submission ID: ${claim.submission_id ?? "—"}`,
-    `Request ID: ${claim.request_id ?? "—"}`,
-    `Request key: ${claim.request_key ?? "—"}`,
-    `Auth User ID: ${claim.auth_user_id ?? "—"}`,
-    `Account ID: ${claim.account_id ?? "—"}`,
-  ].join("\n");
+  const heading = isReportUpdate
+    ? "Solicitud de actualización de informe"
+    : isCompanyDeepDive
+      ? "Profundización de empresa solicitada"
+      : isAutomation
+        ? "Tarea interna programada InduRadar"
+        : isInternalRequest
+          ? "Solicitud interna InduRadar"
+          : "Nueva solicitud InduRadar";
+  const subject = isReportUpdate
+    ? `Actualización InduRadar ${claim.source_report_reference ?? ""} - ${company}`
+    : isCompanyDeepDive
+      ? `Profundización InduRadar ${claim.requested_company_name ?? company} - ${claim.source_report_reference ?? ""}`
+      : isAutomation
+        ? `Tarea interna programada InduRadar - ${claim.title ?? claim.request_key ?? "sin título"}`
+        : isInternalRequest
+          ? `Solicitud interna InduRadar - ${claim.title ?? company}`
+          : `Nueva solicitud InduRadar - ${company}`;
 
-  const html = `
-    <h2>Nueva solicitud InduRadar</h2>
-    <p><strong>Origen:</strong> ${escapeHtml(sourceLabel)}</p>
-    <p><strong>Empresa / cuenta:</strong> ${escapeHtml(company)}</p>
-    <p><strong>Usuario identificado:</strong> ${escapeHtml(identityName)}</p>
-    <p><strong>Email identificado:</strong> ${escapeHtml(identityEmail)}</p>
-    <p><strong>Email del formulario:</strong> ${escapeHtml(claim.form_contact_email ?? "—")}</p>
-    <p><strong>Identidad coincide con formulario:</strong> ${escapeHtml(identityMatch)}</p>
-    <p><strong>Rol de cuenta:</strong> ${escapeHtml(claim.membership_role ?? "—")}</p>
-    <hr>
-    <p><strong>Título:</strong> ${escapeHtml(claim.title ?? "—")}</p>
-    <p><strong>Estado:</strong> ${escapeHtml(claim.status ?? "—")}</p>
-    <p><strong>Créditos cargados:</strong> ${escapeHtml(claim.credits_charged ?? "—")}</p>
-    <hr>
-    <p><strong>Submission ID:</strong><br>${escapeHtml(claim.submission_id ?? "—")}</p>
-    <p><strong>Request ID:</strong><br>${escapeHtml(claim.request_id ?? "—")}</p>
-    <p><strong>Request key:</strong><br>${escapeHtml(claim.request_key ?? "—")}</p>
-    <p><strong>Auth User ID:</strong><br>${escapeHtml(claim.auth_user_id ?? "—")}</p>
-    <p><strong>Account ID:</strong><br>${escapeHtml(claim.account_id ?? "—")}</p>
-  `;
+  const textLines = isReportUpdate
+    ? [
+        heading,
+        "",
+        `Informe origen: ${claim.source_report_reference ?? "—"}`,
+        `Cliente / cuenta: ${company}`,
+        `Usuario: ${identityName}`,
+        `Email: ${identityEmail}`,
+        "",
+        "Qué quiere actualizar:",
+        claim.follow_up_note ?? "—",
+        "",
+        `Submission ID: ${claim.submission_id ?? "—"}`,
+        `Request ID: ${claim.request_id ?? "—"}`,
+        `Request key: ${claim.request_key ?? "—"}`,
+      ]
+    : isCompanyDeepDive
+      ? [
+          heading,
+          "",
+          `Informe origen: ${claim.source_report_reference ?? "—"}`,
+          `Empresa a profundizar: ${claim.requested_company_name ?? "—"}`,
+          `Company ID: ${claim.requested_company_id ?? "—"}`,
+          `Cliente / cuenta: ${company}`,
+          `Usuario: ${identityName}`,
+          `Nota del cliente: ${claim.follow_up_note ?? "—"}`,
+          "",
+          `Submission ID: ${claim.submission_id ?? "—"}`,
+          `Request ID: ${claim.request_id ?? "—"}`,
+          `Request key: ${claim.request_key ?? "—"}`,
+        ]
+      : isInternal
+    ? [
+        heading,
+        "",
+        "Esta notificación corresponde a trabajo interno de InduRadar; no es una solicitud enviada por un cliente.",
+        "",
+        `Origen: ${sourceLabel}`,
+        `Cuenta: ${claim.account_name ?? company}`,
+        `Título: ${claim.title ?? "—"}`,
+        `Estado: ${claim.status ?? "—"}`,
+        `Créditos cargados: ${claim.credits_charged ?? "—"}`,
+        "",
+        `Submission ID: ${claim.submission_id ?? "—"}`,
+        `Request ID: ${claim.request_id ?? "—"}`,
+        `Request key: ${claim.request_key ?? "—"}`,
+        `Account ID: ${claim.account_id ?? "—"}`,
+      ]
+    : [
+        heading,
+        "",
+        `Origen: ${sourceLabel}`,
+        `Empresa / cuenta: ${company}`,
+        `Usuario identificado: ${identityName}`,
+        `Email identificado: ${identityEmail}`,
+        `Email del formulario: ${claim.form_contact_email ?? "—"}`,
+        `Identidad coincide con formulario: ${identityMatch}`,
+        `Rol de cuenta: ${claim.membership_role ?? "—"}`,
+        "",
+        `Título: ${claim.title ?? "—"}`,
+        `Estado: ${claim.status ?? "—"}`,
+        `Créditos cargados: ${claim.credits_charged ?? "—"}`,
+        "",
+        `Submission ID: ${claim.submission_id ?? "—"}`,
+        `Request ID: ${claim.request_id ?? "—"}`,
+        `Request key: ${claim.request_key ?? "—"}`,
+        `Auth User ID: ${claim.auth_user_id ?? "—"}`,
+        `Account ID: ${claim.account_id ?? "—"}`,
+      ];
+  const textBody = textLines.join("\n");
+
+  const html = isReportUpdate
+    ? `
+      <h2>${escapeHtml(heading)}</h2>
+      <p><strong>Informe origen:</strong> ${escapeHtml(claim.source_report_reference ?? "—")}</p>
+      <p><strong>Cliente / cuenta:</strong> ${escapeHtml(company)}</p>
+      <p><strong>Usuario:</strong> ${escapeHtml(identityName)} · ${escapeHtml(identityEmail)}</p>
+      <hr>
+      <p><strong>Qué quiere actualizar:</strong></p>
+      <p>${escapeHtml(claim.follow_up_note ?? "—")}</p>
+      <hr>
+      <p><strong>Submission ID:</strong><br>${escapeHtml(claim.submission_id ?? "—")}</p>
+      <p><strong>Request ID:</strong><br>${escapeHtml(claim.request_id ?? "—")}</p>
+      <p><strong>Request key:</strong><br>${escapeHtml(claim.request_key ?? "—")}</p>
+    `
+    : isCompanyDeepDive
+      ? `
+        <h2>${escapeHtml(heading)}</h2>
+        <p><strong>Informe origen:</strong> ${escapeHtml(claim.source_report_reference ?? "—")}</p>
+        <p><strong>Empresa a profundizar:</strong> ${escapeHtml(claim.requested_company_name ?? "—")}</p>
+        <p><strong>Company ID:</strong> ${escapeHtml(claim.requested_company_id ?? "—")}</p>
+        <p><strong>Cliente / cuenta:</strong> ${escapeHtml(company)}</p>
+        <p><strong>Usuario:</strong> ${escapeHtml(identityName)} · ${escapeHtml(identityEmail)}</p>
+        <p><strong>Nota del cliente:</strong> ${escapeHtml(claim.follow_up_note ?? "—")}</p>
+        <hr>
+        <p><strong>Submission ID:</strong><br>${escapeHtml(claim.submission_id ?? "—")}</p>
+        <p><strong>Request ID:</strong><br>${escapeHtml(claim.request_id ?? "—")}</p>
+        <p><strong>Request key:</strong><br>${escapeHtml(claim.request_key ?? "—")}</p>
+      `
+      : isInternal
+    ? `
+      <h2>${escapeHtml(heading)}</h2>
+      <p><strong>Trabajo interno:</strong> Esta notificación no corresponde a una solicitud enviada por un cliente.</p>
+      <p><strong>Origen:</strong> ${escapeHtml(sourceLabel)}</p>
+      <p><strong>Cuenta:</strong> ${escapeHtml(claim.account_name ?? company)}</p>
+      <hr>
+      <p><strong>Título:</strong> ${escapeHtml(claim.title ?? "—")}</p>
+      <p><strong>Estado:</strong> ${escapeHtml(claim.status ?? "—")}</p>
+      <p><strong>Créditos cargados:</strong> ${escapeHtml(claim.credits_charged ?? "—")}</p>
+      <hr>
+      <p><strong>Submission ID:</strong><br>${escapeHtml(claim.submission_id ?? "—")}</p>
+      <p><strong>Request ID:</strong><br>${escapeHtml(claim.request_id ?? "—")}</p>
+      <p><strong>Request key:</strong><br>${escapeHtml(claim.request_key ?? "—")}</p>
+      <p><strong>Account ID:</strong><br>${escapeHtml(claim.account_id ?? "—")}</p>
+    `
+    : `
+      <h2>${escapeHtml(heading)}</h2>
+      <p><strong>Origen:</strong> ${escapeHtml(sourceLabel)}</p>
+      <p><strong>Empresa / cuenta:</strong> ${escapeHtml(company)}</p>
+      <p><strong>Usuario identificado:</strong> ${escapeHtml(identityName)}</p>
+      <p><strong>Email identificado:</strong> ${escapeHtml(identityEmail)}</p>
+      <p><strong>Email del formulario:</strong> ${escapeHtml(claim.form_contact_email ?? "—")}</p>
+      <p><strong>Identidad coincide con formulario:</strong> ${escapeHtml(identityMatch)}</p>
+      <p><strong>Rol de cuenta:</strong> ${escapeHtml(claim.membership_role ?? "—")}</p>
+      <hr>
+      <p><strong>Título:</strong> ${escapeHtml(claim.title ?? "—")}</p>
+      <p><strong>Estado:</strong> ${escapeHtml(claim.status ?? "—")}</p>
+      <p><strong>Créditos cargados:</strong> ${escapeHtml(claim.credits_charged ?? "—")}</p>
+      <hr>
+      <p><strong>Submission ID:</strong><br>${escapeHtml(claim.submission_id ?? "—")}</p>
+      <p><strong>Request ID:</strong><br>${escapeHtml(claim.request_id ?? "—")}</p>
+      <p><strong>Request key:</strong><br>${escapeHtml(claim.request_key ?? "—")}</p>
+      <p><strong>Auth User ID:</strong><br>${escapeHtml(claim.auth_user_id ?? "—")}</p>
+      <p><strong>Account ID:</strong><br>${escapeHtml(claim.account_id ?? "—")}</p>
+    `;
 
   let response: Response;
   try {

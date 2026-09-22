@@ -60,22 +60,24 @@
       </div>
       <div id="portal-status" class="status" hidden role="status"></div>
       <section class="summary-grid" aria-label="Resumen">
-        <article><span>Saldo disponible</span><strong id="credit-balance">—</strong><small>Puede ser negativo mientras se regulariza.</small></article>
-        <article><span>Solicitudes</span><strong id="request-count">—</strong><small>Trabajos registrados.</small></article>
-        <article><span>Informes disponibles</span><strong id="report-count">—</strong><small>Versiones aprobadas para consultar.</small></article>
+        <button id="credit-summary-toggle" class="summary-card summary-card-action" type="button" aria-expanded="false" aria-controls="credit-ledger-panel">
+          <span>Saldo disponible</span><strong id="credit-balance">—</strong><small>Pulsa para ver los movimientos de saldo.</small>
+        </button>
+        <article class="summary-card"><span>Informes disponibles</span><strong id="report-count">—</strong><small>Versiones aprobadas para consultar.</small></article>
+        <article class="summary-card"><span>Solicitudes</span><strong id="request-count">—</strong><small>Trabajos registrados.</small></article>
       </section>
 
-      <section class="panel">
-        <header><div><p class="eyebrow">Créditos</p><h2>Movimientos</h2></div></header>
+      <section id="credit-ledger-panel" class="panel credit-ledger-panel" hidden>
+        <header><div><p class="eyebrow">Créditos</p><h2>Movimientos de saldo</h2><p>Historial de cargos, recargas y ajustes.</p></div></header>
         <div id="ledger-list" class="list-empty">Cargando movimientos…</div>
-      </section>
-      <section class="panel">
-        <header><div><p class="eyebrow">Trabajos</p><h2>Mis solicitudes</h2></div></header>
-        <div id="request-list" class="list-empty">Cargando solicitudes…</div>
       </section>
       <section class="panel">
         <header><div><p class="eyebrow">Informes</p><h2>Informes disponibles</h2></div></header>
         <div id="report-list" class="list-empty">Cargando informes…</div>
+      </section>
+      <section class="panel">
+        <header><div><p class="eyebrow">Trabajos</p><h2>Mis solicitudes</h2></div></header>
+        <div id="request-list" class="list-empty">Cargando solicitudes…</div>
       </section>
 
       <section id="admin-view" hidden>
