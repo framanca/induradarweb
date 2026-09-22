@@ -10,14 +10,7 @@ const excelButton = document.querySelector('#download-xlsx');
 const reportAuthNode = document.querySelector('#report-auth');
 const reportAuthStatusNode = document.querySelector('#report-auth-status');
 const reportAuthForm = document.querySelector('#report-auth-form');
-const feedbackButton = document.querySelector('#open-feedback');
 const updateButton = document.querySelector('#request-update');
-const interactionDrawer = document.querySelector('#interaction-drawer');
-const interactionBackdrop = document.querySelector('#interaction-backdrop');
-const interactionList = document.querySelector('#interaction-list');
-const interactionStatusNode = document.querySelector('#interaction-status');
-const interactionCompanySearchWrap = document.querySelector('#interaction-company-search-wrap');
-const interactionCompanySearch = document.querySelector('#interaction-company-search');
 const updateDialog = document.querySelector('#report-update-dialog');
 const updateForm = document.querySelector('#report-update-form');
 const updateStatusNode = document.querySelector('#report-update-status');
@@ -25,7 +18,6 @@ let printState = [];
 let canonicalFrame = null;
 let canonicalObserver = null;
 let interactionData = null;
-let interactionTab = 'opportunities';
 
 function setStatus(message, kind = 'info') {
   statusNode.textContent = message;
@@ -157,19 +149,6 @@ function messageFor(error) {
 }
 
 
-function makeNode(tag, className = '', text = '') {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== '') node.textContent = String(text);
-  return node;
-}
-
-function setInteractionStatus(message = '', kind = 'success') {
-  interactionStatusNode.textContent = message;
-  interactionStatusNode.dataset.kind = kind;
-  interactionStatusNode.hidden = !message;
-}
-
 function setUpdateStatus(message = '', kind = 'success') {
   updateStatusNode.textContent = message;
   updateStatusNode.dataset.kind = kind;
@@ -188,235 +167,6 @@ async function loadInteractions(reference) {
   return rpc('portal_get_report_interactions_v1', { p_report_reference: reference });
 }
 
-function openFeedbackDrawer(tab = 'opportunities', companyId = '') {
-  interactionTab = tab;
-  interactionDrawer.hidden = false;
-  interactionBackdrop.hidden = false;
-  document.body.style.overflow = 'hidden';
-  setInteractionStatus();
-  renderInteractionList();
-  if (companyId) {
-    requestAnimationFrame(() => {
-      const target = interactionList.querySelector('[data-company-id="' + CSS.escape(companyId) + '"]');
-      if (target) target.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    });
-  }
-}
-
-function closeFeedbackDrawer() {
-  interactionDrawer.hidden = true;
-  interactionBackdrop.hidden = true;
-  document.body.style.overflow = '';
-}
-
-function selectedThumb(button, selected, negative = false) {
-  button.className = 'thumb-button' + (negative ? ' is-negative' : '') + (selected ? ' is-selected' : '');
-  button.setAttribute('aria-pressed', selected ? 'true' : 'false');
-}
-
-async function saveOpportunityFeedback(item, useful, reason = '') {
-  const reference = reportReference();
-  if (!reference || !item?.company_id) return;
-  setInteractionStatus('Guardando tu valoración…');
-  try {
-    await rpc('portal_submit_feedback_v1', {
-      p_report_reference: reference,
-      p_entity_type: 'client_opportunity',
-      p_entity_id: item.company_id,
-      p_useful: useful,
-      p_reason: reason || null,
-    });
-    item.useful = useful;
-    item.reason = reason || null;
-    setInteractionStatus(useful ? 'Gracias. Hemos guardado que esta oportunidad te ha resultado valiosa.' : 'Gracias. Usaremos este comentario para afinar tus próximos informes.');
-    renderInteractionList();
-    injectInlineInteractions();
-  } catch (error) {
-    console.error('Opportunity feedback failed', error);
-    setInteractionStatus('No se ha podido guardar la valoración. Inténtalo de nuevo.', 'error');
-  }
-}
-
-function openOpportunityReason(card, item) {
-  card.querySelector('.feedback-note')?.remove();
-  const wrap = makeNode('div', 'feedback-note');
-  const hint = makeNode('small', '', 'Ayúdanos a entender qué es interesante para tus informes. El comentario es opcional.');
-  const textarea = document.createElement('textarea');
-  textarea.maxLength = 2000;
-  textarea.placeholder = '¿Qué no ha encajado o qué tipo de oportunidad sería más útil?';
-  textarea.value = item.reason || '';
-  const actions = makeNode('div', 'feedback-note-actions');
-  const skip = makeNode('button', 'secondary-action', 'Guardar sin comentario');
-  skip.type = 'button';
-  const send = makeNode('button', 'primary-action', 'Enviar comentario');
-  send.type = 'button';
-  skip.addEventListener('click', () => void saveOpportunityFeedback(item, false, ''));
-  send.addEventListener('click', () => void saveOpportunityFeedback(item, false, textarea.value.trim()));
-  actions.append(skip, send);
-  wrap.append(hint, textarea, actions);
-  card.append(wrap);
-  textarea.focus();
-}
-
-function renderOpportunityFeedback() {
-  const rows = Array.isArray(interactionData?.opportunities) ? interactionData.opportunities : [];
-  if (!rows.length) {
-    interactionList.append(makeNode('p', 'section-copy', 'Este informe no tiene oportunidades valorables con identidad de empresa resuelta.'));
-    return;
-  }
-  for (const item of rows) {
-    const card = makeNode('article', 'feedback-card');
-    card.dataset.companyId = item.company_id;
-    const head = makeNode('div', 'feedback-card-head');
-    const copy = makeNode('div');
-    copy.append(
-      makeNode('strong', '', (item.rank ? '#' + item.rank + ' · ' : '') + (item.company || 'Empresa')),
-      makeNode('small', '', [item.temperature, item.opportunity_rank_score ? 'Rank ' + item.opportunity_rank_score : ''].filter(Boolean).join(' · ')),
-    );
-    head.append(copy);
-    const actions = makeNode('div', 'feedback-actions');
-    const up = makeNode('button', '', '👍');
-    up.type = 'button';
-    up.title = 'Esta oportunidad me resulta valiosa';
-    selectedThumb(up, item.useful === true);
-    up.addEventListener('click', () => void saveOpportunityFeedback(item, true, ''));
-    const down = makeNode('button', '', '👎');
-    down.type = 'button';
-    down.title = 'Esta oportunidad no encaja';
-    selectedThumb(down, item.useful === false, true);
-    down.addEventListener('click', () => openOpportunityReason(card, item));
-    actions.append(up, down);
-    card.append(head, actions);
-    if (item.useful === false && item.reason) card.append(makeNode('p', 'section-copy', 'Tu comentario: ' + item.reason));
-    interactionList.append(card);
-  }
-}
-
-async function saveCompanyPreference(item, preference, reason = '') {
-  const reference = reportReference();
-  if (!reference || !item?.company_id) return;
-  const actionLabel = preference === 'preferred' ? 'Registrando la solicitud de profundización…' : preference === 'excluded' ? 'Guardando la exclusión…' : 'Restaurando la empresa…';
-  setInteractionStatus(actionLabel);
-  try {
-    const result = await rpc('portal_set_company_preference_v1', {
-      p_report_reference: reference,
-      p_company_id: item.company_id,
-      p_preference: preference,
-      p_reason: reason || null,
-    });
-    item.preference = preference === 'neutral' ? null : preference;
-    item.reason = reason || null;
-    if (preference === 'preferred') {
-      setInteractionStatus('Solicitud de profundización registrada' + (result?.submission_id ? ' · Submission ID ' + result.submission_id : '') + '. No se ha realizado un cargo automático de créditos.');
-    } else if (preference === 'excluded') {
-      setInteractionStatus('Empresa excluida de las nuevas solicitudes e informes de tu cuenta. Puedes deshacerlo en cualquier momento.');
-    } else {
-      setInteractionStatus('Preferencia retirada. La empresa vuelve a ser elegible en futuras solicitudes.');
-    }
-    renderInteractionList();
-    injectInlineInteractions();
-  } catch (error) {
-    console.error('Company preference failed', error);
-    setInteractionStatus('No se ha podido guardar la preferencia. Inténtalo de nuevo.', 'error');
-  }
-}
-
-function openCompanyPreferenceReason(card, item, preference) {
-  card.querySelector('.feedback-note')?.remove();
-  const wrap = makeNode('div', 'feedback-note');
-  const hintText = preference === 'preferred'
-    ? 'Cuéntanos qué te interesa de esta empresa o qué quieres que investiguemos. Es opcional.'
-    : 'Ayúdanos a entender por qué esta empresa no encaja. Es opcional.';
-  wrap.append(makeNode('small', '', hintText));
-  const textarea = document.createElement('textarea');
-  textarea.maxLength = 2000;
-  textarea.placeholder = preference === 'preferred'
-    ? 'Ej. revisar nuevas inversiones, líneas, proyectos o señales recientes'
-    : 'Ej. no es cliente objetivo, actividad incorrecta o fuera de nuestro mercado';
-  textarea.value = item.reason || '';
-  const actions = makeNode('div', 'feedback-note-actions');
-  const cancel = makeNode('button', 'secondary-action', 'Cancelar');
-  cancel.type = 'button';
-  cancel.addEventListener('click', () => wrap.remove());
-  const confirm = makeNode('button', 'primary-action', preference === 'preferred' ? 'Solicitar profundización' : 'Excluir empresa');
-  confirm.type = 'button';
-  confirm.addEventListener('click', () => void saveCompanyPreference(item, preference, textarea.value.trim()));
-  actions.append(cancel, confirm);
-  wrap.append(textarea, actions);
-  card.append(wrap);
-  textarea.focus();
-}
-
-function renderCompanyFeedback() {
-  const all = Array.isArray(interactionData?.companies) ? interactionData.companies : [];
-  const query = (interactionCompanySearch?.value || '').trim().toLocaleLowerCase('es');
-  const rows = query ? all.filter((item) => String(item.company || '').toLocaleLowerCase('es').includes(query)) : all;
-  if (!rows.length) {
-    interactionList.append(makeNode('p', 'section-copy', query ? 'No hay empresas que coincidan con la búsqueda.' : 'No hay empresas disponibles para valorar.'));
-    return;
-  }
-  for (const item of rows) {
-    const stateClass = item.preference === 'excluded' ? ' is-excluded' : item.preference === 'preferred' ? ' is-preferred' : '';
-    const card = makeNode('article', 'feedback-card' + stateClass);
-    card.dataset.companyId = item.company_id;
-    const head = makeNode('div', 'feedback-card-head');
-    const copy = makeNode('div');
-    const location = [item.municipality, item.province, item.country].filter(Boolean).join(' · ');
-    copy.append(makeNode('strong', '', item.company || 'Empresa'), makeNode('small', '', location || ''));
-    head.append(copy);
-    card.append(head);
-
-    if (item.preference === 'excluded') {
-      card.append(makeNode('span', 'preference-badge', 'Excluida de futuros informes'));
-    } else if (item.preference === 'preferred') {
-      card.append(makeNode('span', 'preference-badge', 'Interesante · profundización solicitada'));
-    }
-
-    const actions = makeNode('div', 'feedback-actions');
-    const up = makeNode('button', 'preference-button', '👍 Me interesa');
-    up.type = 'button';
-    up.dataset.preference = 'preferred';
-    up.addEventListener('click', () => openCompanyPreferenceReason(card, item, 'preferred'));
-    const down = makeNode('button', 'preference-button', '👎 No encaja');
-    down.type = 'button';
-    down.dataset.preference = 'excluded';
-    down.addEventListener('click', () => openCompanyPreferenceReason(card, item, 'excluded'));
-    actions.append(up, down);
-    if (item.preference) {
-      const undo = makeNode('button', 'secondary-action', 'Deshacer preferencia');
-      undo.type = 'button';
-      undo.addEventListener('click', () => void saveCompanyPreference(item, 'neutral', ''));
-      actions.append(undo);
-    }
-    card.append(actions);
-    if (item.reason) card.append(makeNode('p', 'section-copy', 'Nota: ' + item.reason));
-    interactionList.append(card);
-  }
-}
-
-function renderInteractionList() {
-  if (!interactionList) return;
-  interactionList.replaceChildren();
-  document.querySelectorAll('.interaction-tab').forEach((button) => {
-    button.classList.toggle('is-active', button.dataset.interactionTab === interactionTab);
-  });
-  interactionCompanySearchWrap.hidden = interactionTab !== 'companies';
-  if (!interactionData) {
-    interactionList.append(makeNode('p', 'section-copy', 'Cargando opciones…'));
-    return;
-  }
-  if (interactionTab === 'companies') renderCompanyFeedback();
-  else renderOpportunityFeedback();
-}
-
-function inlineStyleDocument(doc) {
-  if (!doc || doc.getElementById('induradar-portal-feedback-style')) return;
-  const style = doc.createElement('style');
-  style.id = 'induradar-portal-feedback-style';
-  style.textContent = '.induradar-portal-feedback-inline{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px;padding-top:8px;border-top:1px solid #edf0f3}.induradar-portal-feedback-inline span{font-size:12px;color:#667085;font-weight:700}.induradar-portal-feedback-inline button{border:1px solid #d0d5dd;background:#fff;border-radius:999px;padding:4px 8px;cursor:pointer}.induradar-portal-feedback-inline button.sel{border-color:#0f766e;background:#ecfdf3}.induradar-portal-feedback-inline button.neg.sel{border-color:#b42318;background:#fee4e2}';
-  doc.head.append(style);
-}
-
 function normalizeText(value) {
   return String(value || '').toLocaleLowerCase('es').replace(/\s+/g, ' ').trim();
 }
@@ -430,79 +180,303 @@ function matchInteractionByText(rows, text) {
     });
 }
 
-function injectInlineInteractions(frame = canonicalFrame) {
-  if (!frame || !interactionData) return;
-  const doc = frame.contentDocument;
-  if (!doc) return;
+function inlineStyleDocument(doc) {
+  if (!doc || doc.getElementById('induradar-portal-feedback-style')) return;
+  const style = doc.createElement('style');
+  style.id = 'induradar-portal-feedback-style';
+  style.textContent = [
+    '.induradar-feedback-actions{display:inline-flex;align-items:center;gap:4px;margin-left:8px;vertical-align:middle;white-space:nowrap}',
+    '.induradar-feedback-actions button{border:1px solid #d0d5dd;background:#fff;border-radius:999px;width:30px;height:30px;padding:0;cursor:pointer;font-size:15px;line-height:1}',
+    '.induradar-feedback-actions button:hover{border-color:#98a2b3;background:#f8fafc}',
+    '.induradar-feedback-actions button.sel{border-color:#0f766e;background:#ecfdf3;box-shadow:0 0 0 2px rgba(15,118,110,.08)}',
+    '.induradar-feedback-actions button.neg.sel{border-color:#b42318;background:#fee4e2;box-shadow:0 0 0 2px rgba(180,35,24,.08)}',
+    '.induradar-feedback-editor{margin:8px 0 10px;padding:10px;border:1px solid #d0d5dd;border-radius:10px;background:#f8fafc;font-size:13px}',
+    '.induradar-feedback-editor small{display:block;color:#667085;margin-bottom:7px}',
+    '.induradar-feedback-editor textarea{display:block;width:100%;min-height:72px;resize:vertical;border:1px solid #d0d5dd;border-radius:8px;padding:8px;font:inherit;background:#fff;color:#17212b}',
+    '.induradar-feedback-editor-actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap;margin-top:7px}',
+    '.induradar-feedback-editor-actions button{border:1px solid #0f766e;border-radius:8px;padding:6px 9px;background:#fff;color:#0f766e;font-weight:700;cursor:pointer}',
+    '.induradar-feedback-editor-actions button.primary{background:#0f766e;color:#fff}',
+    '.induradar-feedback-error{margin:6px 0;color:#b42318;font-size:12px;font-weight:700}',
+    '@media print{.induradar-feedback-actions,.induradar-feedback-editor,.induradar-feedback-error{display:none!important}}'
+  ].join('');
+  doc.head.append(style);
+}
+
+function removeInlineEditors(doc) {
+  doc?.querySelectorAll('.induradar-feedback-editor,.induradar-feedback-error').forEach((node) => node.remove());
+}
+
+function placeInlineNode(anchor, node) {
+  if (!anchor || !node) return;
+  if (anchor.tagName === 'TD' || anchor.tagName === 'TH') anchor.append(node);
+  else anchor.insertAdjacentElement('afterend', node);
+}
+
+function showInlineError(host, message) {
+  const doc = host?.ownerDocument;
+  if (!doc || !host) return;
+  host.parentElement?.querySelectorAll('.induradar-feedback-error').forEach((node) => node.remove());
+  host.querySelectorAll?.('.induradar-feedback-error').forEach((node) => node.remove());
+  const node = doc.createElement('div');
+  node.className = 'induradar-feedback-error';
+  node.textContent = message;
+  placeInlineNode(host, node);
+}
+
+async function saveOpportunityFeedback(item, useful, reason = '', errorHost = null) {
+  const reference = reportReference();
+  if (!reference || !item?.company_id) return;
+  try {
+    await rpc('portal_submit_feedback_v1', {
+      p_report_reference: reference,
+      p_entity_type: 'client_opportunity',
+      p_entity_id: item.company_id,
+      p_useful: useful,
+      p_reason: reason || null,
+    });
+    item.useful = useful;
+    item.reason = useful == null ? null : (reason || null);
+    injectInlineInteractions();
+  } catch (error) {
+    console.error('Opportunity feedback failed', error);
+    showInlineError(errorHost, 'No se ha podido guardar la valoración. Inténtalo de nuevo.');
+  }
+}
+
+async function saveCompanyPreference(item, preference, reason = '', errorHost = null) {
+  const reference = reportReference();
+  if (!reference || !item?.company_id) return;
+  try {
+    await rpc('portal_set_company_preference_v1', {
+      p_report_reference: reference,
+      p_company_id: item.company_id,
+      p_preference: preference,
+      p_reason: reason || null,
+    });
+    item.preference = preference === 'neutral' ? null : preference;
+    item.reason = preference === 'neutral' ? null : (reason || null);
+    injectInlineInteractions();
+  } catch (error) {
+    console.error('Company preference failed', error);
+    showInlineError(errorHost, 'No se ha podido guardar la preferencia. Inténtalo de nuevo.');
+  }
+}
+
+function openInlineEditor(doc, anchor, {
+  hint,
+  placeholder,
+  value = '',
+  confirmLabel,
+  onConfirm,
+  allowSkip = true,
+}) {
+  removeInlineEditors(doc);
+  const editor = doc.createElement('div');
+  editor.className = 'induradar-feedback-editor';
+  const help = doc.createElement('small');
+  help.textContent = hint;
+  const textarea = doc.createElement('textarea');
+  textarea.maxLength = 2000;
+  textarea.placeholder = placeholder;
+  textarea.value = value || '';
+  const actions = doc.createElement('div');
+  actions.className = 'induradar-feedback-editor-actions';
+
+  const cancel = doc.createElement('button');
+  cancel.type = 'button';
+  cancel.textContent = 'Cancelar';
+  cancel.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    editor.remove();
+  });
+  actions.append(cancel);
+
+  if (allowSkip) {
+    const skip = doc.createElement('button');
+    skip.type = 'button';
+    skip.textContent = 'Guardar sin comentario';
+    skip.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      void onConfirm('', anchor);
+    });
+    actions.append(skip);
+  }
+
+  const confirm = doc.createElement('button');
+  confirm.type = 'button';
+  confirm.className = 'primary';
+  confirm.textContent = confirmLabel;
+  confirm.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    void onConfirm(textarea.value.trim(), anchor);
+  });
+  actions.append(confirm);
+
+  editor.append(help, textarea, actions);
+  placeInlineNode(anchor, editor);
+  textarea.focus();
+}
+
+function opportunityButtons(doc, item, anchor) {
+  const wrap = doc.createElement('span');
+  wrap.className = 'induradar-feedback-actions';
+  wrap.setAttribute('aria-label', 'Valorar oportunidad');
+
+  const up = doc.createElement('button');
+  up.type = 'button';
+  up.textContent = '👍';
+  up.title = item.useful === true ? 'Deshacer valoración positiva' : 'Esta oportunidad es valiosa';
+  up.setAttribute('aria-pressed', item.useful === true ? 'true' : 'false');
+  if (item.useful === true) up.classList.add('sel');
+  up.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    removeInlineEditors(doc);
+    void saveOpportunityFeedback(item, item.useful === true ? null : true, '', anchor);
+  });
+
+  const down = doc.createElement('button');
+  down.type = 'button';
+  down.textContent = '👎';
+  down.className = 'neg';
+  down.title = item.useful === false ? 'Deshacer valoración negativa' : 'Esta oportunidad no encaja';
+  down.setAttribute('aria-pressed', item.useful === false ? 'true' : 'false');
+  if (item.useful === false) down.classList.add('sel');
+  down.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (item.useful === false) {
+      removeInlineEditors(doc);
+      void saveOpportunityFeedback(item, null, '', anchor);
+      return;
+    }
+    openInlineEditor(doc, anchor, {
+      hint: 'Ayúdanos a entender qué es interesante para tus informes. El comentario es opcional.',
+      placeholder: '¿Qué no ha encajado o qué tipo de oportunidad sería más útil?',
+      value: item.reason || '',
+      confirmLabel: 'Guardar valoración',
+      onConfirm: (reason, errorHost) => saveOpportunityFeedback(item, false, reason, errorHost),
+    });
+  });
+
+  wrap.append(up, down);
+  return wrap;
+}
+
+function companyButtons(doc, item, anchor) {
+  const wrap = doc.createElement('span');
+  wrap.className = 'induradar-feedback-actions';
+  wrap.setAttribute('aria-label', 'Valorar empresa');
+
+  const up = doc.createElement('button');
+  up.type = 'button';
+  up.textContent = '👍';
+  up.title = item.preference === 'preferred'
+    ? 'Deshacer interés por esta empresa'
+    : 'Esta empresa me interesa · solicitar profundización';
+  up.setAttribute('aria-pressed', item.preference === 'preferred' ? 'true' : 'false');
+  if (item.preference === 'preferred') up.classList.add('sel');
+  up.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (item.preference === 'preferred') {
+      removeInlineEditors(doc);
+      void saveCompanyPreference(item, 'neutral', '', anchor);
+      return;
+    }
+    openInlineEditor(doc, anchor, {
+      hint: 'Cuéntanos qué te interesa de esta empresa o qué quieres que investiguemos. El comentario es opcional.',
+      placeholder: 'Ej. revisar nuevas inversiones, líneas, proyectos o señales recientes',
+      value: item.reason || '',
+      confirmLabel: 'Solicitar profundización',
+      onConfirm: (reason, errorHost) => saveCompanyPreference(item, 'preferred', reason, errorHost),
+    });
+  });
+
+  const down = doc.createElement('button');
+  down.type = 'button';
+  down.textContent = '👎';
+  down.className = 'neg';
+  down.title = item.preference === 'excluded'
+    ? 'Deshacer exclusión de esta empresa'
+    : 'No quiero esta empresa en futuros informes';
+  down.setAttribute('aria-pressed', item.preference === 'excluded' ? 'true' : 'false');
+  if (item.preference === 'excluded') down.classList.add('sel');
+  down.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (item.preference === 'excluded') {
+      removeInlineEditors(doc);
+      void saveCompanyPreference(item, 'neutral', '', anchor);
+      return;
+    }
+    openInlineEditor(doc, anchor, {
+      hint: 'Ayúdanos a entender por qué esta empresa no encaja. El comentario es opcional.',
+      placeholder: 'Ej. no es cliente objetivo, actividad incorrecta o fuera de nuestro mercado',
+      value: item.reason || '',
+      confirmLabel: 'Excluir empresa',
+      onConfirm: (reason, errorHost) => saveCompanyPreference(item, 'excluded', reason, errorHost),
+    });
+  });
+
+  wrap.append(up, down);
+  return wrap;
+}
+
+function injectCanonicalInteractions(doc) {
+  if (!doc || !interactionData) return;
   inlineStyleDocument(doc);
+  removeInlineEditors(doc);
 
   const opportunities = Array.isArray(interactionData.opportunities) ? interactionData.opportunities : [];
   doc.querySelectorAll('#oppGrid .card').forEach((card) => {
-    card.querySelector('.induradar-portal-feedback-inline')?.remove();
+    card.querySelectorAll('.induradar-feedback-actions').forEach((node) => node.remove());
     const item = matchInteractionByText(opportunities, card.textContent);
-    if (!item) return;
-    const wrap = doc.createElement('div');
-    wrap.className = 'induradar-portal-feedback-inline';
-    const label = doc.createElement('span');
-    label.textContent = '¿Te ha resultado útil?';
-    const up = doc.createElement('button');
-    up.type = 'button';
-    up.textContent = '👍';
-    up.title = 'Oportunidad valiosa';
-    if (item.useful === true) up.classList.add('sel');
-    up.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      void saveOpportunityFeedback(item, true, '');
-    });
-    const down = doc.createElement('button');
-    down.type = 'button';
-    down.textContent = '👎';
-    down.title = 'No encaja';
-    down.className = 'neg';
-    if (item.useful === false) down.classList.add('sel');
-    down.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      openFeedbackDrawer('opportunities', item.company_id);
-    });
-    wrap.append(label, up, down);
-    card.append(wrap);
+    const title = card.querySelector('h3');
+    if (!item || !title) return;
+    title.append(opportunityButtons(doc, item, title));
   });
 
   const companies = Array.isArray(interactionData.companies) ? interactionData.companies : [];
   doc.querySelectorAll('#companyRows tr').forEach((row) => {
-    row.querySelector('.induradar-portal-feedback-inline')?.remove();
+    row.querySelectorAll('.induradar-feedback-actions').forEach((node) => node.remove());
     const item = matchInteractionByText(companies, row.textContent);
-    if (!item) return;
     const cell = row.cells?.[1] || row.cells?.[0];
-    if (!cell) return;
-    const wrap = doc.createElement('div');
-    wrap.className = 'induradar-portal-feedback-inline';
-    const up = doc.createElement('button');
-    up.type = 'button';
-    up.textContent = '👍';
-    up.title = 'Empresa interesante · solicitar profundización';
-    if (item.preference === 'preferred') up.classList.add('sel');
-    up.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      openFeedbackDrawer('companies', item.company_id);
-    });
-    const down = doc.createElement('button');
-    down.type = 'button';
-    down.textContent = '👎';
-    down.title = 'No quiero esta empresa en futuros informes';
-    down.className = 'neg';
-    if (item.preference === 'excluded') down.classList.add('sel');
-    down.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      openFeedbackDrawer('companies', item.company_id);
-    });
-    wrap.append(up, down);
-    cell.append(wrap);
+    if (!item || !cell) return;
+    cell.append(companyButtons(doc, item, cell));
   });
+}
+
+function injectLegacyInteractions() {
+  if (!interactionData) return;
+  inlineStyleDocument(document);
+  removeInlineEditors(document);
+
+  const opportunities = Array.isArray(interactionData.opportunities) ? interactionData.opportunities : [];
+  reportNode.querySelectorAll('.opportunity-card').forEach((card) => {
+    card.querySelectorAll('.induradar-feedback-actions').forEach((node) => node.remove());
+    const item = matchInteractionByText(opportunities, card.textContent);
+    const title = card.querySelector('.opportunity-heading strong') || card.querySelector('strong');
+    if (!item || !title) return;
+    title.append(opportunityButtons(document, item, title));
+  });
+
+  const companies = Array.isArray(interactionData.companies) ? interactionData.companies : [];
+  reportNode.querySelectorAll('.universe-table tbody tr').forEach((row) => {
+    row.querySelectorAll('.induradar-feedback-actions').forEach((node) => node.remove());
+    const item = matchInteractionByText(companies, row.textContent);
+    const cell = row.cells?.[0];
+    if (!item || !cell) return;
+    cell.append(companyButtons(document, item, cell));
+  });
+}
+
+function injectInlineInteractions(frame = canonicalFrame) {
+  if (frame?.contentDocument) injectCanonicalInteractions(frame.contentDocument);
+  else injectLegacyInteractions();
 }
 
 function observeCanonicalRender(frame) {
@@ -595,7 +569,6 @@ async function start() {
   setStatus('Cargando informe…');
   reportAuthNode.hidden = true;
   setAuthStatus();
-  feedbackButton.hidden = true;
   updateButton.hidden = true;
   printButton.hidden = true;
   if (excelButton) excelButton.hidden = true;
@@ -637,8 +610,7 @@ async function start() {
     printButton.hidden = false;
     if (excelButton) excelButton.hidden = false;
     updateButton.hidden = false;
-    feedbackButton.hidden = !interactionData;
-    renderInteractionList();
+    injectInlineInteractions();
     return;
   } catch (error) {
     if (error?.message !== 'legacy_report') {
@@ -667,8 +639,7 @@ async function start() {
     printButton.hidden = false;
     if (excelButton) excelButton.hidden = false;
     updateButton.hidden = false;
-    feedbackButton.hidden = !interactionData;
-    renderInteractionList();
+    injectInlineInteractions();
   } catch (error) {
     console.error('InduRadar legacy report viewer error', error?.message ?? error);
     setStatus(messageFor(error), 'error');
@@ -733,20 +704,8 @@ excelButton?.addEventListener('click', async () => {
 });
 reportAuthForm.addEventListener('submit', signInToReport);
 document.querySelector('#report-forgot-password').addEventListener('click', () => void requestReportPasswordReset());
-feedbackButton.addEventListener('click', () => openFeedbackDrawer('opportunities'));
 updateButton.addEventListener('click', openUpdateDialog);
-document.querySelector('#close-feedback').addEventListener('click', closeFeedbackDrawer);
-interactionBackdrop.addEventListener('click', closeFeedbackDrawer);
-document.querySelectorAll('.interaction-tab').forEach((button) => button.addEventListener('click', () => {
-  interactionTab = button.dataset.interactionTab || 'opportunities';
-  setInteractionStatus();
-  renderInteractionList();
-}));
-interactionCompanySearch.addEventListener('input', renderInteractionList);
 updateForm.addEventListener('submit', submitReportUpdate);
 document.querySelector('#close-update-dialog').addEventListener('click', closeUpdateDialog);
 document.querySelector('#cancel-update-dialog').addEventListener('click', closeUpdateDialog);
-window.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && !interactionDrawer.hidden) closeFeedbackDrawer();
-});
 start();
