@@ -206,14 +206,21 @@ function removeInlineEditors(doc) {
   doc?.querySelectorAll('.induradar-feedback-editor,.induradar-feedback-error').forEach((node) => node.remove());
 }
 
+function placeInlineNode(anchor, node) {
+  if (!anchor || !node) return;
+  if (anchor.tagName === 'TD' || anchor.tagName === 'TH') anchor.append(node);
+  else anchor.insertAdjacentElement('afterend', node);
+}
+
 function showInlineError(host, message) {
   const doc = host?.ownerDocument;
   if (!doc || !host) return;
   host.parentElement?.querySelectorAll('.induradar-feedback-error').forEach((node) => node.remove());
+  host.querySelectorAll?.('.induradar-feedback-error').forEach((node) => node.remove());
   const node = doc.createElement('div');
   node.className = 'induradar-feedback-error';
   node.textContent = message;
-  host.insertAdjacentElement('afterend', node);
+  placeInlineNode(host, node);
 }
 
 async function saveOpportunityFeedback(item, useful, reason = '', errorHost = null) {
@@ -309,7 +316,7 @@ function openInlineEditor(doc, anchor, {
   actions.append(confirm);
 
   editor.append(help, textarea, actions);
-  anchor.insertAdjacentElement('afterend', editor);
+  placeInlineNode(anchor, editor);
   textarea.focus();
 }
 
