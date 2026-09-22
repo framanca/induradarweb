@@ -18,11 +18,12 @@ test('portal exposes XLSX download and email-link actions', () => {
   assert.match(portalJs, /email_download_link/);
 });
 
-test('get-report materializes XLSX from approved report payload and reuses storage', () => {
+test('get-report streams XLSX deterministically from the approved report payload', () => {
   assert.match(edge, /get_xlsx_export_payload_by_reference_v1/);
-  assert.match(edge, /report-exports/);
-  assert.match(edge, /register_report_xlsx_export_v1/);
-  assert.match(edge, /xlsx-deterministic-v2\.0\.0/);
+  assert.match(edge, /direct-deterministic-v2/);
+  assert.match(edge, /XLSX\.write/);
+  assert.doesNotMatch(edge, /xlsx_materialization_failed/);
+  assert.doesNotMatch(edge, /register_report_xlsx_export_v1/);
   assert.match(edge, /Opportunity Rank/);
   assert.match(edge, /Signal Strength/);
   assert.match(edge, /Earliness/);
