@@ -53,11 +53,13 @@ test('thumb selections can be undone in place', () => {
 });
 
 
-test('canonical report navigation stays inside the iframe without nesting the viewer', () => {
-  assert.match(reportJs, /wireCanonicalFrameNavigation/);
-  assert.match(reportJs, /rawHref\.startsWith\('#'\)/);
-  assert.match(reportJs, /scrollIntoView\(\{ behavior: 'smooth'/);
-  assert.match(reportJs, /sameReportDownload/);
-  assert.match(reportJs, /reportNav\.hidden = true/);
+test('canonical report renders as one full scrolling page without an iframe', () => {
+  assert.match(reportJs, /new DOMParser\(\)\.parseFromString/);
+  assert.match(reportJs, /canonical-full-page/);
+  assert.match(reportJs, /reportNode\.replaceChildren\(fragment\)/);
+  assert.match(reportJs, /#oportunidades article\.card\.opportunity/);
+  assert.match(reportJs, /#empresas table\.company-index tbody tr\.company-row/);
+  assert.doesNotMatch(reportJs, /createElement\('iframe'\)/);
+  assert.doesNotMatch(reportJs, /canonicalFrame/);
   assert.doesNotMatch(reportHtml, /id="open-feedback"/);
 });

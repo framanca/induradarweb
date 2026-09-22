@@ -16,9 +16,9 @@ const updateForm = document.querySelector('#report-update-form');
 const updateStatusNode = document.querySelector('#report-update-status');
 const reportNav = document.querySelector('.report-nav');
 let printState = [];
-let canonicalFrame = null;
-let canonicalObserver = null;
 let interactionData = null;
+let canonicalStyleNode = null;
+let canonicalScriptNodes = [];
 
 function setStatus(message, kind = 'info') {
   statusNode.textContent = message;
@@ -427,13 +427,13 @@ function companyButtons(doc, item, anchor) {
   return wrap;
 }
 
-function injectCanonicalInteractions(doc) {
+function injectCanonicalInteractions(doc = document) {
   if (!doc || !interactionData) return;
   inlineStyleDocument(doc);
-  removeInlineEditors(doc);
 
+  const scope = doc.querySelector('#report-root') || doc;
   const opportunities = Array.isArray(interactionData.opportunities) ? interactionData.opportunities : [];
-  doc.querySelectorAll('#oppGrid .card').forEach((card) => {
+  scope.querySelectorAll('#oportunidades article.card.opportunity').forEach((card) => {
     card.querySelectorAll('.induradar-feedback-actions').forEach((node) => node.remove());
     const item = matchInteractionByText(opportunities, card.textContent);
     const title = card.querySelector('h3');
@@ -442,19 +442,26 @@ function injectCanonicalInteractions(doc) {
   });
 
   const companies = Array.isArray(interactionData.companies) ? interactionData.companies : [];
-  doc.querySelectorAll('#companyRows tr').forEach((row) => {
+  scope.querySelectorAll('#empresas table.company-index tbody tr.company-row').forEach((row) => {
     row.querySelectorAll('.induradar-feedback-actions').forEach((node) => node.remove());
     const item = matchInteractionByText(companies, row.textContent);
-    const cell = row.cells?.[1] || row.cells?.[0];
+    const cell = row.cells?.[0];
     if (!item || !cell) return;
     cell.append(companyButtons(doc, item, cell));
+  });
+
+  scope.querySelectorAll('#empresas .company-details').forEach((card) => {
+    card.querySelectorAll('.induradar-feedback-actions').forEach((node) => node.remove());
+    const item = matchInteractionByText(companies, card.textContent);
+    const title = card.querySelector('h3');
+    if (!item || !title) return;
+    title.append(companyButtons(doc, item, title));
   });
 }
 
 function injectLegacyInteractions() {
   if (!interactionData) return;
   inlineStyleDocument(document);
-  removeInlineEditors(document);
 
   const opportunities = Array.isArray(interactionData.opportunities) ? interactionData.opportunities : [];
   reportNode.querySelectorAll('.opportunity-card').forEach((card) => {
@@ -475,80 +482,94 @@ function injectLegacyInteractions() {
   });
 }
 
-function injectInlineInteractions(frame = canonicalFrame) {
-  if (frame?.contentDocument) injectCanonicalInteractions(frame.contentDocument);
+function injectInlineInteractions() {
+  if (document.body.classList.contains('canonical-full-page')) injectCanonicalInteractions(document);
   else injectLegacyInteractions();
 }
 
-function observeCanonicalRender(frame) {
-  canonicalObserver?.disconnect();
-  const doc = frame.contentDocument;
-  if (!doc) return;
-  const callback = () => window.setTimeout(() => injectInlineInteractions(frame), 20);
-  canonicalObserver = new MutationObserver(callback);
-  const oppGrid = doc.querySelector('#oppGrid');
-  const companyRows = doc.querySelector('#companyRows');
-  if (oppGrid) canonicalObserver.observe(oppGrid, { childList: true });
-  if (companyRows) canonicalObserver.observe(companyRows, { childList: true });
+function clearCanonicalAssets() {
+  canonicalStyleNode?.remove();
+  canonicalStyleNode = null;
+  canonicalScriptNodes.forEach((node) => node.remove());
+  canonicalScriptNodes = [];
+  document.body.classList.remove('canonical-full-page');
 }
 
-function wireCanonicalFrameNavigation(frame, reference) {
-  const doc = frame.contentDocument;
-  if (!doc) return;
-
-  doc.addEventListener('click', (event) => {
-    const target = event.target && typeof event.target.closest === 'function'
-      ? event.target.closest('a[href]')
-      : null;
-    if (!target) return;
-
-    const rawHref = target.getAttribute('href')?.trim() || '';
-    if (!rawHref) return;
-
-    if (rawHref.startsWith('#')) {
+function wireCanonicalPageActions(reference) {
+  const nav = reportNode.querySelector('.nav');
+  if (nav && !nav.querySelector('[data-induradar-update]')) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.induradarUpdate = 'true';
+    button.textContent = 'Solicitar actualización';
+    button.addEventListener('click', (event) => {
       event.preventDefault();
-      event.stopPropagation();
-      const id = decodeURIComponent(rawHref.slice(1));
-      const section = id ? doc.getElementById(id) : null;
-      if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      return;
-    }
+      openUpdateDialog();
+    });
+    const printAction = nav.querySelector('.print');
+    nav.insertBefore(button, printAction || null);
+  }
 
+  reportNode.querySelectorAll('a[href]').forEach((link) => {
+    const rawHref = link.getAttribute('href')?.trim() || '';
+    if (!rawHref) return;
     let url;
     try {
       url = new URL(rawHref, window.location.origin);
     } catch {
       return;
     }
-
     const sameReportDownload = url.origin === window.location.origin
       && url.pathname.replace(/\/+$/, '/') === '/report/'
       && (url.searchParams.get('ref') || '').toUpperCase() === reference
       && url.searchParams.get('download') === 'xlsx';
-
-    if (sameReportDownload) {
+    if (!sameReportDownload) return;
+    link.addEventListener('click', (event) => {
       event.preventDefault();
-      event.stopPropagation();
       void downloadXlsx(reference).catch((error) => {
         console.error('InduRadar XLSX download error', error?.message ?? error);
         setStatus(messageFor(error), 'error');
       });
-    }
-  }, true);
+    });
+  });
 }
 
 function showCanonicalHtml(html, reference) {
-  canonicalObserver?.disconnect();
-  canonicalFrame = document.createElement('iframe');
-  canonicalFrame.className = 'canonical-report-frame';
-  canonicalFrame.title = 'Informe ' + reference;
-  canonicalFrame.srcdoc = html;
-  canonicalFrame.addEventListener('load', () => {
-    wireCanonicalFrameNavigation(canonicalFrame, reference);
-    injectInlineInteractions(canonicalFrame);
-    observeCanonicalRender(canonicalFrame);
+  clearCanonicalAssets();
+
+  const parsed = new DOMParser().parseFromString(html, 'text/html');
+  if (!parsed?.body) throw new Error('invalid_canonical_html');
+
+  const styleText = [...parsed.head.querySelectorAll('style')]
+    .map((node) => node.textContent || '')
+    .filter(Boolean)
+    .join('\n');
+  if (styleText) {
+    canonicalStyleNode = document.createElement('style');
+    canonicalStyleNode.id = 'induradar-canonical-report-style';
+    canonicalStyleNode.textContent = styleText;
+    document.head.append(canonicalStyleNode);
+  }
+
+  const fragment = document.createDocumentFragment();
+  [...parsed.body.childNodes].forEach((node) => {
+    if (node.nodeName === 'SCRIPT') return;
+    fragment.append(document.importNode(node, true));
   });
-  reportNode.replaceChildren(canonicalFrame);
+  reportNode.replaceChildren(fragment);
+
+  document.body.classList.add('canonical-full-page');
+  wireCanonicalPageActions(reference);
+
+  [...parsed.querySelectorAll('script')].forEach((source) => {
+    const script = document.createElement('script');
+    if (source.src) script.src = source.src;
+    else script.textContent = source.textContent || '';
+    document.body.append(script);
+    canonicalScriptNodes.push(script);
+  });
+
+  injectCanonicalInteractions(document);
 }
 
 function updateStorageKey(reference) {
@@ -621,8 +642,7 @@ async function start() {
   printButton.hidden = true;
   if (excelButton) excelButton.hidden = true;
   interactionData = null;
-  canonicalObserver?.disconnect();
-  canonicalFrame = null;
+  clearCanonicalAssets();
 
   const params = new URLSearchParams(window.location.search);
   if (params.get('download') === 'xlsx') {
@@ -656,9 +676,9 @@ async function start() {
     showCanonicalHtml(html, reference);
     setStatus('');
     if (reportNav) reportNav.hidden = true;
-    printButton.hidden = false;
-    if (excelButton) excelButton.hidden = false;
-    updateButton.hidden = false;
+    printButton.hidden = true;
+    if (excelButton) excelButton.hidden = true;
+    updateButton.hidden = true;
     injectInlineInteractions();
     return;
   } catch (error) {
@@ -673,6 +693,7 @@ async function start() {
   // Only reports finalized before the canonical-HTML cutover may take this
   // legacy path. Post-cutover missing HTML fails closed at the server.
   try {
+    clearCanonicalAssets();
     const data = await fetchLegacyReport(reference);
     const model = buildReportViewModel(data);
     referenceNode.textContent = model.reference || reference;
@@ -735,10 +756,7 @@ window.addEventListener('afterprint', () => {
   printState = [];
 });
 
-printButton.addEventListener('click', () => {
-  if (canonicalFrame?.contentWindow) canonicalFrame.contentWindow.print();
-  else window.print();
-});
+printButton.addEventListener('click', () => window.print());
 excelButton?.addEventListener('click', async () => {
   const reference = reportReference();
   if (!reference) return;
