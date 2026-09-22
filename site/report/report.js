@@ -497,7 +497,9 @@ function wireCanonicalFrameNavigation(frame, reference) {
   if (!doc) return;
 
   doc.addEventListener('click', (event) => {
-    const target = event.target instanceof Element ? event.target.closest('a[href]') : null;
+    const target = event.target && typeof event.target.closest === 'function'
+      ? event.target.closest('a[href]')
+      : null;
     if (!target) return;
 
     const rawHref = target.getAttribute('href')?.trim() || '';
