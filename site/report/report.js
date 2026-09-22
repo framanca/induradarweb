@@ -87,7 +87,16 @@ async function reportRequest(reference, format, accept) {
   if (response.status === 401 || response.status === 403) throw new Error('authentication_required');
   if (response.status === 404) throw new Error('report_not_available');
   if (response.status === 409 && format === 'html') throw new Error('legacy_report');
-  if (!response.ok) throw new Error('report_load_failed');
+  if (!response.ok) {
+    let code = '';
+    try {
+      const body = await response.clone().json();
+      code = typeof body?.error === 'string' ? body.error : '';
+    } catch {}
+    const error = new Error(code || 'report_load_failed');
+    error.status = response.status;
+    throw error;
+  }
   return response;
 }
 
@@ -144,6 +153,12 @@ function messageFor(error) {
     case 'invalid_report_payload':
     case 'invalid_canonical_html':
       return 'La respuesta del informe no cumple el formato esperado.';
+    case 'xlsx_payload_unavailable':
+      return 'El informe está disponible, pero no se ha podido preparar la proyección de datos del Excel.';
+    case 'xlsx_payload_invalid':
+      return 'La proyección de datos del Excel no tiene el formato esperado.';
+    case 'xlsx_render_failed':
+      return 'Se han preparado los datos, pero ha fallado la creación del archivo Excel.';
     default:
       return 'No se ha podido cargar el informe. Inténtalo de nuevo desde el portal.';
   }
@@ -541,7 +556,7 @@ function wireCanonicalPageActions(reference) {
           console.error('InduRadar XLSX download error', error?.message ?? error);
           const status = document.createElement('span');
           status.className = 'induradar-xlsx-status';
-          status.textContent = 'No se ha podido preparar el Excel. Inténtalo de nuevo.';
+          status.textContent = messageFor(error);
           link.insertAdjacentElement('afterend', status);
           link.textContent = originalText;
         })
