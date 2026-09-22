@@ -526,10 +526,28 @@ function wireCanonicalPageActions(reference) {
     if (!sameReportDownload) return;
     link.addEventListener('click', (event) => {
       event.preventDefault();
-      void downloadXlsx(reference).catch((error) => {
-        console.error('InduRadar XLSX download error', error?.message ?? error);
-        setStatus(messageFor(error), 'error');
-      });
+      if (link.getAttribute('aria-busy') === 'true') return;
+      const originalText = link.textContent || 'Descargar Excel';
+      const previousStatus = nav?.querySelector('.induradar-xlsx-status');
+      previousStatus?.remove();
+      link.setAttribute('aria-busy', 'true');
+      link.textContent = 'Preparando Excel…';
+      void downloadXlsx(reference)
+        .then(() => {
+          link.textContent = 'Excel descargado ✓';
+          window.setTimeout(() => { link.textContent = originalText; }, 1600);
+        })
+        .catch((error) => {
+          console.error('InduRadar XLSX download error', error?.message ?? error);
+          const status = document.createElement('span');
+          status.className = 'induradar-xlsx-status';
+          status.textContent = 'No se ha podido preparar el Excel. Inténtalo de nuevo.';
+          link.insertAdjacentElement('afterend', status);
+          link.textContent = originalText;
+        })
+        .finally(() => {
+          link.removeAttribute('aria-busy');
+        });
     });
   });
 }
