@@ -1,0 +1,7 @@
+# Never commit machine credentials or operational records.
+private/
+state.json
+users.json
+*.new
+__pycache__/
+test-output/

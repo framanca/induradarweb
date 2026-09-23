@@ -6,16 +6,26 @@
   <title>HMI NX · Designer</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232563eb'/%3E%3Ctext x='9' y='43' font-family='sans-serif' font-size='32' fill='white'%3ENX%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="style.css">
-  <script defer src="core.js"></script><script defer src="runtime.js"></script><script defer src="panels.js"></script><script defer src="app.js"></script>
+
+  <script defer src="core.js"></script>
+  <script defer src="model.js"></script>
+  <script defer src="service.js"></script>
+  <script defer src="data.js"></script>
+  <script defer src="widgets.js"></script>
+  <script defer src="transport.js"></script>
+  <script defer src="runtime.js"></script>
+  <script defer src="exporter.js"></script>
+  <script defer src="panels.js"></script>
+  <script defer src="app.js"></script>
 </head>
 <body>
 <header class="app-header">
-  <div class="brand"><span class="brand-icon">NX</span><div><strong>HMI NX <span>Designer</span></strong><small>EDITOR WEB · PREVIEW TÉCNICA 0.1</small></div></div>
+  <div class="brand"><span class="brand-icon">NX</span><div><strong>HMI NX <span>Designer</span></strong><small>EDITOR WEB · PREVIEW TÉCNICA 0.2</small></div></div>
   <input id="project-name" aria-label="Nombre del proyecto" maxlength="100">
   <span id="save-state" role="status">Local · navegador</span>
   <div class="header-actions"><button data-action="new">Nuevo</button><button data-action="open">Abrir</button><button data-action="save">Guardar .nxhmi</button><button data-action="preview" class="accent">▶ Simular</button><button data-action="export" class="primary">Exportar SD ↓</button></div>
 </header>
-<nav class="app-tabs" aria-label="Secciones"><button data-tab="editor" class="active">Diseñador</button><button data-tab="variables">Variables <span id="tag-count"></span></button><button data-tab="recipes">Recetas</button><button data-tab="alarms">Alarmas</button><button data-tab="connection">Conexión NX</button><button data-tab="projects">Proyectos</button><button data-tab="help">Guía</button><span class="local-badge">PROYECTOS LOCALES · SIN NUBE</span></nav>
+<nav class="app-tabs" aria-label="Secciones"><button data-tab="editor" class="active">Diseñador</button><button data-tab="variables">Variables <span id="tag-count"></span></button><button data-tab="recipes">Recetas</button><button data-tab="alarms">Alarmas</button><button data-tab="roles">Usuarios de operación</button><button data-tab="connection">Conexión NX</button><button data-tab="projects">Proyectos</button><button data-tab="help">Guía</button><span class="local-badge">PROYECTOS LOCALES · SIN NUBE</span></nav>
 <main id="main"></main>
 <footer class="app-footer"><span id="project-summary"></span><span>Prototipo de ingeniería · no usar para seguridad ni jog mantenido</span></footer>
 <dialog id="modal"><div class="modal-top"><h2 id="modal-title"></h2><button data-action="close-modal" aria-label="Cerrar">✕</button></div><div id="modal-body"></div></dialog>
