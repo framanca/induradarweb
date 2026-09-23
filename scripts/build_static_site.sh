@@ -15,13 +15,14 @@ mkdir -p "$output_dir"
 cp -R site/. "$output_dir/"
 
 # HMI NX is isolated from the InduRadar portal and has no cloud/backend dependency.
-# Publish only the static editor files; keep tests and engineering notes in Git.
-for source in core.js runtime.js panels.js app.js; do
+# Publish only static editor modules: never provisioned users, service state or policies.
+hmi_modules=(core.js model.js service.js data.js widgets.js transport.js runtime.js exporter.js panels.js app.js)
+for source in "${hmi_modules[@]}"; do
   node --check "HMI_NX/$source"
 done
-node --test HMI_NX/tests/core.test.cjs
+node --test HMI_NX/tests/*.test.cjs
 mkdir -p "$output_dir/HMI_NX"
-for source in index.html style.css core.js runtime.js panels.js app.js; do
+for source in index.html style.css "${hmi_modules[@]}"; do
   cp "HMI_NX/$source" "$output_dir/HMI_NX/$source"
 done
 
