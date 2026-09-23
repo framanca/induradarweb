@@ -1,0 +1,38 @@
+name: HMI NX validation
+
+on:
+  push:
+    branches: [main, feature/hmi-nx-v2-operations-20260923]
+    paths: ['HMI_NX/**', '.github/workflows/hmi-nx-tests.yml', 'scripts/build_static_site.sh']
+  pull_request:
+    branches: [main]
+    paths: ['HMI_NX/**', '.github/workflows/hmi-nx-tests.yml', 'scripts/build_static_site.sh']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hmi-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check JavaScript and run unit tests
+        run: |
+          for source in HMI_NX/*.js HMI_NX/server/*.cjs; do node --check "$source"; done
+          node --test HMI_NX/tests/*.test.cjs
+      - name: Archive reviewed sources
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HMI_NX_source
+          path: |
+            HMI_NX/
+            scripts/build_static_site.sh
+            .github/workflows/hmi-nx-tests.yml
+          include-hidden-files: true
+          retention-days: 14
