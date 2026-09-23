@@ -1,109 +1,87 @@
-# HMI NX Designer — preview técnica 0.1
+# HMI NX Designer 0.2 — ampliación de ingeniería
 
-Editor visual web independiente dentro de `induradarweb/HMI_NX`. No cambia el portal, los informes ni la base de datos de InduRadar. No depende de React, CDN, herramientas de compilación ni librerías gráficas externas: DOM/CSS/JavaScript nativos, mismo renderer en preview y exportación.
+Editor web y runtime en `HMI_NX/`, aislados de InduRadar. JavaScript/HTML/CSS nativos, sin CDN ni dependencias de compilación. **Los roles son únicamente de operación de máquina. No hay cuentas ni permisos del editor. Sin multidriver ni gráficos de tendencias.**
 
-## Estado real de esta entrega
+## Estado real: qué se entrega y qué falta
 
-**Implementado:** lienzo drag & drop, mover/redimensionar objetos, zoom, rejilla, deshacer/rehacer, duplicación, orden de capas, pantallas múltiples, textos, rectángulos, botones, lámparas, visualizadores, entradas numéricas/texto/BOOL, barras, imágenes, visibilidad condicional, parpadeo/rotación básica, variables, recetas y alarmas, simulador, persistencia local, importar/exportar proyecto y ZIP para SD.
+El editor ampliado, el runtime, la exportación y un servicio de referencia ejecutable están implementados y probados. **No se incluye un FB HTTP compilado para NX102 ni un driver verificado de WebServer_NJ_NX v3.5.** La integración de transporte, identidad, almacenamiento SD y lógica de control en hardware NX102 sigue pendiente. Copiar el HTML e indicar una IP no conecta esa integración.
 
-**No validado ni incluido:** comunicación con hardware NX102 real; driver del protocolo exacto de `WebServer_NJ_NX` v3.5; FB/ST de servidor; transferencia automática a SD; cuentas/autenticación; proyectos cloud; licencias/pagos; seguridad funcional; alarmas históricas/ACK en PLC; almacenamiento de recetas en SD por el PLC. No se presentan esas piezas como terminadas.
+El runtime exige un servicio que implemente el contrato propio `nx-http-v2`. Bloquea la operación si no coinciden protocolo, proyecto, política y capacidades; no degrada permisos a un simple login de navegador. El banco Node.js incluido solo verifica ese contrato con variables ficticias, sesiones reales y archivos privados. **No es un programa ejecutable en NX ni se impone un gateway adicional para producción.**
 
-La documentación pública de Omron confirma HTML personalizado desde SD y hasta 100 datos BOOL/DINT/REAL/STRING, pero esto **no documenta ni valida** los endpoints de esta implementación. `nx-http-v1` es nuestro contrato propio, no un protocolo oficial de Omron. La descarga del PDF del protocolo no fue accesible durante esta ejecución; no se inventó un driver compatible.
+La ficha de Omron confirma HTML personalizado desde SD, pero no acredita nuestra API ni los servicios añadidos: https://automation-knowledge-base.omron.eu/support/solutions/articles/103000365996-web-server-for-nj-nx-controller . El PDF/SLR adjunto no se pudo recuperar durante esta ejecución. No se ha inventado compatibilidad.
 
-Referencia del fabricante: https://automation-knowledge-base.omron.eu/support/solutions/articles/103000365996-web-server-for-nj-nx-controller
+## Funcionalidad implementada
 
-## Puesta en marcha del editor
+- Pantallas, maestras, pop-ups y faceplates parametrizados con variables tipadas. Una maestra por pantalla y hasta tres pop-ups; sin anidamiento de pop-ups.
+- Textos, figuras, imágenes, botones, entradas numéricas/texto/BOOL y teclado virtual, interruptores, selectores, sliders, barras/niveles, pilotos, usuario, reloj, navegación, alarmas, recetas y operaciones.
+- Símbolos SVG propios: motor, bomba, válvula, cilindro, depósito, sensor y transportador. Reglas de color, visibilidad, posición, giro, tamaño, texto y flujo. SVG importados se rasterizan a PNG, no ejecutan contenido activo.
+- Multiselección, copiar/pegar, duplicar, grupos, alineación, distribución, bloqueo de posición, capas, zoom/rejilla y deshacer/rehacer.
+- Variables Sysmac por CSV, TSV o portapapeles. BOOL/DINT/REAL/STRING, hasta 100 tags; longitud STRING declarada 1–255, acceso, unidades, rangos, frecuencia y tags globales. No se abre `.smc2` ni XLSX; se rechazan tipos no soportados. Los nombres no enlazan por sí solos la memoria del PLC.
+- Un gestor de lecturas agrupa dependencias de pantalla, maestra y pop-ups, filtra elementos según el rol y evita peticiones solapadas. Las escrituras van por una cola prioritaria con identificación y resultado, sin reintentos automáticos de órdenes desconocidas.
+- Usuarios de operación: roles por elemento, condiciones de habilitación, confirmación, sesión/inactividad, permisos separados de recetas y alarmas. Administración de cuentas y cambio de contraseña a través de un servicio compatible. Las claves nunca se guardan en el proyecto.
+- Recetas guardadas/editadas/activas diferenciadas, edición/importación/exportación, duplicación, aplicación por lote con versión y control de conflictos. El servicio independiente decide los campos permitidos y valida/aplica todo el lote.
+- Alarmas con códigos, prioridades, histéresis, retardos y apariciones identificadas. Banner, filtros, recuperación por cursor/instantánea y retención. ACK, silencio y reset son acciones diferentes. No se detectan exclusivamente en una pantalla ni se borran por perder comunicación.
+- Registro de operaciones HMI con identidad, antes/solicitud/resultado y fecha. CSV y XLSX de alarmas y operaciones retenidas; Excel usa valores literales, no fórmulas introducidas por textos. No es auditoría de cambios realizados desde Sysmac ni certificación regulatoria.
+- Dos exportaciones: HTML único autocontenido o runtime común y pantallas/imágenes bajo demanda, con carpeta versionada y verificación SHA-256 de vistas. Ambas conservan lecturas selectivas.
 
-El build existente de InduRadar copia estos archivos a `/HMI_NX/`. No se instala un backend ni se cambia la base de datos.
+Los históricos de producción periódicos y su muestreador no se añaden en esta fase; no hay tendencias. El servicio reserva un campo de producción para una futura integración, sin presentarlo como función completada.
 
-Para servir localmente desde la raíz del repositorio:
+## Uso
+
+La publicación existente copia solo los archivos estáticos a `/HMI_NX/`. Para servir el editor en local desde la raíz del repositorio:
 
 ```bash
 python -m http.server 8080
-# Abrir http://localhost:8080/HMI_NX/
+# http://localhost:8080/HMI_NX/
 ```
 
-Usar HTTP(S), no abrir `index.html` con doble clic: el exportador necesita leer sus fuentes para empaquetarlas. Empieza con la demo o `Nuevo → Proyecto vacío`. Los diseños se guardan en IndexedDB y se descargan como `.nxhmi`. Este archivo incluye las imágenes. No se envían diseños a GitHub. Descarga copias: borrar datos del navegador borra su almacenamiento local.
+Abrir sobre HTTP(S), no `file://`, porque el exportador carga sus fuentes locales para empaquetarlas. Empieza con la demo; pulsa **Simular → Identificarse**, elige un rol y habilita escrituras. Observador no tiene permiso para los controles de operación predeterminados. La elección de rol simulada no es autenticación de producción. El panel de inyección de valores es una fuente ficticia, no un comando de operador.
 
-## Variables Sysmac
+En el diseñador se configuran roles, no contraseñas. Las cuentas reales pertenecen al servicio de máquina y a su política instalada. Modificar el proyecto/HTML no modifica esa política. El permiso `manageUsers` administra usuarios de la máquina, nunca el acceso a proyectos.
 
-`Variables → Importar CSV / pegar`: CSV, TSV o filas copiadas de la tabla de variables. Encabezados admitidos: `Name`/`Nombre`, `Data Type`/`Tipo de datos`, `Comment`/`Comentario`. Se acepta `STRING[n]` como STRING en el editor; verificar la longitud real del búfer PLC durante el mapeo. Las importaciones empiezan en solo lectura.
+Guarda `.nxhmi` como copia. IndexedDB mantiene proyectos en este dispositivo; el navegador puede borrar ese almacenamiento. La migración de v1 conserva un registro separado del original; si IndexedDB no está disponible, intenta descargar la copia original antes de migrar. No hay sincronización cloud.
 
-Solo BOOL, DINT, REAL y STRING, hasta 100 variables en V1. Se rechazan duplicados y tipos no soportados sin importar parcialmente. INT, UINT, arrays o estructuras necesitan variables puente explícitas o un futuro adaptador. No se interpreta `.smc2` ni XLSX. Importar nombres **no vincula automáticamente** la memoria del PLC.
-
-## Exportación
-
-`Exportar SD` valida referencias, tipos, rangos, permisos, geometría y recursos. Produce:
+## Exportación y actualización de SD
 
 ```text
-SD/index.html                   Runtime autocontenido
-project.nxhmi                   Fuente editable del proyecto
-Sysmac/variables.csv            Tabla de mapeo orientativa, NO programa ST
-Sysmac/transport-contract.json  Contrato HTTP propio
-LEEME.txt                       Límites y validación necesaria
+SD/index.html
+SD/builds/<buildId>/runtime.js       Solo modo split
+SD/builds/<buildId>/style.css
+SD/builds/<buildId>/views/*.json
+SD/builds/<buildId>/assets/*
+Engineering/operation-policy.json   Propuesta para instalación autorizada, NO directorio web
+Engineering/transport-contract.json
+Engineering/manifest.json
+Sysmac/variables.csv                Tabla orientativa, NO programa ST
+project.nxhmi
+LEEME.txt
 ```
 
-Se exportan los recursos gráficos embebidos; no hay llamadas a CDN. SVG se rasteriza a PNG al importar para excluir contenido activo. Límite de entrada 4 MB por imagen, dimensión rasterizada máxima 2048 px, 12 MB de recursos por proyecto. No incluye un servidor de ficheros en el PLC.
+En split se descargan pantalla activa y maestra; las otras vistas e imágenes se solicitan al utilizarlas. Caché de vistas limitada a ocho, salvo activas. Se sube primero la carpeta de build y se sustituye `index.html` al final. Mantener el build anterior para sesiones abiertas/rollback. No sobrescribir recetas, credenciales o registros operativos al actualizar recursos gráficos.
 
-El perfil de simulación permanece simulación en el exportado. El perfil NX HTTP v1 intentará el contrato siguiente, **solo después de que exista el adaptador**. Con `mismo origen` activado utiliza el origen que sirve la HMI; en la prueba del editor usa la IP configurada.
+La huella verifica consistencia, no sustituye HTTPS ni una firma/autorización de despliegue. Engineering y los archivos privados del servidor jamás deben publicarse en Pages ni dentro de la carpeta SD web.
 
-## Contrato NX HTTP v1 (adaptador pendiente)
+## Sesiones y seguridad operacional
 
-Lectura agrupada, una petición no solapada por ciclo:
+El servicio instalado valida identidad, roles, elemento, destino, valor, condición y revisión; no acepta un rol o política nuevos porque los envíe el navegador. Los pulsos de máquina deben resolverse en tareas PLC; el banco solo los modela. No hay jog mantenido, emergencia ni seguridad funcional.
 
-```http
-POST /api/hmi/read
-Content-Type: application/json
+Las escrituras se desarman al cerrar sesión, caducar, perder conexión o no conocer el resultado. La pantalla muestra estados leídos, no un eco optimista de una orden. Se puede consultar el resultado pendiente; nunca se reenvía automáticamente. Un resultado perdido por la retención se informa como desconocido y exige comprobar el equipo.
 
-{"names":["Machine.Running","Process.Setpoint"]}
-```
+Credenciales reales requieren HTTPS, excepto el banco loopback local. La SD servida mediante HTTP no aporta cifrado. No expongas el PLC a Internet ni desactives restricciones del navegador. Antes de producción hay que resolver y validar la protección del transporte y los servicios NX.
 
-Respuesta:
+El servicio de referencia guarda contraseñas con scrypt, identidades fuera del directorio público, registros acotados y archivos mediante escritura temporal/sincronización/renombrado. No convierte un registro local en auditoría inmutable o conforme a una normativa. Ver `server/README.md` y `plc/INTEGRATION.md`.
 
-```json
-{"values":{"Machine.Running":true,"Process.Setpoint":55}}
-```
-
-Escritura, sin reintentos automáticos:
-
-```http
-POST /api/hmi/write
-Content-Type: application/json
-
-{"commandId":"session:sequence","atomic":true,"values":{"Process.Setpoint":60}}
-```
-
-Confirmación estricta:
-
-```json
-{"commandId":"session:sequence","accepted":true,"applied":true}
-```
-
-El servidor debe aplicar la lista blanca, tipos/rangos, permisos, autenticación/CSRF apropiados, idempotencia por `commandId`, y atomicidad real del lote. Un conjunto inválido se rechaza completo. HTTP 200 no confirma por sí solo una escritura. Confirmar un parámetro tampoco significa que la máquina haya ejecutado la acción física.
-
-El runtime arranca desarmado. Además del permiso de proyecto hay que habilitar la escritura cada sesión. Datos ausentes, error de comunicación o datos no vigentes bloquean escrituras; no se sustituye el fallo por valores simulados. Un timeout de escritura significa resultado desconocido: verificar el PLC, no reenviar automáticamente. El estado visual se actualiza por lectura, no por eco optimista de la orden.
-
-El periodo mínimo configurable de 100 ms es un objetivo de polling, **no una garantía ni un benchmark del NX**. Medir carga, latencias, pérdida de red y concurrencia con hardware real. No usar el navegador para parada de emergencia, jog mantenido o control determinista. No exponer HTTP del PLC a Internet. El editor HTTPS puede bloquear acceso a NX HTTP; ejecutar desde el propio NX o usar un puente HTTPS autorizado. No desactivar protecciones del navegador.
-
-## Recetas y alarmas
-
-Recetas: conjuntos de valores RW tipados. En simulación se aplican juntos; en real el adaptador debe aplicar o rechazar todo el lote. No se guardan automáticamente recetas desde el PLC en la SD.
-
-Alarmas: condiciones BOOL/umbrales evaluadas con cada lectura completa, incluso fuera de la pantalla de alarmas. Al perder datos no se declaran resueltas. Histórico de hasta 200 eventos y reconocimiento **locales a la sesión del navegador**; no es el ACK del PLC y no se conserva tras recargar.
-
-## Pruebas
+## Pruebas reproducibles
 
 ```bash
-node --test HMI_NX/tests/core.test.cjs
-# Opcionales: requieren Python Playwright y Chromium local
-CHROMIUM_PATH=/usr/bin/chromium python HMI_NX/tests/browser_smoke.py
-CHROMIUM_PATH=/usr/bin/chromium python HMI_NX/tests/transport_browser.py
+node --test HMI_NX/tests/*.test.cjs
+# Chromium + Python Playwright instalados; fixtures sin navegación de origen:
+HMI_TEST_PHASE=runtime python HMI_NX/tests/browser_smoke.py
+HMI_TEST_PHASE=editor  python HMI_NX/tests/browser_smoke.py
+HMI_TEST_PHASE=export  python HMI_NX/tests/browser_smoke.py
+python HMI_NX/tests/transport_browser.py
 ```
 
-Ejecutadas durante esta entrega: 11 pruebas unitarias; prueba de navegador offline del diseñador, edición, importación, simulador, escritura, recetas, alarmas, navegación, ZIP y HTML exportado; prueba de transporte con respuestas HTTP simuladas (sin solapamiento, permisos, rangos, ACK, pérdida de red, ausencia de variables, desarmado y no reintento).
+La suite Node prueba modelo/migración, autorización independiente, recetas atómicas, versiones y concurrencia, sesiones, alarmas, fallos de persistencia, exportación y un servidor HTTP real en loopback. Las pruebas de navegador ejercitan DOM, simulación y exportados con `fetch` controlado.
 
-El navegador del entorno no permite navegar a orígenes, por lo que las pruebas DOM cargan fuentes en memoria y sustituyen `fetch` con fixtures. **No se ha validado la persistencia IndexedDB tras una recarga real de origen, ni acceso de red del navegador al PLC.** Las pruebas no desactivan la política del navegador. Estas limitaciones no deben confundirse con pruebas de campo superadas.
-
-## Siguientes piezas técnicas
-
-Antes de vender o utilizar para operar maquinaria: validar transporte y FB real, integrar mapeo de Sysmac, medir rendimiento y límites de SD, completar pruebas de hardware/fallos, definir modelo de comandos/autorizaciones, y añadir cuentas/aislamiento cloud y licencias con controles de servidor. Un login dibujado en una web estática no proporciona esa protección.
+**Límite del entorno:** Chromium bloquea navegación a orígenes con `ERR_BLOCKED_BY_ADMINISTRATOR`. No se desactivó esa política. Por ello no está comprobada la persistencia IndexedDB después de recargar un origen real, ni la red LAN desde el navegador. Las pruebas Node loopback no prueban Ethernet/SD/NX102. Véase `tests/RESULTS.json` para la ejecución de esta entrega.

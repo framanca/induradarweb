@@ -1,0 +1,41 @@
+{
+  "version": "0.2.0",
+  "date": "2026-09-23",
+  "node": {
+    "passed": 37,
+    "failed": 0,
+    "includes": "real loopback reference HTTP server with provisioned temporary credentials"
+  },
+  "browser": {
+    "runtime": "PASS",
+    "editor": "PASS",
+    "single_and_split_export": "PASS",
+    "http_transport_fixtures": "PASS",
+    "javascript_errors": []
+  },
+  "verified": [
+    "v1 migration",
+    "typed Sysmac tags and STRING limits",
+    "role-aware dependencies",
+    "server-side operation authorization",
+    "revision conflicts and command idempotency",
+    "atomic recipes with scoped fields",
+    "alarm occurrences, hysteresis, delays, central ACK and event gaps",
+    "idle expiration independent of polling",
+    "storage rollback",
+    "private file isolation and credential authentication",
+    "single/split deterministic packages",
+    "literal XLSX and CSV formula-injection protection",
+    "faceplates, operation roles and recipe UI",
+    "timeout rejection and lost-ACK result recovery"
+  ],
+  "not_verified": [
+    "NX102 hardware",
+    "WebServer_NJ_NX v3.5 protocol/driver",
+    "compiled PLC server FB",
+    "actual SD transfer/latency",
+    "browser LAN requests",
+    "IndexedDB persistence across real-origin reload"
+  ],
+  "browser_environment": "Origin navigation blocked by ERR_BLOCKED_BY_ADMINISTRATOR; no browser policy was disabled; offline DOM and controlled fetch fixtures used."
+}
