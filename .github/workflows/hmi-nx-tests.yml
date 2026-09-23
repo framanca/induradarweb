@@ -2,7 +2,7 @@ name: HMI NX validation
 
 on:
   push:
-    branches: [main, feature/hmi-nx-v2-operations-20260923]
+    branches: [main, feature/hmi-nx-v2-operations-20260923, test/hmi-nx-v2-acceptance-20260923]
     paths: ['HMI_NX/**', '.github/workflows/hmi-nx-tests.yml', 'scripts/build_static_site.sh']
   pull_request:
     branches: [main]
@@ -21,17 +21,36 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Check JavaScript and run unit tests
+      - name: Check JavaScript and run unit and HTTP tests
         run: |
           for source in HMI_NX/*.js HMI_NX/server/*.cjs; do node --check "$source"; done
           node --test HMI_NX/tests/*.test.cjs
-      - name: Archive reviewed sources
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install browser test dependency
+        run: |
+          python -m pip install playwright==1.57.0
+          python -m playwright install --with-deps chromium
+      - name: Browser acceptance on an actual local HTTP origin
+        run: |
+          python -m http.server 8765 --bind 127.0.0.1 > /tmp/hmi-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" || true' EXIT
+          for attempt in $(seq 1 20); do
+            curl -fsS http://127.0.0.1:8765/HMI_NX/ > /dev/null && break || sleep 1
+          done
+          HMI_BROWSER_ORIGIN=http://127.0.0.1:8765/HMI_NX/ \
+          HMI_TEST_OUTPUT=HMI_NX_TEST_RESULTS \
+          python -u HMI_NX/tests/acceptance_browser.py
+      - name: Archive reviewed sources and acceptance evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: HMI_NX_source
+          name: HMI_NX_source_and_tests
           path: |
             HMI_NX/
+            HMI_NX_TEST_RESULTS/
             scripts/build_static_site.sh
             .github/workflows/hmi-nx-tests.yml
           include-hidden-files: true
