@@ -187,7 +187,7 @@
     const u16=(v,n,p)=>v.setUint16(p,n,true),u32=(v,n,p)=>v.setUint32(p,n>>>0,true);
     const crc=b=>{let c=0xffffffff;for(const x of b){c^=x;for(let k=0;k<8;k++)c=(c>>>1)^(c&1?0xedb88320:0);}return(c^0xffffffff)>>>0;};
     for(const [name,content] of Object.entries(files)){
-      const n=enc.encode(name),b=enc.encode(content),sum=crc(b),h=new Uint8Array(30+n.length),v=new DataView(h.buffer);
+      const n=enc.encode(name),b=content instanceof Uint8Array?content:enc.encode(content),sum=crc(b),h=new Uint8Array(30+n.length),v=new DataView(h.buffer);
       u32(v,0x04034b50,0);u16(v,20,4);u16(v,0x800,6);u16(v,33,12);u32(v,sum,14);u32(v,b.length,18);u32(v,b.length,22);u16(v,n.length,26);h.set(n,30);parts.push(h,b);
       const ch=new Uint8Array(46+n.length),cv=new DataView(ch.buffer);u32(cv,0x02014b50,0);u16(cv,20,4);u16(cv,20,6);u16(cv,0x800,8);u16(cv,33,14);u32(cv,sum,16);u32(cv,b.length,20);u32(cv,b.length,24);u16(cv,n.length,28);u32(cv,offset,42);ch.set(n,46);central.push(ch);offset+=h.length+b.length;
     }

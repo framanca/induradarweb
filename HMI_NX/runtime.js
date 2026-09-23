@@ -1,153 +1,164 @@
-/* Shared renderer and runtime. nx-http-v1 is a CUSTOM adapter contract, not an Omron driver. */
+/* HMI NX 0.2 runtime: view subscriptions, operation sessions, central events and recipes.
+ * No browser-side permission is used as the authority for a real machine command.
+ */
 (function(root){
-  'use strict';
-  const C=root.NXCore;
-  const el=(tag,cls,text)=>{const x=document.createElement(tag);if(cls)x.className=cls;if(text!==undefined)x.textContent=text;return x;};
-  const initial=p=>Object.fromEntries(p.variables.map(v=>[v.name,C.typed(v,v.initial)]));
-  function widget(o,p){
-    const n=el('div',`nx-object nx-${o.kind}`);n.dataset.id=o.id;
-    Object.assign(n.style,{left:o.x+'px',top:o.y+'px',width:o.w+'px',height:o.h+'px',color:o.color,background:o.background,fontSize:o.fontSize+'px'});
-    const label=()=>n.append(el('div','nx-label',o.text));
-    if(o.kind==='text'||o.kind==='rectangle'){n.append(el('span','nx-copy',o.text));}
-    if(o.kind==='image'){
-      const a=p.assets.find(a=>a.id===o.assetId);if(a){const img=el('img');img.src=a.data;img.alt=o.text;img.draggable=false;n.append(img);}else n.append(el('span','nx-copy','＋ Imagen'));
-    }
-    if(o.kind==='lamp'){label();n.append(el('span','nx-lamp-dot'));}
-    if(o.kind==='value'){label();n.append(el('strong','nx-number','—'));}
-    if(o.kind==='bar'){label();const track=el('div','nx-track');track.append(el('div','nx-fill'));n.append(track,el('span','nx-number','—'));}
-    if(o.kind==='button'){const b=el('button','nx-action',o.text);b.type='button';b.style.background=o.background;b.style.color=o.color;n.append(b);}
-    if(o.kind==='input'){
-      label();const wrap=el('div','nx-input-line'),v=p.variables.find(v=>v.name===o.binding);let input;
-      if(v?.type==='BOOL'){input=el('select','nx-entry');for(const [value,text] of [['false','FALSE'],['true','TRUE']]){const a=el('option','',text);a.value=value;input.append(a);}}
-      else {input=el('input','nx-entry');input.type=v?.type==='STRING'?'text':'number';input.step=v?.type==='DINT'?'1':'any';input.maxLength=255;}
-      input.setAttribute('aria-label',o.text||o.binding);wrap.append(input,el('button','nx-apply','Aplicar'));n.append(wrap,el('small','nx-readback','Leído: —'));
-    }
-    if(o.kind==='alarms'){label();n.append(el('div','nx-alarm-rows'));}
-    if(o.kind==='recipes'){label();n.append(el('div','nx-recipe-body'));}
-    return n;
+'use strict';const C=root.NXCore,W=root.NXWidgets,D=root.NXData,{el}=W;
+class Runtime{
+ constructor(project,container,options={}){
+  this.p=C.copy(project);this.container=container;this.sim=options.simulate??project.connection.profile==='simulation';this.notify=options.onStatus||(()=>{});
+  this.transport=options.transport||(this.sim?new NXTransport.SimTransport(this.p,options.service):new NXTransport.HttpTransport(this.p));
+  this.policyDigest=this.p._deployment?.policyDigest||C.policyDigest(this.p);this.values={};this.samples={};this.dues={};this.revision=0;this.nodes=[];this.opened=[];this.alarmRows=[];this.auditRows=[];this.productionRows=[];this.recipes=[];this.cursor={epoch:'',after:0,limit:200};this.dropped=0;
+  this.good=false;this.armed=false;this.busy=false;this.stopped=false;this.loadingView=false;this.ready=false;this.session=null;this.sessionDeadline=0;this.authGeneration=0;this.lastTouch=0;this.lastUserActivity=0;this.lastRead=0;this.lastService=0;this.lastEventPoll=0;this.lastRecipePoll=0;this.sequence=0;this.boot=C.id();this.commandMessage='';this.message=this.sim?'SIMULACIÓN · identificarse para operar':'Comprobando servicio NX HTTP v2';this.unconfirmed=null;this.currentScreen=this.p.screens[0].id;this.viewGeneration=0;this.loaded=new Map();this.loading=new Map();this.files=new Set();this.dialogs=new Set();this.readStats={count:0,lastNames:[],roundtrip:0};
+  this.root=el('div','nx-runtime');this.header=el('header','nx-runtime-header');this.header.append(el('strong','',this.p.name));this.status=el('span','nx-status');this.identity=el('span','nx-session-name','Sin identificar');this.loginButton=el('button','nx-session-login','Identificarse');this.logoutButton=el('button','nx-session-logout','Salir');this.arm=el('button','nx-arm','Habilitar escritura');this.resolveButton=el('button','nx-resolve-command','Consultar orden pendiente');this.resolveButton.hidden=true;this.usersButton=el('button','nx-manage-users','Usuarios de máquina');
+  this.loginButton.onclick=()=>this.loginDialog();this.logoutButton.onclick=()=>this.logout();this.arm.onclick=()=>{if(this.canArm()){this.armed=!this.armed;this.paint();}else this.info('Identifíquese y compruebe conexión, permisos y orden pendiente.');};this.resolveButton.onclick=()=>this.resolveCommand();this.usersButton.onclick=()=>this.usersDialog();
+  this.header.append(this.status,this.identity,this.loginButton,this.logoutButton,this.arm,this.resolveButton,this.usersButton);this.globalBanner=el('div','nx-global-banner');this.nav=el('nav','nx-nav');this.viewport=el('div','nx-runtime-viewport');this.stage=el('div','nx-stage');this.viewport.append(this.stage);this.root.append(this.header,this.globalBanner,this.nav,this.viewport);container.replaceChildren(this.root);
+  this.resize=new ResizeObserver(()=>this.fit());this.resize.observe(this.viewport);
+  this.visibility=()=>{if(document.hidden){this.armed=false;this.good=false;this.samples={};this.paint();}else{this.dues={};this.lastEventPoll=0;}};document.addEventListener('visibilitychange',this.visibility);
+  this.human=event=>{if(event.isTrusted){this.lastUserActivity=performance.now();this.touchSession();}};for(const type of ['pointerdown','keydown'])this.root.addEventListener(type,this.human);
+  this.paintTimer=setInterval(()=>{if(this.stopped)return;if(this.session&&performance.now()>=this.sessionDeadline){this.clearSession('Sesión caducada');this.transport.logout().catch(()=>{});}this.paint();},150);
+  this.start();
+ }
+ async start(){try{const cap=await this.transport.capabilities();if(this.stopped)return;
+  if(cap.protocol!=='nx-http-v2'||cap.policyDigest!==this.policyDigest||cap.projectId!==this.p.id)throw new Error('Servidor o política incompatibles. Instale la política del proyecto en el equipo.');
+  const required=['groupedReads','operationPolicy','sessions','atomicRecipes','eventCursor','commandResults'];if(this.p._deployment?.mode==='split')required.push('assetFiles');if(required.some(x=>!cap.features?.includes(x)))throw new Error('El servidor no acredita todas las capacidades requeridas. Operación bloqueada.');
+  this.capabilities=cap;this.ready=true;this.deviceLabel=this.sim?'SIMULACIÓN':cap.deviceMode==='reference-bench'?'BANCO DE PRUEBAS · NO PLC':'NX HTTP v2 · hardware no verificado desde el editor';
+  await this.show(this.currentScreen,true);this.poll();
+ }catch(e){if(!this.stopped){this.message=e.message;this.good=false;this.armed=false;this.paint();}}}
+ async loadView(view){
+  if(!view?.path||Array.isArray(view.objects))return view;
+  if(this.loading.has(view.id))return this.loading.get(view.id);
+  const job=(async()=>{const ctrl=new AbortController();this.files.add(ctrl);try{const r=await fetch(view.path,{cache:'force-cache',signal:ctrl.signal,credentials:'same-origin'});if(!r.ok)throw new Error('No se pudo cargar '+view.name);const text=await r.text();if(text.length>4*1024*1024||C.digest(text)!==view.hash)throw new Error('Pantalla corrupta o de otra versión: '+view.name);const payload=JSON.parse(text);if(payload.buildId!==this.p._deployment.buildId||payload.view.id!==view.id)throw new Error('Versión de pantalla no compatible');if(this.stopped)return null;Object.assign(view,payload.view);this.loaded.set(view.id,Date.now());return view;}finally{this.files.delete(ctrl);this.loading.delete(view.id);}})();this.loading.set(view.id,job);return job;
+ }
+ evict(){if(this.loaded.size<=8)return;const keep=new Set([this.currentScreen,...this.opened.map(x=>x.id),...this.p.screens.filter(s=>s.id===this.currentScreen).map(s=>s.masterId)]);for(const [id]of [...this.loaded].sort((a,b)=>a[1]-b[1])){if(this.loaded.size<=8)break;if(keep.has(id))continue;const v=C.findView(this.p,id);if(v?.path){delete v.objects;this.loaded.delete(id);}}}
+ async show(id,initial=false){
+  const view=this.p.screens.find(s=>s.id===id);if(!view)return;if(!initial&&!this.confirmLeave())return;
+  const generation=++this.viewGeneration;this.loadingView=true;this.paint();
+  try{await this.loadView(view);const master=this.p.masters.find(m=>m.id===view.masterId);if(master)await this.loadView(master);if(this.stopped||generation!==this.viewGeneration)return;
+   this.closeAllPopups();this.currentScreen=id;this.nav.replaceChildren();for(const s of this.p.screens){const b=el('button',s.id===id?'active':'',s.name);b.onclick=()=>this.show(s.id);this.nav.append(b);}
+   this.stage.replaceChildren();Object.assign(this.stage.style,{width:this.p.width+'px',height:this.p.height+'px',background:view.background});this.nodes=[];this.appendObjects(this.stage,C.objectsFor(this.p,view),false);this.dues={};this.evict();this.fit();
+  }catch(e){this.message=e.message;}finally{this.loadingView=false;this.paint();}
+ }
+ fit(){const scale=Math.min(1,(this.viewport.clientWidth||this.p.width)/this.p.width);this.stage.style.transform=`scale(${scale})`;this.viewport.style.height=this.p.height*scale+'px';}
+ confirmLeave(){if(this.root.querySelector('[data-dirty="1"]')&&!window.confirm('Hay valores editados sin aplicar. ¿Descartarlos al cambiar de pantalla?'))return false;return true;}
+ appendObjects(host,objects,popup){for(const o of objects){const n=W.widget(o,this.p);host.append(n);this.nodes.push({n,o,popup});this.bindWidget(n,o);}}
+ async openPopup(opener){const view=this.p.popups.find(v=>v.id===opener.targetScreen);if(!view)return;if(this.opened.length>=3){this.info('Cierre una ventana antes de abrir otra (máximo 3).');return;}
+  try{await this.loadView(view);if(this.stopped)return;const wrapper=el('div','nx-popup'),head=el('header','nx-popup-header'),close=el('button','','✕'),body=el('div','nx-popup-stage');head.append(el('strong','',view.name),close);wrapper.append(head,body);wrapper.setAttribute('role','dialog');wrapper.setAttribute('aria-label',view.name);wrapper.style.width=Math.min(view.width+24,this.viewport.clientWidth-20)+'px';Object.assign(body.style,{width:view.width+'px',height:view.height+'px',background:view.background});const entry={id:view.id,bindings:opener.popupBindings,context:opener.id,wrapper};this.opened.push(entry);this.viewport.append(wrapper);const scale=Math.min(1,(wrapper.clientWidth-16)/view.width);body.style.transform=`scale(${scale})`;body.style.transformOrigin='top left';wrapper.style.height=(view.height*scale+58)+'px';close.onclick=()=>this.closePopup(entry);this.appendObjects(body,C.objectsFor(this.p,view,entry.bindings,entry.context),entry);this.dues={};this.paint();close.focus();
+  }catch(e){this.info(e.message);}
+ }
+ closePopup(entry){if(entry.wrapper.querySelector('[data-dirty="1"]')&&!window.confirm('¿Descartar la edición de esta ventana?'))return;entry.wrapper.remove();this.nodes=this.nodes.filter(x=>x.popup!==entry);this.opened=this.opened.filter(x=>x!==entry);this.dues={};}
+ closeAllPopups(){for(const entry of this.opened)entry.wrapper.remove();this.opened=[];this.nodes=this.nodes.filter(x=>!x.popup);}
+ quality(name){const sample=this.samples[name],v=this.p.variables.find(v=>v.name===name);return !!sample&&sample.good&&Date.now()-sample.time<=Math.max(1500,(v?.rateMs||250)*3);}
+ canArm(){return this.ready&&this.good&&!!this.session&&performance.now()<this.sessionDeadline&&!this.unconfirmed&&!this.loadingView&&(this.sim||this.p.connection.allowWrites);}
+ canOperate(o){return this.canArm()&&this.armed&&!this.busy&&C.roleAllowed(o.readRoles,this.session?.role)&&C.roleAllowed(o.operateRoles,this.session?.role)&&(!o.enabledBinding||this.quality(o.enabledBinding)&&this.values[o.enabledBinding]===true)&&(!o.binding||this.quality(o.binding));}
+ paint(){
+  if(this.stopped)return;if(!this.sim&&(document.hidden||Date.now()-this.lastService>Math.max(2000,this.p.connection.timeoutMs+500))){this.good=false;this.armed=false;}
+  const quality=Object.fromEntries(this.p.variables.map(v=>[v.name,this.quality(v.name)]));
+  for(const {n,o}of this.nodes){W.refresh(n,o,this.p,this.values,quality,false,this.session?.user||this.session);const readable=C.roleAllowed(o.readRoles,this.session?.role);
+   if(!readable)n.style.visibility='hidden';const can=this.canOperate(o);if(!can&&o.deniedMode==='hide'&&['button','input','switch','slider','selector'].includes(o.kind))n.style.visibility='hidden';
+   for(const input of n.querySelectorAll('button,input,select')){
+    if(input.classList.contains('nx-alarm-action')||input.closest('.nx-record-filters')||input.classList.contains('nx-record-search')||input.className.startsWith('nx-export-')||input.classList.contains('nx-record-period')||input.classList.contains('nx-login'))continue;
+    if(o.kind==='navigation')continue;
+    if(o.kind==='button'&&['navigate','popup','closePopup','login','logout'].includes(o.action)){input.disabled=!readable;continue;}
+    if(o.kind==='recipes'&&input.classList.contains('nx-recipe-select'))continue;
+    input.disabled=!can;
+   }
+   if(o.kind==='alarms'||o.kind==='banner')this.paintAlarms(n,o);
+   if(o.kind==='audit')this.paintAudit(n,o);
+   if(o.kind==='recipes')this.paintRecipeState(n,o);
   }
-  function refreshWidget(n,o,p,values,good,editing=false){
-    const has=Object.hasOwn(values,o.binding),v=values[o.binding];
-    n.classList.toggle('nx-stale',!!o.binding&&!good);
-    if(!editing)n.style.visibility=o.visibleBinding&&values[o.visibleBinding]!==true?'hidden':'visible';
-    if(!editing){n.classList.toggle('nx-blink',o.animation==='blink'&&good&&!!v);n.classList.toggle('nx-rotate',o.animation==='rotate'&&good&&!!v);}
-    const digits=Math.max(0,Math.min(6,Number(o.digits)||0));
-    const txt=!has?'—':typeof v==='number'?v.toFixed(digits)+(o.unit?' '+o.unit:''):String(v);
-    if(o.kind==='value'||o.kind==='bar')n.querySelector('.nx-number').textContent=txt;
-    if(o.kind==='lamp')n.querySelector('.nx-lamp-dot').style.background=has&&good?(v?o.onColor:o.offColor):'#778394';
-    if(o.kind==='bar')n.querySelector('.nx-fill').style.width=Math.max(0,Math.min(100,100*(Number(v)-o.min)/(o.max-o.min)))+'%';
-    if(o.kind==='input'){
-      const input=n.querySelector('.nx-entry');if(document.activeElement!==input&&input.dataset.dirty!=='1')input.value=has?String(v):'';
-      n.querySelector('.nx-readback').textContent=`Leído: ${txt}${good?'':' · dato no vigente'}`;
-    }
+  const active=this.alarmRows.filter(r=>r.active),unacked=active.filter(r=>!r.ack);this.globalBanner.textContent=active.length?`${active.length} alarmas activas · ${unacked.length} sin reconocer · ${active[0].code}: ${active[0].name}`:this.good?'Sin alarmas activas en el servicio':'Estado de alarmas desconocido';this.globalBanner.classList.toggle('has-alarm',active.length>0);
+  this.status.textContent=[this.message,this.commandMessage].filter(Boolean).join(' · ');this.status.className='nx-status '+(this.sim?'simulation':this.good?'online':'offline');
+  this.identity.textContent=this.session?`${this.session.name} · ${this.session.role}`:'Sin identificar';this.arm.disabled=!this.canArm();this.arm.textContent=this.armed?'Escrituras habilitadas · desarmar':'Habilitar escritura';this.logoutButton.hidden=!this.session;this.usersButton.hidden=this.sim||!this.p.security.roles.some(r=>r.id===this.session?.role&&r.manageUsers);this.resolveButton.hidden=!this.unconfirmed;
+  this.notify({simulation:this.sim,good:this.good,values:{...this.values},user:this.session,stats:this.readStats,message:this.status.textContent});
+ }
+ async poll(){if(this.stopped)return;const started=Date.now(),auth=this.authGeneration;try{
+  if(!document.hidden){
+   const now=Date.now(),deps=C.dependencies(this.p,this.currentScreen,this.opened,this.session?.role||null),due=deps.filter(v=>now>=(this.dues[v.name]||0));
+   if(due.length){const names=due.map(v=>v.name),t=Date.now(),data=await this.transport.read(names);if(this.stopped||auth!==this.authGeneration)return this.schedulePoll();
+    if(data.policyDigest!==this.policyDigest||data.sourceGood!==true||!data.values||typeof data.values!=='object')throw new Error('Datos no válidos o política incompatible');
+    const parsed={};for(const v of due){if(!Object.hasOwn(data.values,v.name)||data.quality?.[v.name]!=='good')throw new Error('Dato ausente/no válido: '+v.name);parsed[v.name]=C.typed({...v,min:'',max:''},data.values[v.name]);}
+    for(const v of due){this.values[v.name]=parsed[v.name];this.samples[v.name]={time:Date.now(),good:true};this.dues[v.name]=t+Math.max(v.rateMs,this.p.connection.pollMs);}
+    this.revision=data.revision;this.lastRead=Date.now();this.readStats={count:this.readStats.count+1,lastNames:names,roundtrip:Date.now()-t};
+   }
+   if(now-this.lastEventPoll>=this.p.connection.eventsMs){const events=await this.transport.events(this.cursor);if(this.stopped||auth!==this.authGeneration)return this.schedulePoll();this.applyEvents(events);this.lastEventPoll=events.more?0:Date.now();}
+   if(now-this.lastRecipePoll>=2000){const data=await this.transport.recipes();if(this.stopped||auth!==this.authGeneration)return this.schedulePoll();this.recipes=data.recipes;this.activeRecipe=data.activeRecipe;this.revision=data.revision;this.lastRecipePoll=Date.now();}
+   this.good=true;this.lastService=Date.now();this.message=`${this.deviceLabel} · ${this.readStats.lastNames.length} tags / ${this.readStats.roundtrip} ms${this.dropped?' · histórico con registros descartados':''}`;
   }
-  class Runtime{
-    constructor(p,container,options={}){
-      this.p=C.copy(p);this.container=container;this.sim=options.simulate??p.connection.profile==='simulation';this.notify=options.onStatus||(()=>{});this.values=this.sim?initial(p):{};
-      this.good=this.sim;this.commandMessage='';this.stopped=false;this.armed=false;this.busy=false;this.lastRead=0;this.roundtrip=0;this.sequence=0;this.session=C.id();this.events=[];this.alarmStates=new Map();this.currentScreen=p.screens[0].id;this.controllers=new Set();this.generation=0;
-      this.root=el('div','nx-runtime');this.header=el('header','nx-runtime-header');this.title=el('strong','',p.name);this.status=el('span','nx-status');this.nav=el('nav','nx-nav');
-      this.arm=el('button','nx-arm','Habilitar escritura');this.arm.hidden=this.sim;this.arm.onclick=()=>{if(!this.p.connection.allowWrites){this.message='Active permiso de escritura en la configuración del proyecto.';this.paintStatus();return;}this.armed=!this.armed;this.commandMessage='';this.paintStatus();};
-      this.header.append(this.title,this.status,this.arm);this.viewport=el('div','nx-runtime-viewport');this.stage=el('div','nx-stage');this.viewport.append(this.stage);this.root.append(this.header,this.nav,this.viewport);container.replaceChildren(this.root);
-      this.resizeObserver=new ResizeObserver(()=>this.fit());this.resizeObserver.observe(this.viewport);this.show(this.currentScreen);
-      this.visibility=()=>{if(document.hidden&&!this.sim){this.good=false;this.armed=false;this.paint();}};document.addEventListener('visibilitychange',this.visibility);
-      if(this.sim){this.message='SIMULACIÓN · sin conexión al PLC';this.timer=setInterval(()=>{this.evaluateAlarms();this.paint();},250);}else this.poll();
-      this.paintStatus();
-    }
-    fit(){const width=this.viewport.clientWidth||this.p.width,scale=Math.min(1,width/this.p.width);this.stage.style.transform=`scale(${scale})`;this.viewport.style.height=(this.p.height*scale)+'px';}
-    show(id){
-      const screen=this.p.screens.find(s=>s.id===id);if(!screen)return;this.currentScreen=id;
-      this.nav.replaceChildren();for(const s of this.p.screens){const b=el('button',s.id===id?'active':'',s.name);b.onclick=()=>this.show(s.id);this.nav.append(b);}
-      this.stage.replaceChildren();Object.assign(this.stage.style,{width:this.p.width+'px',height:this.p.height+'px',background:screen.background});this.nodes=[];
-      for(const o of screen.objects){const n=widget(o,this.p);this.stage.append(n);this.nodes.push([n,o]);
-        if(o.kind==='button')n.querySelector('button').onclick=()=>o.action==='navigate'?this.show(o.targetScreen):this.write({[o.binding]:o.writeValue});
-        if(o.kind==='input'){
-          const entry=n.querySelector('.nx-entry');entry.oninput=()=>{entry.dataset.dirty='1';};
-          n.querySelector('.nx-apply').onclick=async()=>{if(await this.write({[o.binding]:entry.value}))entry.dataset.dirty='';};
-        }
-        if(o.kind==='recipes')this.recipeWidget(n,o);
-      }
-      this.paint();this.fit();
-    }
-    recipeWidget(n){
-      const body=n.querySelector('.nx-recipe-body'),select=el('select');select.setAttribute('aria-label','Receta');
-      for(const r of this.p.recipes){const a=el('option','',r.name);a.value=r.id;select.append(a);}
-      const details=el('div','nx-recipe-values'),apply=el('button','nx-recipe-apply','Aplicar lote de receta');
-      const update=()=>{const r=this.p.recipes.find(r=>r.id===select.value);details.replaceChildren();for(const [key,value] of Object.entries(r?.values||{}))details.append(el('div','',`${key}: ${value}`));};
-      select.onchange=update;apply.onclick=()=>{const r=this.p.recipes.find(r=>r.id===select.value);if(r)this.write(r.values);};
-      body.append(select,details,apply,el('small','',this.sim?'Receta aplicada al simulador.':'Requiere aplicación atómica del lote por el servidor/PLC.'));update();
-    }
-    canWrite(){return this.sim||this.good&&this.armed&&this.p.connection.allowWrites&&!this.busy&&!document.hidden;}
-    paintStatus(){
-      this.status.textContent=(this.message||(this.sim?'SIMULACIÓN':this.good?`Conectado · ${this.roundtrip} ms`:'Sin datos válidos'))+(this.commandMessage?' · '+this.commandMessage:'');
-      this.status.className='nx-status '+(this.sim?'simulation':this.good?'online':'offline');this.arm.textContent=this.armed?'Escritura habilitada · desarmar':'Habilitar escritura';
-      this.notify({simulation:this.sim,good:this.good,message:this.status.textContent,roundtrip:this.roundtrip,values:{...this.values}});
-    }
-    paint(){
-      if(!this.sim&&Date.now()-this.lastRead>Math.max(1500,this.p.connection.pollMs*3)){this.good=false;this.armed=false;}
-      for(const [n,o] of this.nodes||[]){
-        refreshWidget(n,o,this.p,this.values,this.good);
-        for(const b of n.querySelectorAll('button'))if(!(o.kind==='button'&&o.action==='navigate')&&!b.classList.contains('nx-ack'))b.disabled=!this.canWrite()||this.busy;
-        if(o.kind==='alarms')this.paintAlarms(n);
-      }this.paintStatus();
-    }
-    evaluateAlarms(){
-      if(!this.good)return;
-      for(const a of this.p.alarms){const active=C.alarmOn(a,this.values,this.p.variables);if(active===null)continue;const old=this.alarmStates.get(a.id);this.alarmStates.set(a.id,active);
-        if(active===old||(!active&&old===undefined))continue;
-        if(active)this.events.unshift({id:C.id(),alarmId:a.id,name:a.name,severity:a.severity,active:true,ack:false,time:Date.now()});
-        else {const e=this.events.find(e=>e.alarmId===a.id&&e.active);if(e){e.active=false;e.cleared=Date.now();}}
-      }this.events=this.events.slice(0,200);
-    }
-    paintAlarms(n){
-      const body=n.querySelector('.nx-alarm-rows');const key=JSON.stringify(this.events)+this.good;if(body.dataset.key===key)return;body.dataset.key=key;body.replaceChildren();
-      if(!this.good)body.append(el('p','','Comunicación perdida: estado de alarmas desconocido.'));
-      if(!this.events.length)body.append(el('p','','Sin eventos en esta sesión.'));
-      for(const event of this.events){const row=el('div',`nx-alarm-row ${event.severity}`);row.append(el('span','',`${new Date(event.time).toLocaleTimeString()} · ${event.name} · ${event.active?'ACTIVA':'CESADA'}${event.ack?' · reconocida':''}`));
-        if(!event.ack){const ack=el('button','nx-ack','Reconocer');ack.onclick=()=>{event.ack=true;this.paint();};row.append(ack);}body.append(row);
-      }body.append(el('small','','Histórico y reconocimiento locales a esta sesión. No sustituye al registro/ACK del PLC.'));
-    }
-    setSim(name,value){if(!this.sim)return;const v=this.p.variables.find(v=>v.name===name);if(v){this.values[name]=C.typed(v,value);this.evaluateAlarms();this.paint();}}
-    base(){
-      const c=this.p.connection;const url=new URL(c.sameOrigin?location.origin:c.baseUrl);
-      if(!['http:','https:'].includes(url.protocol))throw new Error('Abra la HMI desde un servidor HTTP(S), no como archivo.');
-      if(location.protocol==='https:'&&url.protocol==='http:')throw new Error('HTTPS → HTTP bloqueado. Abra el runtime desde el NX o utilice un puente HTTPS autorizado.');
-      return url.origin;
-    }
-    async request(path,payload){
-      const controller=new AbortController();this.controllers.add(controller);const timeout=setTimeout(()=>controller.abort(),this.p.connection.timeoutMs);
-      try{const response=await fetch(this.base()+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal,cache:'no-store',credentials:'same-origin',redirect:'error'});
-        if(!response.ok)throw new Error(`HTTP ${response.status}`);return await response.json();
-      }finally{clearTimeout(timeout);this.controllers.delete(controller);}
-    }
-    async poll(){
-      if(this.stopped)return;
-      const generation=this.generation,start=Date.now();
-      if(!document.hidden){try{
-        const names=this.p.variables.map(v=>v.name),data=await this.request('/api/hmi/read',{names});
-        if(this.stopped||generation!==this.generation)return;
-        if(!data||!data.values||typeof data.values!=='object'||Array.isArray(data.values))throw new Error('Respuesta inválida: falta values');
-        const next={};for(const v of this.p.variables){if(!Object.hasOwn(data.values,v.name))throw new Error(`Falta la variable ${v.name}`);next[v.name]=C.typed({...v,min:'',max:''},data.values[v.name]);}
-        this.values=next;this.lastRead=Date.now();this.roundtrip=Date.now()-start;this.good=true;this.message=`NX HTTP v1 · ${this.roundtrip} ms · lectura solicitada cada ${this.p.connection.pollMs} ms`;this.evaluateAlarms();
-      }catch(e){if(this.stopped)return;this.good=false;this.armed=false;this.message=`Sin conexión: ${e.message}. No hay datos simulados de sustitución.`;}}
-      this.paint();if(!this.stopped)this.timer=setTimeout(()=>this.poll(),Math.max(this.good?10:1000,this.p.connection.pollMs-(Date.now()-start)));
-    }
-    async write(raw){
-      if(!this.canWrite()||this.busy){this.commandMessage='Escritura bloqueada: revise conexión, permisos y habilitación.';this.paint();return false;}
-      try{
-        const values={};for(const [name,value] of Object.entries(raw)){const v=this.p.variables.find(v=>v.name===name);if(!v||v.access!=='RW')throw new Error(`Variable sin permiso: ${name}`);values[name]=C.typed(v,value);}
-        if(!Object.keys(values).length)throw new Error('Lote vacío');this.busy=true;this.paint();
-        if(this.sim){Object.assign(this.values,values);this.commandMessage='Lote aplicado al simulador';this.evaluateAlarms();}
-        else{
-          const commandId=`${this.session}:${++this.sequence}`;
-          const ack=await this.request('/api/hmi/write',{commandId,atomic:true,values});
-          if(this.stopped)return false;
-          if(ack.commandId!==commandId||ack.accepted!==true||ack.applied!==true)throw new Error('Falta confirmación completa del lote. Verifique el PLC; no se reintenta.');
-          this.commandMessage='Lote confirmado por el adaptador; el estado se confirma en la siguiente lectura.';
-        }return true;
-      }catch(e){this.commandMessage=`Escritura no confirmada: ${e.message}`;if(!this.sim)this.armed=false;return false;}
-      finally{this.busy=false;if(!this.stopped)this.paint();}
-    }
-    stop(){this.stopped=true;this.generation++;this.armed=false;clearTimeout(this.timer);clearInterval(this.timer);this.controllers.forEach(c=>c.abort());this.resizeObserver.disconnect();document.removeEventListener('visibilitychange',this.visibility);}
+ }catch(e){if(this.stopped)return;if(auth!==this.authGeneration)return this.schedulePoll();this.good=false;this.armed=false;this.message=e.message;if(e.status===401)this.clearSession('Identificación requerida o sesión caducada');}
+ this.paint();if(!this.stopped)this.pollTimer=setTimeout(()=>this.poll(),Math.max(this.good?25:1000,50-(Date.now()-started)));
+ }
+ applyEvents(data){
+  if(!data.sourceGood||!data.storageGood)throw new Error('Servicio de eventos/datos no disponible');if(data.reset||data.gap){const s=data.snapshot;if(!s)throw new Error('No hay instantánea tras un hueco');this.alarmRows=s.alarms;this.auditRows=s.audit;this.productionRows=s.production;this.recipes=s.recipes;this.activeRecipe=s.activeRecipe;this.revision=s.revision;if(data.gap)this.commandMessage='Se detectó un hueco: se muestra la instantánea retenida';}
+  else for(const event of data.events||[]){const r=event.data;if(event.kind==='alarm'){const i=this.alarmRows.findIndex(a=>a.id===r.id);if(i<0)this.alarmRows.push(r);else this.alarmRows[i]=r;}if(event.kind==='operation')this.auditRows.push(r);if(event.kind==='recipes')this.recipes=r;if(event.kind==='recipe.active')this.activeRecipe=r;}
+  this.auditRows=this.auditRows.slice(-this.p.records.retention);const active=this.alarmRows.filter(a=>a.active),closed=this.alarmRows.filter(a=>!a.active).slice(-this.p.records.retention);this.alarmRows=[...closed,...active];this.cursor={epoch:data.epoch,after:data.next,limit:200};this.dropped=data.dropped||0;
+ }
+ schedulePoll(){if(!this.stopped){clearTimeout(this.pollTimer);this.pollTimer=setTimeout(()=>this.poll(),50);}}
+ setSession(data){this.authGeneration++;const now=performance.now(),serverTime=data.serverTime||Date.now();this.session=data.user;this.sessionDeadline=now+Math.max(0,Math.min(data.expiresAt,data.idleExpiresAt)-serverTime);this.armed=false;this.lastUserActivity=now;this.lastTouch=now;this.lastRecipePoll=0;this.lastEventPoll=0;this.dues={};this.paint();}
+ clearSession(message){this.authGeneration++;this.session=null;this.sessionDeadline=0;this.armed=false;this.samples={};this.dues={};this.transport.token='';this.commandMessage=message;this.paint();}
+ async touchSession(){if(!this.session||this.touchPending)return;const now=performance.now(),rate=Math.min(15000,this.p.security.idleSeconds*1000/3);if(now-this.lastTouch<rate)return;this.lastTouch=now;this.touchPending=true;const auth=this.authGeneration;try{const data=await this.transport.touch();if(this.stopped||!this.session||auth!==this.authGeneration)return;const serverTime=data.serverTime||Date.now();this.sessionDeadline=performance.now()+Math.max(0,Math.min(data.idleExpiresAt,data.expiresAt)-serverTime);}catch(e){if(auth===this.authGeneration)this.clearSession(e.message);}finally{this.touchPending=false;}}
+ async logout(){this.armed=false;try{await this.transport.logout();}catch{}this.clearSession('Sesión cerrada');}
+ dialog(title){const d=el('dialog','nx-runtime-dialog'),head=el('div','modal-top'),body=el('div','nx-dialog-body'),close=el('button','','✕');head.append(el('h2','',title),close);d.append(head,body);this.root.append(d);this.dialogs.add(d);const end=()=>{d.close();d.remove();this.dialogs.delete(d);};close.onclick=end;d.addEventListener('cancel',e=>{e.preventDefault();end();});d.showModal();return {d,body,close:end};}
+ info(message){this.commandMessage=message;this.paint();}
+ async loginDialog(){
+  const {body,close}=this.dialog(this.sim?'Usuario simulado · no son credenciales de máquina':'Identificación de operador');body.append(el('p','hint',this.sim?'Selecciona un rol para comprobar permisos. Esta sesión es una simulación.':'La identidad y los permisos se verifican en el servicio de máquina; las claves no se guardan en el proyecto.'));
+  if(this.sim){for(const role of this.p.security.roles){const b=el('button','nx-sim-role',role.name);b.dataset.role=role.id;b.onclick=async()=>{try{if(this.session)await this.transport.logout();this.setSession(await this.transport.login(role.id));close();}catch(e){this.info(e.message);}};body.append(b);}}
+  else {const user=el('input'),password=el('input'),login=el('button','primary','Entrar'),error=el('p','error-list');user.placeholder='Usuario';user.autocomplete='username';password.type='password';password.placeholder='Contraseña';password.autocomplete='current-password';body.append(user,password,login,error);login.onclick=async()=>{login.disabled=true;try{if(this.session)await this.transport.logout();this.setSession(await this.transport.login(user.value,password.value));password.value='';close();}catch(e){password.value='';error.textContent=e.message;login.disabled=false;}};password.onkeydown=e=>{if(e.key==='Enter')login.click();};user.focus();}
+ }
+ async usersDialog(){if(!this.p.security.roles.some(r=>r.id===this.session?.role&&r.manageUsers)||this.sim)return;const {body}=this.dialog('Usuarios de operación · servicio de máquina');try{const result=await this.transport.users('list');for(const user of result.users){const row=el('div','nx-user-row'),role=el('select');for(const r of this.p.security.roles){const opt=el('option','',r.name);opt.value=r.id;role.append(opt);}role.value=user.role;const disabled=el('input');disabled.type='checkbox';disabled.checked=user.disabled;const save=el('button','','Guardar');row.append(el('span','',user.name+' ('+user.id+')'),role,el('span','','Desactivado'),disabled,save);save.onclick=async()=>{try{await this.transport.users('update',{id:user.id,role:role.value,disabled:disabled.checked});this.info('Usuario actualizado; sus sesiones se invalidan.');}catch(e){this.info(e.message);}};const change=el('button','','Cambiar contraseña');change.onclick=()=>{const box=this.dialog('Contraseña · '+user.name),password=el('input'),repeat=el('input'),submit=el('button','primary','Actualizar');password.type=repeat.type='password';password.placeholder='Nueva contraseña (mínimo 12 caracteres)';repeat.placeholder='Repetir contraseña';box.body.append(password,repeat,submit);submit.onclick=async()=>{if(password.value!==repeat.value){this.info('Las contraseñas no coinciden');return;}try{await this.transport.users('password',{id:user.id,password:password.value});password.value=repeat.value='';box.close();this.info('Contraseña actualizada; sesiones del usuario invalidadas.');}catch(e){this.info(e.message);}};};row.append(change);body.append(row);}
+ const add=el('button','primary','Añadir usuario');body.append(add);add.onclick=()=>{const box=this.dialog('Nuevo usuario de máquina'),id=el('input'),name=el('input'),password=el('input'),role=el('select');id.placeholder='Identificador';name.placeholder='Nombre';password.type='password';password.placeholder='Contraseña (mínimo 12 caracteres)';for(const r of this.p.security.roles){const opt=el('option','',r.name);opt.value=r.id;role.append(opt);}const save=el('button','primary','Crear');box.body.append(id,name,password,role,save);save.onclick=async()=>{try{await this.transport.users('create',{id:id.value,name:name.value,password:password.value,role:role.value});password.value='';box.close();this.info('Usuario creado en el servicio.');}catch(e){this.info(e.message);}};};
+ }catch(e){body.append(el('p','error-list',e.message));}}
+ bindWidget(n,o){
+  if(o.kind==='button')n.querySelector('button').onclick=()=>{if(o.action==='navigate')this.show(o.targetScreen);else if(o.action==='popup')this.openPopup(o);else if(o.action==='login')this.loginDialog();else if(o.action==='logout')this.logout();else if(o.action==='closePopup'){const entry=this.nodes.find(x=>x.n===n)?.popup;if(entry)this.closePopup(entry);}else this.send(o,o.action,{value:o.writeValue});};
+  if(o.kind==='input'){const entry=n.querySelector('.nx-entry');entry.oninput=()=>{entry.dataset.dirty='1';};n.querySelector('.nx-apply').onclick=async()=>{if(await this.send(o,'write',{value:entry.value}))entry.dataset.dirty='';};const b=n.querySelector('.nx-keyboard-open');if(b)b.onclick=()=>this.keyboard(entry,o);}
+  if(o.kind==='switch')n.querySelector('button').onclick=()=>this.send(o,'write',{value:!this.values[o.binding]});
+  if(o.kind==='selector')n.querySelector('select').onchange=e=>this.send(o,'write',{value:e.target.value});
+  if(o.kind==='slider'){
+   const slider=n.querySelector('.nx-slider');let last=0;const send=async()=>{if(await this.send(o,'write',{value:slider.value}))slider.dataset.dirty='';};
+   slider.oninput=()=>{slider.dataset.dirty='1';n.querySelector('.nx-slider-value').textContent=slider.value+' '+o.unit;if(o.writeMode==='continuous'&&Date.now()-last>=250&&!this.busy){last=Date.now();send();}};
+   slider.onchange=()=>{if(o.writeMode!=='apply')send();};n.querySelector('.nx-slider-apply')?.addEventListener('click',send);
   }
-  root.NXRuntime={Runtime,widget,refreshWidget,initial};
+  if(o.kind==='navigation')n.querySelectorAll('[data-screen]').forEach(b=>b.onclick=()=>this.show(b.dataset.screen));
+  if(o.kind==='user')n.querySelector('button').onclick=()=>this.loginDialog();
+  if(o.kind==='recipes')this.buildRecipes(n,o);
+  if(o.kind==='alarms'||o.kind==='banner'||o.kind==='audit'){
+   for(const input of n.querySelectorAll('input,select'))input.oninput=()=>{delete n.dataset.paintKey;this.paint();};
+   n.querySelector('.nx-export-csv')?.addEventListener('click',()=>this.exportRecords(n,o,'csv'));n.querySelector('.nx-export-xlsx')?.addEventListener('click',()=>this.exportRecords(n,o,'xlsx'));
+  }
+ }
+ keyboard(input,o){if(!this.canOperate(o))return;const v=this.p.variables.find(v=>v.name===(o.writeBinding||o.binding)),box=this.dialog('Entrada · '+o.text),draft=el('input');draft.value=input.value;draft.setAttribute('aria-label','Valor editado');const grid=el('div','nx-keyboard');const chars=v?.type==='STRING'?'1234567890QWERTYUIOPASDFGHJKLÑZXCVBNM .-_':'1234567890.-';for(const ch of chars){const b=el('button','',ch===' '?'Espacio':ch);b.onclick=()=>{draft.value+=ch;};grid.append(b);}const erase=el('button','','⌫'),clear=el('button','','Borrar'),accept=el('button','primary','Aceptar edición');erase.onclick=()=>draft.value=draft.value.slice(0,-1);clear.onclick=()=>draft.value='';accept.onclick=()=>{try{C.typed(v,draft.value);input.value=draft.value;input.dataset.dirty='1';box.close();}catch(e){this.info(e.message);}};box.body.append(draft,grid,erase,clear,accept);}
+ async send(o,action,data){
+  if(!this.canOperate(o)){this.info('Operación bloqueada por permiso, conexión, habilitación o dato no vigente.');return false;}
+  if(o.confirm&&!window.confirm(o.confirmText||'¿Confirmas la operación?'))return false;
+  if(action==='write'){try{const v=this.p.variables.find(v=>v.name===(o.writeBinding||o.binding));data={...data,value:C.typed(v,data.value)};}catch(e){this.info(e.message);return false;}}
+  this.busy=true;this.commandMessage='Orden pendiente de confirmación';this.paint();const commandId=this.boot+':'+(++this.sequence),req={commandId,policyDigest:this.policyDigest,elementId:o.elementId||o.id,action,expectedRevision:this.revision,data};
+  try{const result=await this.transport.command(req);if(this.stopped)return false;if(result.status==='rejected'){const e=new Error(result.message||'Rechazado');e.response=result;e.status=409;throw e;}if(result.commandId!==commandId||result.status!=='applied'||result.applied!==true)throw new Error('Respuesta sin confirmación válida');this.revision=result.revision;this.dues={};this.lastEventPoll=0;this.lastRecipePoll=0;this.commandMessage='Operación aplicada por el servicio; se confirmará la lectura';this.lastUserActivity=performance.now();await this.touchSession();return true;
+  }catch(e){this.armed=false;if(e.status===401)this.clearSession(e.message);if(e.response?.status==='rejected'||e instanceof NXService.Fault){this.commandMessage='Orden rechazada: '+e.message;}else{this.unconfirmed={commandId,userId:this.session?.id,action,createdAt:Date.now()};this.commandMessage='Resultado desconocido: no repetir. Consulte la orden pendiente.';}return false;
+  }finally{this.busy=false;this.paint();}
+ }
+ async resolveCommand(){if(!this.unconfirmed)return;try{const r=await this.transport.result(this.unconfirmed.commandId);if(!['applied','rejected'].includes(r.status))throw new Error('El servidor aún no confirma el resultado');this.commandMessage='Orden recuperada: '+r.status;this.unconfirmed=null;this.revision=r.revision??this.revision;this.dues={};this.lastEventPoll=0;this.lastRecipePoll=0;}catch(e){this.commandMessage=e.message+' · no se reenviará la orden';}this.paint();}
+ alarmFiltered(n,o){let rows=o.kind==='banner'?this.alarmRows.filter(r=>r.active):this.alarmRows;const f=n.querySelector('.nx-alarm-filter')?.value||'all',search=(n.querySelector('.nx-record-search')?.value||'').toLowerCase(),severity=n.querySelector('.nx-alarm-severity')?.value||'';return rows.filter(r=>(f==='all'||f==='active'&&r.active||f==='unacked'&&!r.ack)&&(!severity||r.severity===severity)&&(`${r.code} ${r.name}`.toLowerCase().includes(search))).sort((a,b)=>b.time-a.time);}
+ paintAlarms(n,o){const rows=this.alarmFiltered(n,o),body=n.querySelector('.nx-alarm-rows'),key=JSON.stringify(rows)+this.canOperate(o)+this.session?.role;if(body.dataset.key===key)return;body.dataset.key=key;body.replaceChildren();
+  if(!rows.length)body.append(el('p','',this.good?'Sin eventos en el filtro actual':'Estado desconocido'));
+  for(const r of rows){const row=el('div',`nx-alarm-row ${r.severity}`);row.append(el('span','',`${new Date(r.time).toLocaleTimeString()} · ${r.code} · ${r.name} · ${r.active?'ACTIVA':'CESADA'}${r.ack?' · ACK '+r.ackBy:''}${r.silenced?' · SILENCIADA':''}`));const def=this.p.alarms.find(a=>a.id===r.alarmId);
+   for(const [action,label,roleKey,needed]of [['alarm.ack','Reconocer','ackRoles',!r.ack],['alarm.silence','Silenciar','silenceRoles',r.active&&!r.silenced],['alarm.reset','Reset','resetRoles',!r.active&&r.ack&&!!def?.resetBinding]]){
+    if(!needed)continue;const b=el('button','nx-alarm-action',label);b.disabled=!this.canOperate(o)||!C.roleAllowed(def?.[roleKey],this.session?.role);b.onclick=()=>this.send(o,action,{eventId:r.id});row.append(b);
+   }body.append(row);
+  }
+ }
+ paintAudit(n){const text=(n.querySelector('.nx-record-search')?.value||'').toLowerCase(),rows=this.auditRows.filter(r=>(r.user+' '+r.action+' '+r.target).toLowerCase().includes(text)),body=n.querySelector('.nx-audit-rows'),key=JSON.stringify(rows);if(body.dataset.key===key)return;body.dataset.key=key;body.replaceChildren();for(const r of rows.slice().reverse()){const row=el('div','nx-audit-row');row.append(el('strong','',r.user+' · '+r.action),el('span','',new Date(r.time).toLocaleString()),el('span','',r.target+' · '+r.result),el('small','',JSON.stringify(r.applied??r.requested)));body.append(row);}if(!rows.length)body.append(el('p','','Sin operaciones retenidas para este filtro.'));}
+ exportRecords(n,o,format){const isAlarm=o.kind==='alarms',rows=isAlarm?this.alarmFiltered(n,o):this.auditRows.filter(r=>(r.user+' '+r.action+' '+r.target).toLowerCase().includes((n.querySelector('.nx-record-search')?.value||'').toLowerCase()));const table=D.records(isAlarm?'alarms':'audit',rows);table.push([],['Ámbito','Registros retenidos / filtro visible'],['Registros descartados por retención',this.dropped],['Origen',this.deviceLabel],['Exportado UTC',new Date().toISOString()]);D.download((isAlarm?'Alarmas':'Operaciones')+'.'+format,format==='xlsx'?D.xlsx(table,isAlarm?'Alarmas':'Operaciones'):D.csv(table),format==='xlsx'?'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':'text/csv;charset=utf-8');}
+ buildRecipes(n,o){const body=n.querySelector('.nx-recipe-body'),select=el('select','nx-recipe-select'),details=el('div','nx-recipe-values'),active=el('small','nx-active-recipe'),actions=el('div','nx-recipe-actions');select.setAttribute('aria-label','Receta');for(const [key,title]of [['apply','Aplicar lote'],['edit','Editar'],['new','Nueva'],['duplicate','Duplicar'],['delete','Eliminar'],['export','Exportar'],['import','Importar']]){const b=el('button','nx-recipe-'+key,title);b.onclick=()=>{const r=this.recipes.find(r=>r.id===select.value);if(key==='apply'&&r)this.send(o,'recipe.apply',{id:r.id,version:r.version});if(key==='edit'&&r)this.recipeDialog(o,r);if(key==='new')this.recipeDialog(o);if(key==='duplicate'&&r)this.recipeDialog(o,{...C.copy(r),id:null,name:r.name+' copia',version:0});if(key==='delete'&&r&&window.confirm('¿Eliminar '+r.name+'?'))this.send(o,'recipe.delete',{id:r.id,version:r.version});if(key==='export'&&r)D.download(r.name.replace(/[^A-Za-z0-9_-]/g,'_')+'.nxrecipe',JSON.stringify({schemaVersion:1,name:r.name,values:r.values},null,2),'application/json');if(key==='import'){const input=el('input');input.type='file';input.accept='.nxrecipe,.json';input.onchange=async()=>{try{const f=input.files[0];if(!f||f.size>1024*1024)throw new Error('Archivo no válido');const r=JSON.parse(await f.text());if(r.schemaVersion!==1||!r.name||!r.values)throw new Error('Receta inválida');for(const[k,v]of Object.entries(r.values))C.typed(this.p.variables.find(x=>x.name===k),v);this.recipeDialog(o,{name:r.name,values:r.values,id:null,version:0});}catch(e){this.info(e.message);}};input.click();}};actions.append(b);}select.onchange=()=>{delete n.dataset.recipeKey;this.paintRecipeState(n,o);};body.append(select,active,details,actions);}
+ paintRecipeState(n,o){const select=n.querySelector('.nx-recipe-select'),key=JSON.stringify(this.recipes);if(select.dataset.list!==key){const old=select.value;select.replaceChildren();for(const r of this.recipes){const opt=el('option','',`${r.name} · v${r.version}`);opt.value=r.id;select.append(opt);}if(this.recipes.some(r=>r.id===old))select.value=old;select.dataset.list=key;}
+  const r=this.recipes.find(r=>r.id===select.value),body=n.querySelector('.nx-recipe-values'),k=JSON.stringify(r)+JSON.stringify(this.activeRecipe);if(n.dataset.recipeKey!==k){n.dataset.recipeKey=k;body.replaceChildren();for(const[name,value]of Object.entries(r?.values||{}))body.append(el('div','',`${name}: ${value}`));n.querySelector('.nx-active-recipe').textContent=this.activeRecipe?`Activa: ${this.activeRecipe.name} v${this.activeRecipe.version}`:'Sin receta activa confirmada';}
+  for(const b of n.querySelectorAll('.nx-recipe-actions button')){const editing=['nx-recipe-edit','nx-recipe-new','nx-recipe-duplicate','nx-recipe-delete','nx-recipe-import'].includes(b.className);b.disabled=!this.canOperate(o)||(editing&&!C.roleAllowed(o.recipeEditRoles,this.session?.role));if(b.className==='nx-recipe-export')b.disabled=!r;}
+ }
+ recipeDialog(o,r=null){if(!this.canOperate(o)||!C.roleAllowed(o.recipeEditRoles,this.session?.role)){this.info('No tiene permiso para editar recetas');return;}const box=this.dialog(r?.id?'Editar receta · control de versión':'Nueva receta operativa'),name=el('input'),rows=el('div','nx-recipe-form');name.value=r?.name||'Nueva receta';name.setAttribute('aria-label','Nombre de receta');const fields=[];
+  const recipeNames=new Set(o.recipeVariables?.length?o.recipeVariables:this.p.recipes.flatMap(r=>Object.keys(r.values)));
+  for(const v of this.p.variables.filter(v=>v.access==='RW'&&recipeNames.has(v.name))){const line=el('label','nx-recipe-field'),use=el('input'),input=el('input');use.type='checkbox';use.checked=Object.hasOwn(r?.values||{},v.name);input.type=v.type==='STRING'||v.type==='BOOL'?'text':'number';input.step='any';input.value=String(r?.values?.[v.name]??this.values[v.name]??v.initial);line.append(use,el('span','',v.name),input);rows.append(line);fields.push({v,use,input});}
+  const capture=el('button','','Capturar valores leídos'),save=el('button','primary','Guardar versión'),error=el('p','error-list');capture.onclick=()=>{for(const {v,input}of fields)if(this.quality(v.name))input.value=String(this.values[v.name]);};save.onclick=async()=>{try{const values={};for(const{v,use,input}of fields)if(use.checked)values[v.name]=C.typed(v,input.value);if(await this.send(o,'recipe.save',{id:r?.id||null,version:r?.version||0,name:name.value.trim(),values}))box.close();else error.textContent=this.commandMessage;}catch(e){error.textContent=e.message;}};box.body.append(name,rows,capture,save,error);
+ }
+ setSim(name,value){if(!this.sim)return;const v=this.p.variables.find(v=>v.name===name);this.transport.service.setSource({[name]:C.typed(v,value)});this.dues={};this.lastEventPoll=0;}
+ stop(){this.stopped=true;this.armed=false;clearInterval(this.paintTimer);clearTimeout(this.pollTimer);this.transport.stop();this.resize.disconnect();this.files.forEach(x=>x.abort());this.dialogs.forEach(d=>{d.close();d.remove();});document.removeEventListener('visibilitychange',this.visibility);for(const type of ['pointerdown','keydown'])this.root.removeEventListener(type,this.human);}
+}
+root.NXRuntime={Runtime,widget:W.widget,refreshWidget:W.refresh,initial:p=>Object.fromEntries(p.variables.map(v=>[v.name,C.typed(v,v.initial)]))};
 })(globalThis);
