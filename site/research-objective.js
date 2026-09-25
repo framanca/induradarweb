@@ -4,22 +4,16 @@
   const DEFAULT_OBJECTIVE = 'signal_discovery';
   const OBJECTIVES = [
     {
-      value: 'universe_discovery',
-      title: 'Empresas objetivo',
-      description:
-        'Ampliar el universo de fabricantes, plantas, OEM, integradores u otras cuentas que encajen en la solicitud.',
-    },
-    {
       value: 'signal_discovery',
-      title: 'Señales activas',
+      title: 'Descubrir oportunidades',
       description:
-        'Buscar inversiones, ampliaciones, proyectos y otros cambios recientes que puedan generar negocio en tu sector.',
+        'Buscar señales, proyectos e inversiones y centrar la investigación en convertir los mejores hallazgos en oportunidades comerciales.',
     },
     {
-      value: 'balanced',
-      title: 'Empresas + señales',
+      value: 'universe_discovery',
+      title: 'Descubrir empresas',
       description:
-        'Mapear cuentas y priorizar las que muestran cambios relevantes.',
+        'Construir un universo de empresas objetivo y priorizar identidad, encaje, deduplicación y cobertura.',
     },
   ];
 
@@ -100,7 +94,7 @@
       }
       @media (min-width: 760px) {
         .research-objective-options {
-          grid-template-columns: repeat(3, minmax(0, 1fr));
+          grid-template-columns: repeat(2, minmax(0, 1fr));
         }
       }
     `;
