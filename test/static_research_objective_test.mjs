@@ -11,22 +11,19 @@ const buildScript = await readFile(
   'utf8',
 );
 
-test('research objective selector exposes all three SFP2 paths', () => {
-  for (const value of ['universe_discovery', 'signal_discovery', 'balanced']) {
+test('research objective selector exposes only opportunity and company discovery', () => {
+  for (const value of ['signal_discovery', 'universe_discovery']) {
     assert.match(selectorSource, new RegExp(`value: '${value}'`));
   }
-  assert.match(selectorSource, /Empresas objetivo/);
-  assert.match(selectorSource, /Señales activas/);
-  assert.match(selectorSource, /Empresas \+ señales/);
-  assert.match(selectorSource, /Ampliar el universo de fabricantes, plantas, OEM, integradores u otras cuentas que encajen en la solicitud\./);
-  assert.match(selectorSource, /Buscar inversiones, ampliaciones, proyectos y otros cambios recientes que puedan generar negocio en tu sector\./);
-  assert.doesNotMatch(selectorSource, /aunque todavía no exista una señal pública/);
-  assert.doesNotMatch(selectorSource, /aunque esas señales descubran empresas/);
-  assert.doesNotMatch(selectorSource, /Combinar la ampliación del universo/);
-  assert.doesNotMatch(selectorSource, /Elige qué debe pesar más en la investigación/);
+  assert.match(selectorSource, /Descubrir oportunidades/);
+  assert.match(selectorSource, /Descubrir empresas/);
+  assert.match(selectorSource, /convertir los mejores hallazgos en oportunidades comerciales/);
+  assert.match(selectorSource, /priorizar identidad, encaje, deduplicación y cobertura/);
+  assert.doesNotMatch(selectorSource, /value: 'balanced'/);
+  assert.doesNotMatch(selectorSource, /Empresas \+ señales/);
 });
 
-test('signal discovery remains the backwards-compatible default', () => {
+test('opportunity discovery remains the public default while preserving the signal_discovery backend value', () => {
   assert.match(selectorSource, /const DEFAULT_OBJECTIVE = 'signal_discovery'/);
 });
 
