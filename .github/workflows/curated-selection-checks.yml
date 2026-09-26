@@ -1,0 +1,23 @@
+name: Curated selection checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  curated-selection:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate source-bound selection scripts
+        run: |
+          node --check site/selection/renderer.js
+          node --check site/selection/selection.js
+          node --check site/portal/curated-links.js
+          node --test test/curated_selection_test.mjs
+          test -f site/selection/index.html
+          grep -q 'curated-links.js' site/portal/index.html
