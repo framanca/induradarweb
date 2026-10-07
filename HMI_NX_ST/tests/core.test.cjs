@@ -11,3 +11,5 @@ test('POC limits exposed variables to 32',()=>{const p=C.newProject();p.variable
 test('local variable TSV matches Sysmac Internals column order without a header',()=>{const lines=C.localVariablesTSV().split(/\r?\n/);assert.ok(!lines[0].startsWith('Name\t'));for(const line of lines){const cols=line.split('\t');assert.equal(cols.length,7);assert.ok(cols[0]);assert.ok(cols[1]);}const first=lines[0].split('\t');assert.equal(first[0],'Web_State');assert.equal(first[1],'UINT');assert.equal(first[2],'0');assert.equal(first[3],'');assert.equal(first[4],'');assert.equal(first[5],'');assert.equal(first[6],'Estado servidor HTTP');});
 
 test('Sysmac literals escape JavaScript dollar signs',()=>{const p=C.demoProject();const s=C.buildST(p);assert.match(s,/\?\$\$\//);assert.ok(!s.includes('?$/'));});
+
+test('generated ST uses CONCAT for STRING assembly',()=>{const p=C.demoProject();const s=C.buildST(p);assert.match(s,/Web_ApiBody := CONCAT\(Web_ApiBody,/);assert.ok(!/Web_ApiBody := Web_ApiBody &/.test(s));});
