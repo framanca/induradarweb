@@ -13,3 +13,5 @@ test('local variable TSV matches Sysmac Internals column order without a header'
 test('Sysmac literals escape JavaScript dollar signs',()=>{const p=C.demoProject();const s=C.buildST(p);assert.match(s,/\?\$\$\//);assert.ok(!s.includes('?$/'));});
 
 test('generated ST uses CONCAT for STRING assembly',()=>{const p=C.demoProject();const s=C.buildST(p);assert.match(s,/Web_ApiBody := CONCAT\(Web_ApiBody,/);assert.ok(!/Web_ApiBody := Web_ApiBody &/.test(s));});
+
+test('external variable TSV references exposed global variables',()=>{const p=C.demoProject();const x=C.externalVariablesTSV(p).split(/\r?\n/);assert.equal(x.length,4);assert.equal(x[0],'Machine_Running\tBOOL');assert.ok(x.some(line=>line==='Process_Setpoint\tREAL'));const o=C.exportPackage(p);assert.ok(o.files['WebHMI_ExternalVariables.tsv']);});
