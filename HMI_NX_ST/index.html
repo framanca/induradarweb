@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>HMI NX ST · Embedded WebHMI</title>
+<link rel="stylesheet" href="style.css">
+<script defer src="model.js"></script>
+<script defer src="runtime.js"></script>
+<script defer src="st.js"></script>
+<script defer src="zip.js"></script>
+<script defer src="app.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div><strong>HMI NX ST</strong><span>POC · Webserver ST embebido</span></div>
+  <div class="top-actions"><button id="demoBtn">Demo</button><button id="newBtn">Nuevo</button><button id="saveBtn">Guardar proyecto</button><button id="loadBtn">Abrir</button><button id="exportBtn" class="primary">Exportar Sysmac</button></div>
+</header>
+<div class="notice"><strong>Editor independiente.</strong> No modifica HMI NX 0.2. Genera una primera versión de servidor HTTP para pegar en un programa ST de Sysmac Studio. Hardware NX102 todavía no validado.</div>
+<main class="layout">
+  <aside class="left">
+    <section>
+      <h2>Proyecto</h2>
+      <label>Nombre<input id="projectName" value="WebHMI ST"></label>
+      <div class="grid2"><label>Puerto<input id="port" type="number" min="1024" max="65535" value="8080"></label><label>Polling ms<input id="pollMs" type="number" min="100" max="5000" value="500"></label></div>
+      <div class="grid2"><label>Ancho<input id="screenW" type="number" value="1024"></label><label>Alto<input id="screenH" type="number" value="600"></label></div>
+    </section>
+    <section>
+      <h2>Variables Sysmac</h2>
+      <p class="hint">Importa CSV/TSV/TXT exportado o copiado de la tabla de variables globales. También acepta declaraciones ST simples.</p>
+      <div class="row"><button id="importFileBtn">Archivo</button><button id="pasteBtn">Pegar tabla</button></div>
+      <input id="varsFile" type="file" accept=".csv,.tsv,.txt" hidden>
+      <div id="varSummary" class="summary"></div>
+      <div id="varList" class="var-list"></div>
+    </section>
+    <section>
+      <h2>Elementos</h2>
+      <div class="tool-grid">
+        <button data-kind="text">Texto</button><button data-kind="lamp">Piloto</button><button data-kind="value">Valor</button><button data-kind="input">Entrada</button><button data-kind="button">Botón</button><button data-kind="bar">Barra</button>
+      </div>
+    </section>
+  </aside>
+  <section class="center">
+    <div class="canvas-head"><strong>Pantalla</strong><span id="canvasInfo"></span><button id="previewBtn">Vista previa</button></div>
+    <div class="canvas-wrap"><div id="canvas"></div></div>
+  </section>
+  <aside class="right">
+    <section><h2>Propiedades</h2><div id="properties" class="properties"><p class="hint">Selecciona un elemento.</p></div></section>
+    <section><h2>Diagnóstico POC</h2><div id="diagnostics"></div></section>
+  </aside>
+</main>
+<dialog id="pasteDialog"><form method="dialog"><h2>Importar variables de Sysmac</h2><p>Pega la tabla copiada de Global Variables o el contenido CSV/TSV.</p><textarea id="pasteText" rows="16"></textarea><div id="pasteError" class="error"></div><div class="dialog-actions"><button value="cancel">Cancelar</button><button id="pasteImport" type="button" class="primary">Importar</button></div></form></dialog>
+<dialog id="previewDialog"><div class="dialog-wide"><div class="dialog-title"><h2>Vista previa</h2><button id="closePreview">✕</button></div><iframe id="previewFrame"></iframe></div></dialog>
+<input id="projectFile" type="file" accept=".json,.nxst" hidden>
+<div id="toast"></div>
+</body>
+</html>
