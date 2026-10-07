@@ -1,60 +1,29 @@
 <!doctype html>
 <html lang="es">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex,nofollow">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
 <title>HMI NX ST · Embedded WebHMI</title>
 <link rel="stylesheet" href="style.css">
-<script defer src="model.js"></script>
-<script defer src="runtime.js"></script>
-<script defer src="st.js"></script>
-<script defer src="zip.js"></script>
-<script defer src="app.js"></script>
+<script defer src="model.js"></script><script defer src="runtime.js"></script><script defer src="st.js"></script><script defer src="zip.js"></script><script defer src="app.js"></script>
 </head>
 <body>
-<header class="topbar">
-  <div><strong>HMI NX ST</strong><span>POC · Webserver ST embebido</span></div>
-  <div class="top-actions"><button id="demoBtn">Demo</button><button id="newBtn">Nuevo</button><button id="saveBtn">Guardar proyecto</button><button id="loadBtn">Abrir</button><button id="exportBtn" class="primary">Exportar Sysmac</button></div>
-</header>
-<div class="notice"><strong>Editor independiente.</strong> No modifica HMI NX 0.2. Genera un servidor HTTP embebido en ST para Sysmac Studio. Transporte básico validado en NX102 real.</div>
+<header class="topbar"><div><strong>HMI NX ST</strong><span>0.3 · Webserver ST embebido</span></div><div class="top-actions"><button id="demoBtn">Demo</button><button id="newBtn">Nuevo</button><button id="saveBtn">Guardar</button><button id="loadBtn">Abrir</button><button id="exportBtn" class="primary">Exportar Sysmac</button></div></header>
+<div class="notice"><strong>NX102 real validado:</strong> servidor ST + HTML embebido + lectura. Esta version añade RW, pantallas, imagenes, widgets industriales, alarmas vivas y recetas.</div>
 <main class="layout">
-  <aside class="left">
-    <section>
-      <h2>Proyecto</h2>
-      <label>Nombre<input id="projectName" value="WebHMI ST"></label>
-      <div class="grid2"><label>Puerto<input id="port" type="number" min="1024" max="65535" value="8080"></label><label>Polling ms<input id="pollMs" type="number" min="100" max="5000" value="500"></label></div>
-      <div class="grid2"><label>Ancho diseño<input id="screenW" type="number" min="320" max="3840" value="1024"></label><label>Alto diseño<input id="screenH" type="number" min="240" max="2160" value="600"></label></div>
-      <div class="grid2"><label>Ancho mín. navegador<input id="minDisplayWidth" type="number" min="320" max="3840" value="480"></label><label>Ancho máx. navegador<input id="maxDisplayWidth" type="number" min="320" max="7680" value="1920"></label></div>
-      <p class="hint">La HMI escala proporcionalmente al ancho disponible. Bajo el mínimo conserva el tamaño y permite scroll; sobre el máximo queda centrada.</p>
-    </section>
-    <section>
-      <h2>Variables Sysmac</h2>
-      <p class="hint">Importa CSV/TSV/TXT exportado o copiado de la tabla de variables globales. También acepta declaraciones ST simples.</p>
-      <div class="row"><button id="importFileBtn">Archivo</button><button id="pasteBtn">Pegar tabla</button></div>
-      <input id="varsFile" type="file" accept=".csv,.tsv,.txt" hidden>
-      <div id="varSummary" class="summary"></div>
-      <div id="varList" class="var-list"></div>
-    </section>
-    <section>
-      <h2>Elementos</h2>
-      <div class="tool-grid">
-        <button data-kind="text">Texto</button><button data-kind="lamp">Piloto</button><button data-kind="value">Valor</button><button data-kind="input">Entrada</button><button data-kind="button">Botón</button><button data-kind="bar">Barra</button>
-      </div>
-    </section>
-  </aside>
-  <section class="center">
-    <div class="canvas-head"><strong>Pantalla</strong><span id="canvasInfo"></span><button id="previewBtn">Vista previa</button></div>
-    <div class="canvas-wrap"><div id="canvas"></div></div>
-  </section>
-  <aside class="right">
-    <section><h2>Propiedades</h2><div id="properties" class="properties"><p class="hint">Selecciona un elemento.</p></div></section>
-    <section><h2>Diagnóstico POC</h2><div id="diagnostics"></div></section>
-  </aside>
+<aside class="left">
+<section><h2>Proyecto</h2><label>Nombre<input id="projectName"></label><div class="grid2"><label>Puerto<input id="port" type="number" min="1024" max="65535"></label><label>Polling ms<input id="pollMs" type="number" min="100" max="5000"></label></div><div class="grid2"><label>Ancho diseño<input id="screenW" type="number" min="320" max="3840"></label><label>Alto diseño<input id="screenH" type="number" min="240" max="2160"></label></div><div class="grid2"><label>Ancho min.<input id="minDisplayWidth" type="number" min="320" max="3840"></label><label>Ancho max.<input id="maxDisplayWidth" type="number" min="320" max="7680"></label></div></section>
+<section><h2>Pantallas</h2><select id="screenSelect"></select><div class="row topgap"><button id="addScreen">+ Pantalla</button><button id="renameScreen">Renombrar</button><button id="deleteScreen">Eliminar</button></div></section>
+<section><h2>Variables Sysmac</h2><p class="hint">Pega o importa Global Variables. La asignacion a Entrada/Boton activa R+W automaticamente.</p><div class="row"><button id="importFileBtn">Archivo</button><button id="pasteBtn">Pegar tabla</button></div><input id="varsFile" type="file" accept=".csv,.tsv,.txt" hidden><div id="varSummary" class="summary"></div><div id="varList" class="var-list"></div></section>
+<section><h2>Imagenes</h2><button id="addAsset">+ Añadir imagen</button><input id="assetFile" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" multiple hidden><div id="assetList" class="asset-list"></div></section>
+<section><h2>Elementos</h2><div class="tool-grid"><button data-kind="text">Texto</button><button data-kind="lamp">Piloto</button><button data-kind="value">Valor</button><button data-kind="input">Entrada</button><button data-kind="button">Boton</button><button data-kind="bar">Barra</button><button data-kind="image">Imagen</button><button data-kind="nav">Navegacion</button><button data-kind="motor">Motor</button><button data-kind="pump">Bomba</button><button data-kind="valve">Valvula</button><button data-kind="tank">Deposito</button><button data-kind="sensor">Sensor</button><button data-kind="conveyor">Cinta</button><button data-kind="alarms">Panel alarmas</button><button data-kind="recipes">Panel recetas</button></div></section>
+<section><div class="section-head"><h2>Alarmas</h2><button id="addAlarm">+ Alarma</button></div><div id="alarmList"></div></section>
+<section><div class="section-head"><h2>Recetas</h2><button id="addRecipe">+ Receta</button></div><div id="recipeList"></div></section>
+</aside>
+<section class="center"><div class="canvas-head"><strong>Pantalla</strong><span id="canvasInfo"></span><button id="previewBtn">Vista previa</button></div><div class="canvas-wrap"><div id="canvas"></div></div></section>
+<aside class="right"><section><h2>Propiedades</h2><div id="properties" class="properties"><p class="hint">Selecciona un elemento.</p></div></section><section><h2>Diagnostico</h2><div id="diagnostics"></div></section></aside>
 </main>
-<dialog id="pasteDialog"><form method="dialog"><h2>Importar variables de Sysmac</h2><p>Pega la tabla copiada de Global Variables o el contenido CSV/TSV.</p><textarea id="pasteText" rows="16"></textarea><div id="pasteError" class="error"></div><div class="dialog-actions"><button value="cancel">Cancelar</button><button id="pasteImport" type="button" class="primary">Importar</button></div></form></dialog>
-<dialog id="previewDialog"><div class="dialog-wide"><div class="dialog-title"><h2>Vista previa</h2><button id="closePreview">✕</button></div><iframe id="previewFrame"></iframe></div></dialog>
-<input id="projectFile" type="file" accept=".json,.nxst" hidden>
-<div id="toast"></div>
-</body>
-</html>
+<dialog id="pasteDialog"><form method="dialog"><h2>Importar variables de Sysmac</h2><textarea id="pasteText" rows="16"></textarea><div id="pasteError" class="error"></div><div class="dialog-actions"><button value="cancel">Cancelar</button><button id="pasteImport" type="button" class="primary">Importar</button></div></form></dialog>
+<dialog id="previewDialog"><div class="dialog-wide"><div class="dialog-title"><h2>Vista previa</h2><button id="closePreview">×</button></div><iframe id="previewFrame"></iframe></div></dialog>
+<dialog id="recipeDialog"><form method="dialog" class="recipe-dialog"><h2>Editar receta</h2><label>Nombre<input id="recipeName"></label><div id="recipeVars" class="recipe-vars"></div><div class="dialog-actions"><button id="cancelRecipe" type="button">Cancelar</button><button id="saveRecipe" type="button" class="primary">Guardar receta</button></div></form></dialog>
+<input id="projectFile" type="file" accept=".json,.nxst" hidden><div id="toast"></div>
+</body></html>
