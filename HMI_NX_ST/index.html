@@ -17,14 +17,16 @@
   <div><strong>HMI NX ST</strong><span>POC · Webserver ST embebido</span></div>
   <div class="top-actions"><button id="demoBtn">Demo</button><button id="newBtn">Nuevo</button><button id="saveBtn">Guardar proyecto</button><button id="loadBtn">Abrir</button><button id="exportBtn" class="primary">Exportar Sysmac</button></div>
 </header>
-<div class="notice"><strong>Editor independiente.</strong> No modifica HMI NX 0.2. Genera una primera versión de servidor HTTP para pegar en un programa ST de Sysmac Studio. Hardware NX102 todavía no validado.</div>
+<div class="notice"><strong>Editor independiente.</strong> No modifica HMI NX 0.2. Genera un servidor HTTP embebido en ST para Sysmac Studio. Transporte básico validado en NX102 real.</div>
 <main class="layout">
   <aside class="left">
     <section>
       <h2>Proyecto</h2>
       <label>Nombre<input id="projectName" value="WebHMI ST"></label>
       <div class="grid2"><label>Puerto<input id="port" type="number" min="1024" max="65535" value="8080"></label><label>Polling ms<input id="pollMs" type="number" min="100" max="5000" value="500"></label></div>
-      <div class="grid2"><label>Ancho<input id="screenW" type="number" value="1024"></label><label>Alto<input id="screenH" type="number" value="600"></label></div>
+      <div class="grid2"><label>Ancho diseño<input id="screenW" type="number" min="320" max="3840" value="1024"></label><label>Alto diseño<input id="screenH" type="number" min="240" max="2160" value="600"></label></div>
+      <div class="grid2"><label>Ancho mín. navegador<input id="minDisplayWidth" type="number" min="320" max="3840" value="480"></label><label>Ancho máx. navegador<input id="maxDisplayWidth" type="number" min="320" max="7680" value="1920"></label></div>
+      <p class="hint">La HMI escala proporcionalmente al ancho disponible. Bajo el mínimo conserva el tamaño y permite scroll; sobre el máximo queda centrada.</p>
     </section>
     <section>
       <h2>Variables Sysmac</h2>
