@@ -7,3 +7,5 @@ test('ST contains standard Omron socket blocks and embedded chunks',()=>{const s
 test('package zip starts with local header and contains project',()=>{const o=C.exportPackage(C.demoProject());assert.equal(o.zip[0],0x50);assert.ok(o.files['WebHMI_Server.st']);assert.ok(o.files['project.nxst']);});
 
 test('POC limits exposed variables to 32',()=>{const p=C.newProject();p.variables=Array.from({length:33},(_,i)=>({id:i+1,name:'V'+i,type:'BOOL',stringLength:255,comment:'',access:'R',expose:true,live:true,writeSupported:true}));assert.ok(C.validate(p).some(x=>x.includes('máximo 32')));});
+
+test('local variable TSV matches Sysmac Internals column order without a header',()=>{const lines=C.localVariablesTSV().split(/\r?\n/);assert.ok(!lines[0].startsWith('Name\t'));for(const line of lines){const cols=line.split('\t');assert.equal(cols.length,7);assert.ok(cols[0]);assert.ok(cols[1]);}const first=lines[0].split('\t');assert.equal(first[0],'Web_State');assert.equal(first[1],'UINT');assert.equal(first[2],'0');assert.equal(first[3],'');assert.equal(first[4],'');assert.equal(first[5],'');});
