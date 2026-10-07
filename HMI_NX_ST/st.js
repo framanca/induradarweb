@@ -1,5 +1,5 @@
 (function(root){'use strict';const C=root.NXST,enc=new TextEncoder();
-function stLiteral(s){return String(s).replace(/\$/g,()=> '$').replace(/'/g,()=> "
+function stLiteral(s){return String(s).replace(/\$/g,()=> '$$').replace(/'/g,()=> "$'").replace(/\r/g,()=> '$r').replace(/\n/g,()=> '$n');}
 function chunks(text,max=1400){const out=[];for(let i=0;i<text.length;i+=max)out.push(text.slice(i,i+max));return out;}
 function toStringExpr(v){if(v.type==='BOOL')return null;if(v.type==='STRING')return v.name;return v.type+'_TO_STRING('+v.name+')';}
 function fromStringExpr(v){if(v.type==='BOOL')return null;return 'STRING_TO_'+v.type+'(Web_ValueText)';}
