@@ -53,3 +53,5 @@ test('STRING write uses raw POST body and ST direct assignment',()=>{const p=C.n
 test('runtime exposes alarm window with active count and list',()=>{const p=C.demoProject();const h=C.buildRuntimeHTML(p);assert.match(h,/id="alarmOpen"/);assert.match(h,/id="alarmWindow"/);assert.match(h,/id="alarmList"/);assert.match(h,/alarmCount\.textContent/);assert.match(h,/alarmbar\.onclick/);assert.match(h,/ACTIVA/);});
 
 test('STRING recipes compile to escaped ST literals',()=>{const p=C.newProject();const v=C.importSysmac('Name\tData Type\nProduct\tSTRING[80]')[0];v.access='RW';v.expose=true;p.variables=[v];p.recipes=[{id:'r',name:'R',values:{Product:"Lote A"}}];const s=C.buildST(p);assert.match(s,/Product := 'Lote A';/);});
+
+test('runtime text widgets keep editor left alignment',()=>{const h=C.buildRuntimeHTML(C.demoProject());assert.match(h,/\.text \.in\{justify-content:flex-start;text-align:left\}/);});
