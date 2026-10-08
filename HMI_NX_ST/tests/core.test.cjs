@@ -18,8 +18,18 @@ test('external variable TSV references exposed global variables',()=>{const p=C.
 
 test('button modes and REAL precision are exported to runtime',()=>{const p=C.demoProject();const h=C.buildRuntimeHTML(p);assert.match(h,/"actionMode":"set"/);assert.match(h,/"decimals":2/);assert.match(h,/mode==="toggle"/);assert.match(h,/toFixed\(d\)/);});
 
-test('button binding requires BOOL and decimals stay within range',()=>{const p=C.demoProject();const button=p.objects.find(o=>o.kind==='button');button.binding='Process_Setpoint';assert.ok(C.validate(p).some(x=>x.includes('requiere BOOL')));button.binding='Start_Request';const value=p.objects.find(o=>o.kind==='value');value.decimals=7;assert.ok(C.validate(p).some(x=>x.includes('decimales')));});
+test('button binding requires BOOL and decimals stay within range',()=>{const p=C.demoProject();const button=p.screens[0].objects.find(o=>o.kind==='button');button.binding='Process_Setpoint';assert.ok(C.validate(p).some(x=>x.includes('requiere BOOL')));button.binding='Start_Request';const value=p.screens[0].objects.find(o=>o.kind==='value');value.decimals=7;assert.ok(C.validate(p).some(x=>x.includes('decimales')));});
 
 test('responsive width defaults and validation are stable',()=>{const p=C.newProject();assert.equal(p.minDisplayWidth,480);assert.equal(p.maxDisplayWidth,1920);assert.equal(C.validate(p).filter(x=>x.includes('ancho mínimo')||x.includes('ancho máximo')).length,0);p.minDisplayWidth=2000;p.maxDisplayWidth=1000;assert.ok(C.validate(p).some(x=>x.includes('mínimo no puede superar')));});
 
 test('runtime fits stage to browser width with min and max limits',()=>{const p=C.demoProject();p.minDisplayWidth=480;p.maxDisplayWidth=1600;const h=C.buildRuntimeHTML(p);assert.match(h,/"minDisplayWidth":480/);assert.match(h,/"maxDisplayWidth":1600/);assert.match(h,/id="viewport"/);assert.match(h,/function fitStage\(\)/);assert.match(h,/ResizeObserver/);assert.match(h,/target=Math\.max\(minW,Math\.min\(maxW,available\)\)/);});
+
+test('multi-screen projects are embedded with navigation',()=>{const p=C.demoProject();const s=C.newScreen('Mantenimiento');s.objects.push(Object.assign(C.newObject('lamp'),{binding:'Machine_Running'}));p.screens.push(s);const h=C.buildRuntimeHTML(p);assert.match(h,/Mantenimiento/);assert.match(h,/showScreen/);assert.equal(C.validate(p).length,0);});
+
+test('industrial widgets and images are supported',()=>{const p=C.demoProject();p.assets.push({id:'img1',name:'logo.png',data:'data:image/png;base64,AA=='});p.screens[0].objects.push(Object.assign(C.newObject('image'),{assetId:'img1'}));p.screens[0].objects.push(Object.assign(C.newObject('pump'),{binding:'Machine_Running'}));const h=C.buildRuntimeHTML(p);assert.match(h,/data:image\/png;base64,AA==/);assert.match(h,/industrial/);assert.equal(C.validate(p).length,0);});
+
+test('alarms are evaluated in generated ST and returned by api read',()=>{const p=C.demoProject();const s=C.buildST(p);assert.match(s,/A1=1\$n/);assert.match(s,/Process_Level > REAL#90\.0/);assert.match(s,/A1=0\$n/);});
+
+test('recipes compile into one PLC recipe CASE route',()=>{const p=C.demoProject();const s=C.buildST(p);assert.match(s,/POST \/api\/recipe\?/);assert.match(s,/Process_Setpoint := REAL#50\.0/);assert.match(s,/BAD RECIPE/);const h=C.buildRuntimeHTML(p);assert.match(h,/applyRecipe/);});
+
+test('old one-screen object projects migrate',()=>{const p=C.newProject();const old={...p,objects:[C.newObject('text')]};delete old.screens;const n=C.normalize(old);assert.equal(n.screens.length,1);assert.equal(n.screens[0].objects.length,1);});

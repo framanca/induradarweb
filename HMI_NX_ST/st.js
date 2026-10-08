@@ -3,23 +3,182 @@ function stLiteral(s){return String(s).replace(/\$/g,()=> '$$').replace(/'/g,()=
 function chunks(text,max=1400){const out=[];for(let i=0;i<text.length;i+=max)out.push(text.slice(i,i+max));return out;}
 function toStringExpr(v){if(v.type==='BOOL')return null;if(v.type==='STRING')return v.name;return v.type+'_TO_STRING('+v.name+')';}
 function fromStringExpr(v){if(v.type==='BOOL')return null;return 'STRING_TO_'+v.type+'(Web_ValueText)';}
-function buildST(p){
- const html=C.buildRuntimeHTML(p),parts=chunks(html),exposed=p.variables.filter(v=>v.expose&&v.live),rw=exposed.filter(v=>v.access==='RW'&&v.writeSupported);
- const read=[];for(const v of exposed){if(v.type==='BOOL'){read.push(`IF ${v.name} THEN\n    Web_ApiBody := CONCAT(Web_ApiBody, '${v.id}=1$n');\nELSE\n    Web_ApiBody := CONCAT(Web_ApiBody, '${v.id}=0$n');\nEND_IF;`);}else{const expr=toStringExpr(v);read.push(`Web_ApiBody := CONCAT(Web_ApiBody, '${v.id}=', ${expr}, '$n');`);}}
- const writes=rw.map(v=>{if(v.type==='BOOL')return `${v.id}: ${v.name} := (Web_ValueText = '1') OR (Web_ValueText = 'TRUE') OR (Web_ValueText = 'true');`;return `${v.id}: ${v.name} := ${fromStringExpr(v)};`;}).join('\n            ');
+function stTyped(v,value){if(v.type==='BOOL')return (value===true||String(value)==='1'||String(value).toLowerCase()==='true')?'TRUE':'FALSE';if(v.type==='REAL'||v.type==='LREAL'){const n=Number(value);return v.type+'#'+(Number.isInteger(n)?n.toFixed(1):String(n));}if(C.NUMERIC_TYPES.has(v.type))return v.type+'#'+String(Math.trunc(Number(value)));throw new Error('Tipo no escribible: '+v.type);}
+function alarmExpr(v,a){const op={eq:'=',ne:'<>',gt:'>',ge:'>=',lt:'<',le:'<='}[a.operator]||'=';return '('+v.name+' '+op+' '+stTyped(v,a.value)+')';}
+function buildST(input){
+ const p=C.normalize(input),html=C.buildRuntimeHTML(p),parts=chunks(html),exposed=p.variables.filter(v=>v.expose&&v.live),rw=exposed.filter(v=>v.access==='RW'&&v.writeSupported),vm=new Map(p.variables.map(v=>[v.name,v]));
+ const read=[];for(const v of exposed){if(v.type==='BOOL'){read.push(`IF ${v.name} THEN\n    Web_ApiBody := CONCAT(Web_ApiBody, '${v.id}=1$n');\nELSE\n    Web_ApiBody := CONCAT(Web_ApiBody, '${v.id}=0$n');\nEND_IF;`);}else{read.push(`Web_ApiBody := CONCAT(Web_ApiBody, '${v.id}=', ${toStringExpr(v)}, '$n');`);}}
+ for(const [i,a] of p.alarms.entries()){const v=vm.get(a.binding);if(!v)continue;read.push(`IF ${alarmExpr(v,a)} THEN\n    Web_ApiBody := CONCAT(Web_ApiBody, 'A${i+1}=1$n');\nELSE\n    Web_ApiBody := CONCAT(Web_ApiBody, 'A${i+1}=0$n');\nEND_IF;`);}
+ const writes=rw.map(v=>{if(v.type==='BOOL')return `${v.id}:\n                ${v.name} := (Web_ValueText = '1') OR (Web_ValueText = 'TRUE') OR (Web_ValueText = 'true');\n                Web_Found := TRUE;`;return `${v.id}:\n                ${v.name} := ${fromStringExpr(v)};\n                Web_Found := TRUE;`;}).join('\n            ');
+ const recipeCases=p.recipes.map((r,i)=>{const assigns=[];for(const [name,value] of Object.entries(r.values||{})){const v=vm.get(name);if(v&&v.access==='RW'&&v.writeSupported)assigns.push(`${v.name} := ${stTyped(v,value)};`);}return `${i+1}:\n                ${assigns.join('\n                ')||';'}\n                Web_Found := TRUE;`;}).join('\n            ');
  const chunkCases=parts.map((c,i)=>`${i}: Web_TxText := '${stLiteral(c)}';`).join('\n            ');
- return `(* HMI NX ST · POC generado automáticamente\n   Proyecto: ${p.name}\n   Puerto: ${p.port}\n   HTML embebido: ${enc.encode(html).length} bytes / ${parts.length} fragmentos\n\n   IMPORTANTE:\n   - POC de un cliente a la vez, HTTP/1.0, Connection: close.\n   - No es seguridad funcional ni servidor HTTPS.\n   - Las variables de máquina referenciadas deben existir como globales en el proyecto.\n   - Validar en NX102 aislado antes de usar con una máquina real.\n*)\n\nCASE Web_State OF\n0: // Inicialización de las instancias de socket\n    Web_Accept(Execute:=FALSE, SrcTcpPort:=UINT#${p.port}, TimeOut:=UINT#0);\n    Web_Rcv(Execute:=FALSE, Socket:=Web_Socket, TimeOut:=UINT#0, Size:=UINT#0, RcvDat:=Web_Rx[0]);\n    Web_Send(Execute:=FALSE, Socket:=Web_Socket, SendDat:=Web_Tx[0], Size:=UINT#0);\n    Web_Close(Execute:=FALSE, Socket:=Web_Socket);\n    Web_State := UINT#10;\n\n10: // Esperar un cliente TCP\n    Web_Accept(Execute:=TRUE, SrcTcpPort:=UINT#${p.port}, TimeOut:=UINT#0);\n    IF Web_Accept.Done THEN\n        Web_Socket := Web_Accept.Socket;\n        Web_Accept(Execute:=FALSE, SrcTcpPort:=UINT#${p.port}, TimeOut:=UINT#0);\n        Web_State := UINT#20;\n    ELSIF Web_Accept.Error THEN\n        Web_Accept(Execute:=FALSE, SrcTcpPort:=UINT#${p.port}, TimeOut:=UINT#0);\n    END_IF;\n\n20: // Recibir una petición HTTP (POC: cabecera completa <= 1900 bytes)\n    Web_Rcv(Execute:=TRUE, Socket:=Web_Socket, TimeOut:=UINT#50, Size:=UINT#1900, RcvDat:=Web_Rx[0]);\n    IF Web_Rcv.Done THEN\n        Web_RxText := AryToString(Web_Rx[0], Web_Rcv.RcvSize);\n        Web_Rcv(Execute:=FALSE, Socket:=Web_Socket, TimeOut:=UINT#0, Size:=UINT#0, RcvDat:=Web_Rx[0]);\n        Web_Request := UINT#0;\n        IF (FIND(Web_RxText, 'GET / ') = 1) OR (FIND(Web_RxText, 'GET /index.html ') = 1) THEN\n            Web_Request := UINT#1; // HTML\n        ELSIF FIND(Web_RxText, 'GET /api/read ') = 1 THEN\n            Web_Request := UINT#2; // Lectura\n        ELSIF FIND(Web_RxText, 'POST /api/write?') = 1 THEN\n            Web_Request := UINT#3; // Escritura\n        ELSE\n            Web_Request := UINT#9; // 404\n        END_IF;\n        Web_State := UINT#30;\n    ELSIF Web_Rcv.Error THEN\n        Web_Rcv(Execute:=FALSE, Socket:=Web_Socket, TimeOut:=UINT#0, Size:=UINT#0, RcvDat:=Web_Rx[0]);\n        Web_State := UINT#90;\n    END_IF;\n\n30: // Preparar respuesta\n    CASE Web_Request OF\n    1:\n        Web_TxText := 'HTTP/1.0 200 OK$r$nContent-Type: text/html; charset=utf-8$r$nCache-Control: no-store$r$nConnection: close$r$n$r$n';\n        Web_Chunk := UINT#0;\n    2:\n        Web_ApiBody := '';\n        ${read.join('\n        ')}\n        Web_TxText := 'HTTP/1.0 200 OK$r$nContent-Type: text/plain; charset=utf-8$r$nCache-Control: no-store$r$nConnection: close$r$n$r$n';\n    3:\n        Web_PosId := FIND(Web_RxText, '?id=');\n        Web_PosVal := FIND(Web_RxText, '&v=');\n        Web_PosEnd := FIND(Web_RxText, ' HTTP/');\n        IF (Web_PosId > 0) AND (Web_PosVal > Web_PosId) AND (Web_PosEnd > Web_PosVal) THEN\n            Web_IdText := MID(In:=Web_RxText, L:=Web_PosVal-(Web_PosId+UINT#4), P:=Web_PosId+UINT#4);\n            Web_ValueText := MID(In:=Web_RxText, L:=Web_PosEnd-(Web_PosVal+UINT#3), P:=Web_PosVal+UINT#3);\n            Web_WriteId := STRING_TO_UINT(Web_IdText);\n            CASE Web_WriteId OF\n            ${writes||'0: ; // No hay variables RW compatibles seleccionadas.'}\n            ELSE\n                ;\n            END_CASE;\n            Web_ApiBody := 'OK';\n            Web_TxText := 'HTTP/1.0 200 OK$r$nContent-Type: text/plain$r$nCache-Control: no-store$r$nConnection: close$r$n$r$n';\n        ELSE\n            Web_ApiBody := 'BAD REQUEST';\n            Web_TxText := 'HTTP/1.0 400 Bad Request$r$nContent-Type: text/plain$r$nConnection: close$r$n$r$n';\n        END_IF;\n    ELSE\n        Web_ApiBody := 'NOT FOUND';\n        Web_TxText := 'HTTP/1.0 404 Not Found$r$nContent-Type: text/plain$r$nConnection: close$r$n$r$n';\n    END_CASE;\n    Web_State := UINT#40;\n\n40: // Enviar cabecera\n    Web_TxSize := StringToAry(Web_TxText, Web_Tx[0]);\n    Web_Send(Execute:=TRUE, Socket:=Web_Socket, SendDat:=Web_Tx[0], Size:=Web_TxSize);\n    IF Web_Send.Done THEN\n        Web_Send(Execute:=FALSE, Socket:=Web_Socket, SendDat:=Web_Tx[0], Size:=UINT#0);\n        IF Web_Request = UINT#1 THEN Web_State := UINT#50; ELSE Web_State := UINT#60; END_IF;\n    ELSIF Web_Send.Error THEN\n        Web_Send(Execute:=FALSE, Socket:=Web_Socket, SendDat:=Web_Tx[0], Size:=UINT#0);\n        Web_State := UINT#90;\n    END_IF;\n\n50: // Enviar HTML por fragmentos <= 1400 caracteres\n    CASE Web_Chunk OF\n            ${chunkCases}\n    ELSE\n        Web_TxText := '';\n    END_CASE;\n    Web_TxSize := StringToAry(Web_TxText, Web_Tx[0]);\n    Web_Send(Execute:=TRUE, Socket:=Web_Socket, SendDat:=Web_Tx[0], Size:=Web_TxSize);\n    IF Web_Send.Done THEN\n        Web_Send(Execute:=FALSE, Socket:=Web_Socket, SendDat:=Web_Tx[0], Size:=UINT#0);\n        IF Web_Chunk >= UINT#${parts.length-1} THEN Web_State := UINT#90; ELSE Web_Chunk := Web_Chunk + UINT#1; END_IF;\n    ELSIF Web_Send.Error THEN\n        Web_Send(Execute:=FALSE, Socket:=Web_Socket, SendDat:=Web_Tx[0], Size:=UINT#0);\n        Web_State := UINT#90;\n    END_IF;\n\n60: // Enviar cuerpo de API\n    Web_TxText := Web_ApiBody;\n    Web_TxSize := StringToAry(Web_TxText, Web_Tx[0]);\n    Web_Send(Execute:=TRUE, Socket:=Web_Socket, SendDat:=Web_Tx[0], Size:=Web_TxSize);\n    IF Web_Send.Done OR Web_Send.Error THEN\n        Web_Send(Execute:=FALSE, Socket:=Web_Socket, SendDat:=Web_Tx[0], Size:=UINT#0);\n        Web_State := UINT#90;\n    END_IF;\n\n90: // Cerrar conexión y volver a escuchar\n    Web_Close(Execute:=TRUE, Socket:=Web_Socket);\n    IF Web_Close.Done OR Web_Close.Error THEN\n        Web_Close(Execute:=FALSE, Socket:=Web_Socket);\n        Web_State := UINT#10;\n    END_IF;\nEND_CASE;\n`;
+ return `(* HMI NX ST · servidor WebHMI generado
+   Proyecto: ${p.name}
+   Puerto: ${p.port}
+   HTML embebido: ${enc.encode(html).length} bytes / ${parts.length} fragmentos
+   Funciones: RW, pantallas, imágenes, widgets industriales, alarmas actuales y recetas.
+   Seguridad funcional e interlocks permanecen en el programa de máquina.
+*)
+
+CASE Web_State OF
+0:
+    Web_Accept(Execute:=FALSE, SrcTcpPort:=UINT#${p.port}, TimeOut:=UINT#0);
+    Web_Rcv(Execute:=FALSE, Socket:=Web_Socket, TimeOut:=UINT#0, Size:=UINT#0, RcvDat:=Web_Rx[0]);
+    Web_Send(Execute:=FALSE, Socket:=Web_Socket, SendDat:=Web_Tx[0], Size:=UINT#0);
+    Web_Close(Execute:=FALSE, Socket:=Web_Socket);
+    Web_State := UINT#10;
+
+10:
+    Web_Accept(Execute:=TRUE, SrcTcpPort:=UINT#${p.port}, TimeOut:=UINT#0);
+    IF Web_Accept.Done THEN
+        Web_Socket := Web_Accept.Socket;
+        Web_Accept(Execute:=FALSE, SrcTcpPort:=UINT#${p.port}, TimeOut:=UINT#0);
+        Web_State := UINT#20;
+    ELSIF Web_Accept.Error THEN
+        Web_Accept(Execute:=FALSE, SrcTcpPort:=UINT#${p.port}, TimeOut:=UINT#0);
+    END_IF;
+
+20:
+    Web_Rcv(Execute:=TRUE, Socket:=Web_Socket, TimeOut:=UINT#50, Size:=UINT#1900, RcvDat:=Web_Rx[0]);
+    IF Web_Rcv.Done THEN
+        Web_RxText := AryToString(Web_Rx[0], Web_Rcv.RcvSize);
+        Web_Rcv(Execute:=FALSE, Socket:=Web_Socket, TimeOut:=UINT#0, Size:=UINT#0, RcvDat:=Web_Rx[0]);
+        Web_Request := UINT#0;
+        IF (FIND(Web_RxText, 'GET / ') = 1) OR (FIND(Web_RxText, 'GET /index.html ') = 1) THEN
+            Web_Request := UINT#1;
+        ELSIF FIND(Web_RxText, 'GET /api/read ') = 1 THEN
+            Web_Request := UINT#2;
+        ELSIF FIND(Web_RxText, 'POST /api/write?') = 1 THEN
+            Web_Request := UINT#3;
+        ELSIF FIND(Web_RxText, 'POST /api/recipe?') = 1 THEN
+            Web_Request := UINT#4;
+        ELSE
+            Web_Request := UINT#9;
+        END_IF;
+        Web_State := UINT#30;
+    ELSIF Web_Rcv.Error THEN
+        Web_Rcv(Execute:=FALSE, Socket:=Web_Socket, TimeOut:=UINT#0, Size:=UINT#0, RcvDat:=Web_Rx[0]);
+        Web_State := UINT#90;
+    END_IF;
+
+30:
+    CASE Web_Request OF
+    1:
+        Web_TxText := 'HTTP/1.0 200 OK$r$nContent-Type: text/html; charset=utf-8$r$nCache-Control: no-store$r$nConnection: close$r$n$r$n';
+        Web_Chunk := UINT#0;
+
+    2:
+        Web_ApiBody := '';
+        ${read.join('\n        ')}
+        Web_TxText := 'HTTP/1.0 200 OK$r$nContent-Type: text/plain; charset=utf-8$r$nCache-Control: no-store$r$nConnection: close$r$n$r$n';
+
+    3:
+        Web_PosId := FIND(Web_RxText, '?id=');
+        Web_PosVal := FIND(Web_RxText, '&v=');
+        Web_PosEnd := FIND(Web_RxText, ' HTTP/');
+        Web_Found := FALSE;
+        IF (Web_PosId > 0) AND (Web_PosVal > Web_PosId) AND (Web_PosEnd > Web_PosVal) THEN
+            Web_IdText := MID(In:=Web_RxText, L:=Web_PosVal-(Web_PosId+UINT#4), P:=Web_PosId+UINT#4);
+            Web_ValueText := MID(In:=Web_RxText, L:=Web_PosEnd-(Web_PosVal+UINT#3), P:=Web_PosVal+UINT#3);
+            Web_WriteId := STRING_TO_UINT(Web_IdText);
+            CASE Web_WriteId OF
+            ${writes||'0: ;'}
+            ELSE
+                ;
+            END_CASE;
+        END_IF;
+        IF Web_Found THEN
+            Web_ApiBody := 'OK';
+            Web_TxText := 'HTTP/1.0 200 OK$r$nContent-Type: text/plain$r$nCache-Control: no-store$r$nConnection: close$r$n$r$n';
+        ELSE
+            Web_ApiBody := 'BAD WRITE';
+            Web_TxText := 'HTTP/1.0 400 Bad Request$r$nContent-Type: text/plain$r$nConnection: close$r$n$r$n';
+        END_IF;
+
+    4:
+        Web_PosId := FIND(Web_RxText, '?id=');
+        Web_PosEnd := FIND(Web_RxText, ' HTTP/');
+        Web_Found := FALSE;
+        IF (Web_PosId > 0) AND (Web_PosEnd > Web_PosId) THEN
+            Web_IdText := MID(In:=Web_RxText, L:=Web_PosEnd-(Web_PosId+UINT#4), P:=Web_PosId+UINT#4);
+            Web_WriteId := STRING_TO_UINT(Web_IdText);
+            CASE Web_WriteId OF
+            ${recipeCases||'0: ;'}
+            ELSE
+                ;
+            END_CASE;
+        END_IF;
+        IF Web_Found THEN
+            Web_ApiBody := 'OK';
+            Web_TxText := 'HTTP/1.0 200 OK$r$nContent-Type: text/plain$r$nCache-Control: no-store$r$nConnection: close$r$n$r$n';
+        ELSE
+            Web_ApiBody := 'BAD RECIPE';
+            Web_TxText := 'HTTP/1.0 400 Bad Request$r$nContent-Type: text/plain$r$nConnection: close$r$n$r$n';
+        END_IF;
+
+    ELSE
+        Web_ApiBody := 'NOT FOUND';
+        Web_TxText := 'HTTP/1.0 404 Not Found$r$nContent-Type: text/plain$r$nConnection: close$r$n$r$n';
+    END_CASE;
+    Web_State := UINT#40;
+
+40:
+    Web_TxSize := StringToAry(Web_TxText, Web_Tx[0]);
+    Web_Send(Execute:=TRUE, Socket:=Web_Socket, SendDat:=Web_Tx[0], Size:=Web_TxSize);
+    IF Web_Send.Done THEN
+        Web_Send(Execute:=FALSE, Socket:=Web_Socket, SendDat:=Web_Tx[0], Size:=UINT#0);
+        IF Web_Request = UINT#1 THEN Web_State := UINT#50; ELSE Web_State := UINT#60; END_IF;
+    ELSIF Web_Send.Error THEN
+        Web_Send(Execute:=FALSE, Socket:=Web_Socket, SendDat:=Web_Tx[0], Size:=UINT#0);
+        Web_State := UINT#90;
+    END_IF;
+
+50:
+    CASE Web_Chunk OF
+            ${chunkCases}
+    ELSE
+        Web_TxText := '';
+    END_CASE;
+    Web_TxSize := StringToAry(Web_TxText, Web_Tx[0]);
+    Web_Send(Execute:=TRUE, Socket:=Web_Socket, SendDat:=Web_Tx[0], Size:=Web_TxSize);
+    IF Web_Send.Done THEN
+        Web_Send(Execute:=FALSE, Socket:=Web_Socket, SendDat:=Web_Tx[0], Size:=UINT#0);
+        IF Web_Chunk >= UINT#${parts.length-1} THEN Web_State := UINT#90; ELSE Web_Chunk := Web_Chunk + UINT#1; END_IF;
+    ELSIF Web_Send.Error THEN
+        Web_Send(Execute:=FALSE, Socket:=Web_Socket, SendDat:=Web_Tx[0], Size:=UINT#0);
+        Web_State := UINT#90;
+    END_IF;
+
+60:
+    Web_TxText := Web_ApiBody;
+    Web_TxSize := StringToAry(Web_TxText, Web_Tx[0]);
+    Web_Send(Execute:=TRUE, Socket:=Web_Socket, SendDat:=Web_Tx[0], Size:=Web_TxSize);
+    IF Web_Send.Done OR Web_Send.Error THEN
+        Web_Send(Execute:=FALSE, Socket:=Web_Socket, SendDat:=Web_Tx[0], Size:=UINT#0);
+        Web_State := UINT#90;
+    END_IF;
+
+90:
+    Web_Close(Execute:=TRUE, Socket:=Web_Socket);
+    IF Web_Close.Done OR Web_Close.Error THEN
+        Web_Close(Execute:=FALSE, Socket:=Web_Socket);
+        Web_State := UINT#10;
+    END_IF;
+END_CASE;
+`;
 }
-function externalVariablesTSV(p){return p.variables.filter(v=>v.expose&&v.live).map(v=>[v.name,v.type].join('\t')).join('\r\n');}
+function referencedVariables(p){const n=C.normalize(p),set=new Set(n.variables.filter(v=>v.expose&&v.live).map(v=>v.name));for(const s of n.screens)for(const o of s.objects)if(o.binding)set.add(o.binding);for(const a of n.alarms)if(a.binding)set.add(a.binding);for(const r of n.recipes)for(const k of Object.keys(r.values||{}))set.add(k);return n.variables.filter(v=>set.has(v.name));}
+function externalVariablesTSV(p){return referencedVariables(p).map(v=>[v.name,v.type].join('\t')).join('\r\n');}
 function localVariablesTSV(){const rows=[
 ['Web_State','UINT','0','','','','Estado servidor HTTP'],
 ['Web_Request','UINT','0','','','','Ruta solicitada'],
 ['Web_Chunk','UINT','0','','','','Fragmento HTML'],
-['Web_WriteId','UINT','0','','','','ID variable escritura'],
+['Web_WriteId','UINT','0','','','','ID escritura/receta'],
 ['Web_PosId','UINT','0','','','','Posición id'],
 ['Web_PosVal','UINT','0','','','','Posición valor'],
 ['Web_PosEnd','UINT','0','','','','Fin request line'],
 ['Web_TxSize','UINT','0','','','','Bytes a enviar'],
+['Web_Found','BOOL','FALSE','','','','Ruta/ID válido'],
 ['Web_Rx','ARRAY[0..1999] OF BYTE','','','','','Buffer RX'],
 ['Web_Tx','ARRAY[0..1999] OF BYTE','','','','','Buffer TX'],
 ['Web_RxText','STRING[1985]','','','','','Petición HTTP'],
@@ -33,7 +192,42 @@ function localVariablesTSV(){const rows=[
 ['Web_Send','SktTCPSend','','','','','Send TCP'],
 ['Web_Close','SktClose','','','','','Close TCP']
 ];return rows.map(r=>r.join('\t')).join('\r\n');}
-function readme(p,html,st){return `HMI NX ST · primera versión independiente\n\nProyecto: ${p.name}\nPuerto: ${p.port}\nHTML embebido: ${enc.encode(html).length} bytes\nST generado: ${enc.encode(st).length} bytes\n\nOBJETIVO\n- Pegar WebHMI_Server.st como cuerpo de un Program ST en Sysmac Studio.\n- Abrir WebHMI_LocalVariables.tsv, copiar todas sus filas y pegarlas desde la primera celda Name vacía de Internals. El archivo ya sigue el orden Sysmac: Name, Data Type, Initial Value, AT, Retain, Constant, Comment y no incluye cabecera.\n- Abrir WebHMI_ExternalVariables.tsv y pegar sus filas en la pestaña Externals del mismo Program, empezando por Name. Son referencias a las variables globales usadas por la HMI.\n- Las variables de máquina referenciadas deben existir previamente en Global Variables con los mismos nombres/tipos.\n- Asignar el programa a una tarea cíclica y transferir al NX.\n- Abrir http://IP_DEL_NX:${p.port}/\n\nALCANCE POC\n- 1 cliente simultáneo.\n- HTTP/1.0 y conexión cerrada después de cada petición.\n- GET / sirve HTML autocontenido desde literales ST.\n- GET /api/read devuelve todas las variables expuestas.\n- POST /api/write?id=N&v=VAL permite BOOL y tipos numéricos RW.\n- Sin SD, sin librería REST de pago, sin servidor externo.\n\nLIMITACIONES IMPORTANTES\n- Este código NO se ha compilado todavía en Sysmac Studio ni probado en NX102 físico.\n- La recepción POC presupone que la petición HTTP cabe en <=1900 bytes de una lectura; la siguiente versión debe acumular TCP fragmentado antes de considerarse robusta.\n- No HTTPS, usuarios, recetas, alarmas históricas ni varios clientes en esta versión.\n- El servidor no es para seguridad funcional, E-stop ni jog mantenido.\n- Use un puerto libre >=1024; el puerto 80 pertenece al servidor HTTP del sistema.\n\nREFERENCIAS OMRON\n- TCP Server sample (ST): https://automation-knowledge-base.omron.eu/support/solutions/articles/103000352893-sample-program-tcp-server-for-nj-nx\n- TCP Server for NJ/NX Controller in ST: https://automation-knowledge-base.omron.eu/support/solutions/articles/103000320620-tcp-server-for-nj-nx-controller-in-st\n- Instructions Reference W502: SktTCPAccept, SktTCPRcv, SktTCPSend, SktClose, StringToAry, AryToString.\n`}
+function readme(input,html,st){const p=C.normalize(input);return `HMI NX ST · paquete generado
 
+Proyecto: ${p.name}
+Puerto: ${p.port}
+Pantallas: ${p.screens.length}
+Imágenes: ${p.assets.length}
+Alarmas actuales: ${p.alarms.length}
+Recetas: ${p.recipes.length}
+HTML embebido: ${enc.encode(html).length} bytes
+ST generado: ${enc.encode(st).length} bytes
+
+INSTALACIÓN
+- Pegar WebHMI_Server.st en un Program ST.
+- Pegar WebHMI_LocalVariables.tsv en Internals.
+- Pegar WebHMI_ExternalVariables.tsv en Externals.
+- Las variables referenciadas deben existir como Global Variables con el mismo nombre/tipo.
+- Asignar el Program a una tarea y transferir al NX.
+- Abrir http://IP_DEL_NX:${p.port}/
+
+FUNCIONES
+- Escritura directa BOOL y numérica RW.
+- Botones SET/RESET/TOGGLE.
+- Varias pantallas.
+- Imágenes embebidas como data URL.
+- Widgets: motor, bomba, válvula, depósito, cinta, sensor.
+- Alarmas actuales evaluadas en ST y enviadas en /api/read.
+- Recetas compiladas en ST y aplicadas en una sola ejecución del CASE de receta.
+
+LÍMITES ACTUALES
+- 1 cliente simultáneo.
+- HTTP/1.0 con Connection: close.
+- Petición <=1900 bytes en una recepción.
+- Alarmas: estado actual, sin histórico/ACK persistente todavía.
+- Recetas: valores compilados con la exportación; editar una receta exige regenerar/transferir ST.
+- Sin HTTPS ni gestión de usuarios todavía.
+- No usar la HMI para funciones de seguridad.
+`;}
 Object.assign(C,{buildST,localVariablesTSV,externalVariablesTSV,readme});
 })(globalThis);
