@@ -33,3 +33,11 @@ test('alarms are evaluated in generated ST and returned by api read',()=>{const 
 test('recipes compile into one PLC recipe CASE route',()=>{const p=C.demoProject();const s=C.buildST(p);assert.match(s,/POST \/api\/recipe\?/);assert.match(s,/Process_Setpoint := REAL#50\.0/);assert.match(s,/BAD RECIPE/);const h=C.buildRuntimeHTML(p);assert.match(h,/applyRecipe/);});
 
 test('old one-screen object projects migrate',()=>{const p=C.newProject();const old={...p,objects:[C.newObject('text')]};delete old.screens;const n=C.normalize(old);assert.equal(n.screens.length,1);assert.equal(n.screens[0].objects.length,1);});
+
+test('button can navigate to another screen without PLC variable',()=>{const p=C.demoProject();const second=C.newScreen('Manual');p.screens.push(second);const b=C.newObject('button');b.text='Ir Manual';b.actionType='navigate';b.targetScreenId=second.id;b.binding='';p.screens[0].objects.push(b);assert.equal(C.validate(p).filter(x=>x.includes('Ir Manual')).length,0);const h=C.buildRuntimeHTML(p);assert.match(h,/"actionType":"navigate"/);assert.match(h,new RegExp(second.id));assert.match(h,/showScreenById/);});
+
+test('navigation button rejects missing target screen',()=>{const p=C.demoProject();const b=C.newObject('button');b.text='Ir';b.actionType='navigate';b.targetScreenId='missing';p.screens[0].objects.push(b);assert.ok(C.validate(p).some(x=>x.includes('pantalla destino')));});
+
+test('image budgets are strict per image and project total',()=>{const p=C.demoProject();const mk=n=>'data:image/png;base64,'+Buffer.alloc(n).toString('base64');p.assets=[{id:'big',name:'big.png',data:mk(C.IMAGE_MAX_BYTES+1)}];assert.ok(C.validate(p).some(x=>x.includes('64 KB')));p.assets=Array.from({length:5},(_,i)=>({id:'i'+i,name:'i'+i+'.png',data:mk(60*1024)}));assert.ok(C.validate(p).some(x=>x.includes('256 KB')));});
+
+test('export hard-blocks embedded HTML above 512 KB',()=>{const p=C.demoProject();p.screens[0].objects.push(Object.assign(C.newObject('text'),{text:'X'.repeat(C.HTML_MAX_BYTES)}));assert.throws(()=>C.exportPackage(p),/512 KB/);});
