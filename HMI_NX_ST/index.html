@@ -10,12 +10,13 @@
 <script defer src="runtime.js"></script>
 <script defer src="st.js"></script>
 <script defer src="zip.js"></script>
+<script defer src="history.js"></script>
 <script defer src="app.js"></script>
 </head>
 <body>
 <header class="topbar">
   <div><strong>HMI NX ST</strong><span>WebHMI embebida en Structured Text</span></div>
-  <div class="top-actions"><span id="saveStatus" class="save-status" title="Copia automática local">Iniciando autosave…</span><button id="recoveryBtn">Recuperar</button><button id="demoBtn">Demo</button><button id="newBtn">Nuevo</button><button id="saveBtn">Guardar proyecto</button><button id="loadBtn">Abrir</button><button id="exportBtn" class="primary">Exportar Sysmac</button></div>
+  <div class="top-actions"><span id="saveStatus" class="save-status" title="Copia automática local">Iniciando autosave…</span><button id="recoveryBtn">Recuperar</button><button id="undoBtn" title="Deshacer (Ctrl+Z)" aria-label="Deshacer" disabled>↶ Deshacer</button><button id="redoBtn" title="Rehacer (Ctrl+Y / Ctrl+Mayús+Z)" aria-label="Rehacer" disabled>↷ Rehacer</button><button id="demoBtn">Demo</button><button id="newBtn">Nuevo</button><button id="saveBtn">Guardar proyecto</button><button id="loadBtn">Abrir</button><button id="exportBtn" class="primary">Exportar Sysmac</button></div>
 </header>
 <div class="notice"><strong>NX102 validado:</strong> servidor ST, HTML embebido y lectura real. Escritura, pantallas, alarmas y recetas deben volver a validarse en hardware tras cada evolución.</div>
 <main class="layout">
