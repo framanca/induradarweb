@@ -32,3 +32,9 @@ Un cliente simultáneo, HTTP/1.0 con `Connection: close`, una sola pantalla, pet
 - **Deshacer/Rehacer es temporal** y se reinicia al abrir otro proyecto. Para revertir borrados después de cerrar o refrescar, usar «Recuperar» y sus instantáneas de respaldo. Descargar periódicamente `.nxst`: el almacenamiento del navegador no equivale a una copia externa y no se comparte entre otros equipos/perfiles.
 
 Pruebas del historial: `node HMI_NX_ST/tests/history.test.cjs`. Además de estas pruebas unitarias, validar manualmente en Chrome, Firefox y Safari los flujos de borrar/cancelar/deshacer/refrescar y pérdida de almacenamiento.
+
+## Navegación de la HMI generada
+
+La cabecera de operación presenta una única barra de navegación con el selector **Pantalla** y, a su lado, el botón **Alarmas**, que mantiene el indicador del número de alarmas activas. Al seleccionar una pantalla se conserva la navegación por los botones internos configurados por el diseñador, actualizándose siempre la selección del desplegable. La vista de alarmas sigue siendo una ventana superpuesta; abrirla no cambia la pantalla activa. Se mantiene un diseño responsive con controles táctiles adecuados para móvil.
+
+Prueba de regresión: `node --test HMI_NX_ST/tests/navigation.test.cjs`.
