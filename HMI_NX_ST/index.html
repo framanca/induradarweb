@@ -15,7 +15,7 @@
 <body>
 <header class="topbar">
   <div><strong>HMI NX ST</strong><span>WebHMI embebida en Structured Text</span></div>
-  <div class="top-actions"><button id="demoBtn">Demo</button><button id="newBtn">Nuevo</button><button id="saveBtn">Guardar proyecto</button><button id="loadBtn">Abrir</button><button id="exportBtn" class="primary">Exportar Sysmac</button></div>
+  <div class="top-actions"><span id="saveStatus" class="save-status" title="Copia automática local">Iniciando autosave…</span><button id="recoveryBtn">Recuperar</button><button id="demoBtn">Demo</button><button id="newBtn">Nuevo</button><button id="saveBtn">Guardar proyecto</button><button id="loadBtn">Abrir</button><button id="exportBtn" class="primary">Exportar Sysmac</button></div>
 </header>
 <div class="notice"><strong>NX102 validado:</strong> servidor ST, HTML embebido y lectura real. Escritura, pantallas, alarmas y recetas deben volver a validarse en hardware tras cada evolución.</div>
 <main class="layout">
@@ -76,6 +76,7 @@
 </main>
 <dialog id="pasteDialog"><form method="dialog"><h2>Importar variables de Sysmac</h2><textarea id="pasteText" rows="16"></textarea><div id="pasteError" class="error"></div><div class="dialog-actions"><button value="cancel">Cancelar</button><button id="pasteImport" type="button" class="primary">Importar</button></div></form></dialog>
 <dialog id="previewDialog"><div class="dialog-wide"><div class="dialog-title"><h2>Vista previa</h2><button id="closePreview">✕</button></div><iframe id="previewFrame"></iframe></div></dialog>
+<dialog id="recoveryDialog"><div class="recovery-panel"><div class="dialog-title"><h2>Copias automáticas</h2><button id="closeRecovery">✕</button></div><p class="hint">Las copias se guardan sólo en este navegador. Recuperar sustituye el proyecto abierto, guardándolo antes como copia de seguridad.</p><div id="recoveryList"></div><div class="dialog-actions"><button id="discardDrafts" class="danger">Borrar copias locales</button><button id="closeRecovery2">Cerrar</button></div></div></dialog>
 <input id="projectFile" type="file" accept=".json,.nxst" hidden>
 <div id="toast"></div>
 </body>
