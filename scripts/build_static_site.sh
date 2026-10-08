@@ -29,15 +29,17 @@ for source in index.html style.css "${hmi_scripts[@]}"; do
 done
 
 # HMI NX ST is a separate experimental editor. It does not replace HMI_NX.
-hmi_st_scripts=(model.js runtime.js st.js zip.js app.js)
+hmi_st_scripts=(model.js runtime.js st.js zip.js history.js app.js)
 for source in "${hmi_st_scripts[@]}"; do
   node --check "HMI_NX_ST/$source"
 done
-node --test HMI_NX_ST/tests/core.test.cjs
+node --test HMI_NX_ST/tests/*.test.cjs
 mkdir -p "$output_dir/HMI_NX_ST"
 for source in index.html style.css "${hmi_st_scripts[@]}"; do
   cp "HMI_NX_ST/$source" "$output_dir/HMI_NX_ST/$source"
 done
+# Catch missing JS dependencies in both published editors before Pages deployment.
+node scripts/verify_webhmi_bundle.cjs "$output_dir"
 
 mkdir -p "$output_dir/assets/config"
 cp assets/InduRadarLogoVertical-600.webp "$output_dir/assets/"
