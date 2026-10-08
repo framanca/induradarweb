@@ -118,3 +118,25 @@ test('status widget can map visual ON to TRUE or FALSE',()=>{const p=C.newProjec
 test('editor exposes state OFF ON previews and numeric input limit fields',()=>{const app=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8');assert.match(app,/Estado ON cuando BOOL =/);assert.match(app,/class="state-pair"/);assert.match(app,/C\.statusSvg\(o\.symbolType,false\)/);assert.match(app,/C\.statusSvg\(o\.symbolType,true\)/);assert.match(app,/data-p="inputMin"/);assert.match(app,/data-p="inputMax"/);assert.match(app,/Se admiten valores negativos/);});
 
 test('editor supports context menu and keyboard widget copy paste',()=>{const app=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8'),html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8'),css=fs.readFileSync(path.join(__dirname,'..','style.css'),'utf8');assert.match(app,/function copyWidget\(\)/);assert.match(app,/function pasteWidget\(\)/);assert.match(app,/o\.id=C\.id\(\)/);assert.match(app,/n\.oncontextmenu=e=>showWidgetMenu\(e,o\.id\)/);assert.match(app,/key==='c'/);assert.match(app,/key==='v'/);assert.match(app,/input,textarea,select,\[contenteditable\]/);assert.match(html,/id="widgetMenu"/);assert.match(css,/widget-menu\[hidden\]/);});
+
+
+test('eight HMI widgets validate, export their properties and compile standalone runtime',()=>{
+ const p=C.demoProject();
+ p.variables.push({id:7,name:'Mode',type:'INT',stringLength:255,comment:'Modo',access:'RW',expose:true,live:true,writeSupported:true});
+ for(const kind of ['slider','switch','selector','multistate','gauge','stepper','counter','dropdown']){
+  const o=C.newObject(kind);
+  o.binding=kind==='switch'?'Machine_Running':['selector','multistate','dropdown'].includes(kind)?'Mode':'Process_Setpoint';
+  o.min=-20;o.max=100;o.step=.5;o.optionsText='0=Paro|#dc2626\n1=Marcha|#16a34a';
+  p.screens[0].objects.push(o);
+ }
+ assert.equal(C.validate(p).length,0);
+ const h=C.buildRuntimeHTML(p);
+ for(const kind of ['slider','switch','selector','multistate','gauge','stepper','counter','dropdown'])assert.ok(h.includes('"kind":"'+kind+'"'));
+ assert.match(h,/function optionsFor/);
+ assert.match(h,/gauge-ring/);
+ assert.match(h,/if\(o.kind==="counter"\)/);
+ assert.match(h,/input.onchange=\(\)=>write/);
+ assert.match(h,/const move=delta=>write/);
+ const script=h.match(/<script>([\s\S]*)<\/script>/)[1];
+ assert.doesNotThrow(()=>new Function(script));
+});

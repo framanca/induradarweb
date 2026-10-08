@@ -45,7 +45,7 @@ jobs:
           python -u HMI_NX/tests/acceptance_browser.py
       - name: Verify published WebHMI ST editor buttons in Chromium
         run: |
-          bash scripts/build_static_site.sh build/site > /tmp/hmi-site-build.log
+          bash scripts/build_static_site.sh build/site > /tmp/hmi-site-build.log 2>&1 || { cat /tmp/hmi-site-build.log; exit 1; }
           (cd build/site && python -m http.server 8766 --bind 127.0.0.1 > /tmp/hmi-st-http.log 2>&1) &
           SERVER_PID=$!
           trap 'kill "$SERVER_PID" || true' EXIT
