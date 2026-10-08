@@ -93,7 +93,7 @@ test('runtime keeps last good snapshot and marks stale instead of clearing value
 
 test('writes are queued, retried only within TTL and confirmed by readback',()=>{const h=C.buildRuntimeHTML(C.demoProject());assert.match(h,/pendingWrites=new Map/);assert.match(h,/WRITE_TTL=5000/);assert.match(h,/MAX_WRITE_ATTEMPTS=3/);assert.match(h,/function confirmWrites/);assert.match(h,/sameValue\(tag,vals\[name\],item\.raw\)/);assert.match(h,/item\.state="retry"/);assert.match(h,/latest|pendingWrites\.set\(name/);assert.match(h,/No confirmado antes de caducar/);});
 
-test('input Enter uses the same write path as Apply',()=>{const h=C.buildRuntimeHTML(C.demoProject());assert.match(h,/i\.addEventListener\("keydown",e=>\{if\(e\.key==="Enter"\)/);assert.match(h,/const send=\(\)=>write\(o\.binding,i\.value\)/);});
+test('input Enter uses the same write path as Apply',()=>{const h=C.buildRuntimeHTML(C.demoProject());assert.match(h,/i\.addEventListener\("keydown",e=>\{if\(e\.key==="Enter"\)/);assert.match(h,/const send=\(\)=>write\(o\.binding,i\.value,\{min:o\.inputMin,max:o\.inputMax,node:n\}\)/);});
 
 test('server ST includes a cycle watchdog recovery path',()=>{const s=C.buildST(C.demoProject());assert.match(s,/Web_StateTicks > Web_WatchdogLimit/);assert.match(s,/Web_State := UINT#90/);const vars=C.localVariablesTSV();assert.match(vars,/Web_PrevState\tUINT/);assert.match(vars,/Web_StateTicks\tUDINT/);assert.match(vars,/Web_WatchdogLimit\tUDINT\t5000/);});
 
