@@ -45,3 +45,11 @@ test('export hard-blocks embedded HTML above 512 KB',()=>{const p=C.demoProject(
 test('editor warns before image embedding and auto-optimizes to WebP',()=>{const app=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8');assert.match(app,/confirm\('La imagen se incrusta dentro del programa del NX/);assert.match(app,/async function optimizeImage/);assert.match(app,/image\/webp/);assert.match(app,/IMAGE_OPTIMIZE_MAX_DIM/);assert.match(app,/Imagen optimizada:/);});
 
 test('image optimizer keeps conservative 1024 px ceiling',()=>{assert.equal(C.IMAGE_OPTIMIZE_MAX_DIM,1024);});
+
+test('STRING can be RW input up to 512 bytes',()=>{const v=C.importSysmac('Name\tData Type\nText\tSTRING[80]')[0];assert.equal(v.writeSupported,true);v.access='RW';const p=C.newProject();p.variables=[v];const o=C.newObject('input');o.binding='Text';p.screens[0].objects.push(o);assert.equal(C.validate(p).length,0);const tooLong=C.importSysmac('Name\tData Type\nBig\tSTRING[600]')[0];assert.equal(tooLong.writeSupported,false);});
+
+test('STRING write uses raw POST body and ST direct assignment',()=>{const p=C.newProject();const v=C.importSysmac('Name\tData Type\nText\tSTRING[80]')[0];v.access='RW';v.expose=true;p.variables=[v];const o=C.newObject('input');o.binding='Text';p.screens[0].objects.push(o);const h=C.buildRuntimeHTML(p);assert.match(h,/body:raw/);assert.match(h,/Content-Type":"text\/plain;charset=UTF-8"/);assert.ok(!h.includes('&v="+encodeURIComponent'));const s=C.buildST(p);assert.match(s,/Text := Web_ValueText;/);assert.match(s,/Web_PosBody := FIND\(Web_RxText, '\$r\$n\$r\$n'\)/);assert.match(C.localVariablesTSV(),/Web_ValueText\tSTRING\[512\]/);});
+
+test('runtime exposes alarm window with active count and list',()=>{const p=C.demoProject();const h=C.buildRuntimeHTML(p);assert.match(h,/id="alarmOpen"/);assert.match(h,/id="alarmWindow"/);assert.match(h,/id="alarmList"/);assert.match(h,/alarmCount\.textContent/);assert.match(h,/alarmbar\.onclick/);assert.match(h,/ACTIVA/);});
+
+test('STRING recipes compile to escaped ST literals',()=>{const p=C.newProject();const v=C.importSysmac('Name\tData Type\nProduct\tSTRING[80]')[0];v.access='RW';v.expose=true;p.variables=[v];p.recipes=[{id:'r',name:'R',values:{Product:"Lote A"}}];const s=C.buildST(p);assert.match(s,/Product := 'Lote A';/);});
