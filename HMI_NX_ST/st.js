@@ -238,11 +238,11 @@ INSTALACIÓN
 
 FUNCIONES
 - Comunicación robusta: snapshots SEQ/END, actualización atómica y watchdog de estados.
-- Escritura directa BOOL, numérica y STRING RW.
+- Escritura directa BOOL, numérica y STRING RW; entradas numéricas con límites mínimo/máximo validados en navegador.
 - Botones SET/RESET/TOGGLE.
 - Varias pantallas.
 - Imágenes embebidas como data URL, estáticas o con cambio OFF/ON gobernado por BOOL.
-- Widgets: motor, bomba, válvula, depósito, cinta, sensor.
+- Estado BOOL con símbolos SVG integrados OFF/ON: lámpara, motor, bomba, válvula, cinta y sensor; mapeo TRUE/FALSE invertible.
 - Alarmas actuales evaluadas en ST, enviadas en /api/read y mostradas en ventana de alarmas.
 - Recetas compiladas en ST y aplicadas en una sola ejecución del CASE de receta.
 
