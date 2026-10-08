@@ -16,6 +16,8 @@ test('generated ST uses CONCAT for STRING assembly',()=>{const p=C.demoProject()
 
 test('external variable TSV references exposed global variables',()=>{const p=C.demoProject();const x=C.externalVariablesTSV(p).split(/\r?\n/);assert.equal(x.length,4);assert.equal(x[0],'Machine_Running\tBOOL');assert.ok(x.some(line=>line==='Process_Setpoint\tREAL'));const o=C.exportPackage(p);assert.ok(o.files['WebHMI_ExternalVariables.tsv']);});
 
+test('REAL and LREAL use decimal comma for display, canonical dot in numeric input and PLC wire',()=>{const h=C.buildRuntimeHTML(C.demoProject());assert.match(h,/n\.toFixed\(d\)\.replace\("\.",","\)/);assert.match(h,/function fmtInput\(o,v,empty=""\)/);assert.match(h,/n\.entry\.value=fmtInput\(o,v,""\)/);assert.match(h,/body:item\.raw/);const script=h.match(/<script>([\s\S]*)<\/script>/)[1];assert.doesNotThrow(()=>new Function(script));});
+
 test('button modes and REAL precision are exported to runtime',()=>{const p=C.demoProject();const h=C.buildRuntimeHTML(p);assert.match(h,/"actionMode":"set"/);assert.match(h,/"decimals":2/);assert.match(h,/mode==="toggle"/);assert.match(h,/toFixed\(d\)/);});
 
 test('button binding requires BOOL and decimals stay within range',()=>{const p=C.demoProject();const button=p.screens[0].objects.find(o=>o.kind==='button');button.binding='Process_Setpoint';assert.ok(C.validate(p).some(x=>x.includes('requiere BOOL')));button.binding='Start_Request';const value=p.screens[0].objects.find(o=>o.kind==='value');value.decimals=7;assert.ok(C.validate(p).some(x=>x.includes('decimales')));});
