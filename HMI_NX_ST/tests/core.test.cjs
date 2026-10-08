@@ -129,7 +129,7 @@ test('eight HMI widgets validate, export their properties and compile standalone
   o.min=-20;o.max=100;o.step=.5;o.optionsText='0=Paro|#dc2626\n1=Marcha|#16a34a';
   p.screens[0].objects.push(o);
  }
- assert.deepEqual(C.validate(p),[]);
+ assert.equal(C.validate(p).length,0);
  const h=C.buildRuntimeHTML(p);
  for(const kind of ['slider','switch','selector','multistate','gauge','stepper','counter','dropdown'])assert.ok(h.includes('"kind":"'+kind+'"'));
  assert.match(h,/function optionsFor/);
