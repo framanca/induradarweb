@@ -7,10 +7,10 @@
 const C=root.NXCore,legacy={...C},clone=C.copy;
 const VERSION=2;
 const KINDS=[...C.KINDS,'switch','selector','slider','level','circle','line','symbol','banner','audit','clock','user','navigation'];
-const SYMBOLS=['motor','pump','valve','cylinder','tank','sensor','conveyor'];
+const SYMBOLS=['motor','pump','valve','sensor','conveyor','cylinder','tank'];
 const roles=()=>[{id:'observer',name:'Observador'},{id:'operator',name:'Operador'},{id:'maintenance',name:'Mantenimiento'},{id:'admin',name:'Administrador de máquina'}];
 const view=(kind='screen',name='Pantalla')=>({id:C.id(),kind,name,width:1024,height:600,background:'#101c2c',masterId:'',slots:[],objects:[]});
-function props(o){return {writeBinding:o.binding||'',readRoles:['*'],operateRoles:['operator','maintenance','admin'],deniedMode:'disable',enabledBinding:'',confirm:false,confirmText:'¿Confirmas esta operación?',audit:true,locked:false,groupId:'',orientation:'horizontal',step:1,options:[{value:0,label:'Baja'},{value:1,label:'Media'},{value:2,label:'Alta'}],writeMode:'release',keyboard:true,rules:[],symbol:'motor',popupBindings:{},recipeEditRoles:['maintenance','admin'],recipeVariables:[],...o};}
+function props(o){return {writeBinding:o.binding||'',readRoles:['*'],operateRoles:['operator','maintenance','admin'],deniedMode:'disable',enabledBinding:'',confirm:false,confirmText:'¿Confirmas esta operación?',audit:true,locked:false,groupId:'',orientation:'horizontal',step:1,options:[{value:0,label:'Baja'},{value:1,label:'Media'},{value:2,label:'Alta'}],writeMode:'release',keyboard:true,rules:[],symbol:'motor',symbolOnState:'active',popupBindings:{},recipeEditRoles:['maintenance','admin'],recipeVariables:[],...o};}
 function migrate(source){
  const p=clone(source);if(![1,2].includes(p?.schemaVersion))throw new Error('Versión de proyecto no soportada');
  const from=p.schemaVersion;p.schemaVersion=VERSION;p.appVersion='0.2.0';p.revision=Number.isInteger(p.revision)?p.revision:1;
@@ -114,6 +114,7 @@ function validate(p,complete=true){
    for(const k of ['color','background','onColor','offColor'])if(!/^#[a-f0-9]{6}$/i.test(o[k]))err('Color inválido');
    checkRoles(o.readRoles,o.text);checkRoles(o.operateRoles,o.text);checkRoles(o.recipeEditRoles,o.text);
    if(!['hide','disable'].includes(o.deniedMode)||!['none','blink','rotate'].includes(o.animation))err('Apariencia no válida');
+   if(o.kind==='symbol'&&(!SYMBOLS.includes(o.symbol)||!['active','inactive'].includes(o.symbolOnState)))err('Estado gráfico no válido');
    if(!Number.isFinite(o.fontSize)||o.fontSize<8||o.fontSize>120)err('Tamaño de fuente no válido');
    if(!Array.isArray(o.rules)||o.rules.length>20)err('Reglas de animación no válidas');
    else for(const r of o.rules){if(!['x','y','rotate','width','height','color','text','visible','flow'].includes(r.property)||!['eq','ne','gt','ge','lt','le','range'].includes(r.operator))err('Regla desconocida');if(complete&&!variable(r.variable))err('Variable de regla: '+r.variable);if(r.operator==='range'&&(![r.from,r.to,r.outMin,r.outMax].every(Number.isFinite)||r.to<=r.from))err('Escala de regla no válida');if(r.property==='color'&&!/^#[a-f0-9]{6}$/i.test(r.output||''))err('Color de regla no válido');}

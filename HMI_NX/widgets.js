@@ -11,6 +11,43 @@ const symbols={
  sensor:'<rect x="18" y="54" width="67" height="57" rx="8"/><path d="M18 81H2M95 61q27 18 0 38M113 48q42 31 0 66M130 34q58 46 0 94"/><circle cx="52" cy="73" r="7"/>',
  conveyor:'<rect x="10" y="73" width="159" height="29" rx="14"/><circle cx="28" cy="88" r="8"/><circle cx="151" cy="88" r="8"/><path d="M26 104v30m126-30v30"/><g class="nx-flow"><path d="M41 88h94" stroke-dasharray="9 10"/></g><rect x="61" y="39" width="42" height="31" rx="3"/>'
 };
+const symbolStates={
+ motor:{
+  inactive:symbols.motor,
+  active:'<rect x="22" y="38" width="118" height="66" rx="12"/><path d="M43 32v79m15-79v79m15-79v79m15-79v79m15-79v79M140 57h28v27h-28M18 116h130"/><g class="nx-rotor"><circle cx="79" cy="70" r="23"/><path d="M79 50l7 14 16-2-10 12 8 14-17-5-11 12 1-17-15-8 16-7z"/></g><path class="nx-motion" d="M49 25q31-16 61-2M111 112q-31 16-61 2"/>'
+ },
+ pump:{
+  inactive:symbols.pump,
+  active:'<path d="M17 74h27M127 52V22h35M80 112v14M54 130h62"/><circle cx="86" cy="74" r="41"/><g class="nx-rotor"><circle cx="86" cy="74" r="8" class="nx-state-fill"/><path d="M86 43q18 8 20 25M117 74q-8 18-25 20M86 105q-18-8-20-25M55 74q8-18 25-20"/></g><g class="nx-flow"><path d="M125 30h37m-12-10 12 10-12 10" stroke-dasharray="8 8"/></g>'
+ },
+ valve:{
+  inactive:'<path d="M8 75h45m74 0h45"/><circle cx="90" cy="75" r="37"/><path d="M90 38v74M90 38V18M67 18h46"/><circle cx="90" cy="75" r="7" class="nx-state-fill"/>',
+  active:'<path d="M8 75h45m74 0h45"/><circle cx="90" cy="75" r="37"/><path d="M53 75h74M90 38V18M67 18h46"/><circle cx="90" cy="75" r="7" class="nx-state-fill"/>'
+ },
+ sensor:{
+  inactive:'<rect x="18" y="54" width="67" height="57" rx="8"/><path d="M18 81H2M96 63q22 17 0 34M112 50q37 29 0 62"/><circle cx="52" cy="73" r="7"/>',
+  active:'<rect x="18" y="54" width="67" height="57" rx="8"/><path d="M18 81H2"/><circle cx="52" cy="73" r="8" class="nx-state-fill"/><g class="nx-sensor-beam"><path d="M94 67h42M94 94h42"/><path d="M104 80h32"/></g><rect x="139" y="55" width="29" height="54" rx="4"/><path d="M146 65h15M146 99h15"/>'
+ },
+ conveyor:{
+  inactive:'<rect x="10" y="73" width="159" height="29" rx="14"/><circle cx="28" cy="88" r="8"/><circle cx="151" cy="88" r="8"/><path d="M26 104v30m126-30v30"/><rect x="49" y="39" width="42" height="31" rx="3"/>',
+  active:'<rect x="10" y="73" width="159" height="29" rx="14"/><circle cx="28" cy="88" r="8"/><circle cx="151" cy="88" r="8"/><path d="M26 104v30m126-30v30"/><g class="nx-flow"><path d="M42 88h92m-13-10 13 10-13 10" stroke-dasharray="9 10"/></g><rect x="101" y="39" width="42" height="31" rx="3"/>'
+ },
+ cylinder:{
+  inactive:'<rect x="14" y="44" width="100" height="57" rx="6"/><path d="M35 44v57M112 56h15v34h-15M127 74h18"/><rect x="143" y="48" width="10" height="54"/>',
+  active:'<rect x="14" y="44" width="100" height="57" rx="6"/><path d="M35 44v57M112 56h15v34h-15"/><g class="nx-arm"><path d="M127 74h44"/><rect x="161" y="48" width="10" height="54"/></g>'
+ },
+ tank:{
+  inactive:'<path d="M38 26Q85 2 132 26v103H38z"/><rect class="nx-fluid nx-state-fill" x="41" y="101" width="88" height="24"/><path d="M70 129v15h65M57 20v-9"/>',
+  active:'<path d="M38 26Q85 2 132 26v103H38z"/><rect class="nx-fluid nx-state-fill" x="41" y="55" width="88" height="70"/><path d="M70 129v15h65M57 20v-9"/>'
+ }
+};
+function symbolMarkup(type,state){const set=symbolStates[type]||symbolStates.motor;return set[state]||set.inactive;}
+function renderSymbol(host,type,state){
+ if(!host)return;const nextType=symbolStates[type]?type:'motor',nextState=state==='active'?'active':'inactive';
+ if(host.dataset.symbol===nextType&&host.dataset.state===nextState)return;
+ host.dataset.symbol=nextType;host.dataset.state=nextState;
+ host.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 150" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+symbolMarkup(nextType,nextState)+'</svg>';
+}
 function widget(o,p){
  const n=el('div',`nx-object nx-${o.kind}`);n.dataset.id=o.id;n.dataset.element=o.elementId||o.id;
  Object.assign(n.style,{left:o.x+'px',top:o.y+'px',width:o.w+'px',height:o.h+'px',color:o.color,background:o.background,fontSize:o.fontSize+'px'});
@@ -30,7 +67,7 @@ function widget(o,p){
  if(o.kind==='switch'){label();const b=el('button','nx-switch-button','—');b.type='button';b.setAttribute('role','switch');n.append(b,el('small','nx-readback','Leído: —'));}
  if(o.kind==='selector'){label();const select=el('select','nx-select-value');select.setAttribute('aria-label',o.text);for(const a of o.options){const option=el('option','',a.label);option.value=String(a.value);select.append(option);}n.append(select,el('small','nx-readback','Leído: —'));}
  if(o.kind==='slider'){if(o.orientation==='vertical')n.classList.add('vertical');label();const slider=el('input','nx-slider');slider.type='range';slider.min=o.min;slider.max=o.max;slider.step=o.step;slider.setAttribute('aria-label',o.text);n.append(slider,el('small','nx-slider-value','—'));if(o.writeMode==='apply')n.append(el('button','nx-slider-apply','Aplicar'));n.append(el('small','nx-readback','Leído: —'));}
- if(o.kind==='symbol'){label();const svg=el('div','nx-symbol');svg.innerHTML=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 150" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${symbols[o.symbol]||symbols.motor}</svg>`;n.append(svg);}
+ if(o.kind==='symbol'){label();const svg=el('div','nx-symbol');n.append(svg);}
  if(o.kind==='alarms'||o.kind==='banner'){
   label();if(o.kind==='alarms'){const tools=el('div','nx-record-filters');const filter=el('select','nx-alarm-filter');for(const [value,name]of [['all','Todas'],['active','Activas'],['unacked','Sin reconocer']]){const option=el('option','',name);option.value=value;filter.append(option);}const search=el('input','nx-record-search');search.placeholder='Buscar código o mensaje';tools.append(filter,search);const severity=el('select','nx-alarm-severity');for(const [value,name]of [['','Prioridad: todas'],['high','Alta'],['warning','Aviso'],['info','Información']]){const opt=el('option','',name);opt.value=value;severity.append(opt);}tools.append(severity);n.append(tools);}
   n.append(el('div','nx-alarm-rows'));if(o.kind==='alarms')n.append(recordFooter());
@@ -51,7 +88,7 @@ function refresh(n,o,p,values,quality,editing=false,session=null){
  n.classList.toggle('nx-blink',!editing&&o.animation==='blink'&&good&&!!value);n.classList.toggle('nx-rotate',!editing&&o.animation==='rotate'&&good&&!!value);
  n.classList.remove('nx-flowing');
  const baseText=n.querySelector('.nx-copy,.nx-label');if(baseText)baseText.textContent=o.text;
- if(o.kind==='symbol')n.style.color=good&&value?o.onColor:o.offColor;
+ if(o.kind==='symbol'){const onState=o.symbolOnState==='inactive'?'inactive':'active',graphicState=has&&good?(value?onState:(onState==='active'?'inactive':'active')):'inactive',svg=n.querySelector('.nx-symbol');renderSymbol(svg,o.symbol,graphicState);n.classList.toggle('nx-symbol-active',graphicState==='active'&&has&&good);n.classList.toggle('nx-symbol-unknown',!has||!good);n.style.color=has&&good?(value?o.onColor:o.offColor):'#778394';}
  if(!editing){for(const r of o.rules){const rg=typeof quality==='boolean'?quality:quality[r.variable]===true;if(!rg||!C.ruleMatch(r,values[r.variable]))continue;const v=C.ruleValue(r,values[r.variable]);
   if(r.property==='color')n.style.color=v;
   if(r.property==='text'){const t=n.querySelector('.nx-copy,.nx-label');if(t)t.textContent=String(v);}
@@ -67,7 +104,7 @@ function refresh(n,o,p,values,quality,editing=false,session=null){
  const txt=!has?'—':typeof value==='number'?value.toFixed(Math.max(0,Math.min(6,o.digits)))+(o.unit?' '+o.unit:''):String(value);
  if(['value','bar','level'].includes(o.kind))n.querySelector('.nx-number').textContent=txt;
  if(o.kind==='lamp'){n.querySelector('.nx-lamp-dot').style.background=has&&good?(value?o.onColor:o.offColor):'#778394';n.querySelector('.nx-state-label').textContent=has&&good?(value?'ON':'OFF'):'DESCONOCIDO';}
- if(o.kind==='symbol'){const fill=n.querySelector('.nx-fluid');if(fill&&has)fill.style.opacity=Math.max(0,Math.min(1,Number(value)/100));}
+ if(o.kind==='symbol'){const fill=n.querySelector('.nx-fluid');if(fill&&has&&typeof value==='number'&&value!==0&&value!==1)fill.style.opacity=Math.max(0,Math.min(1,Number(value)/100));}
  if(['bar','level'].includes(o.kind)){const fraction=Math.max(0,Math.min(100,100*(Number(value)-o.min)/(o.max-o.min)))||0;const f=n.querySelector('.nx-fill');if(n.classList.contains('vertical'))f.style.height=fraction+'%';else f.style.width=fraction+'%';}
  const readback=n.querySelector('.nx-readback');if(readback)readback.textContent=`Leído: ${txt}${good?'':' · dato no vigente'}`;
  if(o.kind==='input'){const input=n.querySelector('.nx-entry');if(document.activeElement!==input&&input.dataset.dirty!=='1')input.value=has?String(value):'';}
@@ -77,5 +114,5 @@ function refresh(n,o,p,values,quality,editing=false,session=null){
  if(o.kind==='clock')n.querySelector('.nx-clock-value').textContent=new Date().toLocaleString();
  if(o.kind==='user'){n.querySelector('.nx-user-name').textContent=session?`${session.name} · ${session.role}`:'Sin identificar';n.querySelector('.nx-login').textContent=session?'Cambiar usuario':'Identificarse';}
 }
-root.NXWidgets={el,widget,refresh,symbols};
+root.NXWidgets={el,widget,refresh,symbols,symbolMarkup};
 })(globalThis);
