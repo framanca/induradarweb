@@ -3,7 +3,7 @@ const LIVE_TYPES=new Set(['BOOL','SINT','USINT','INT','UINT','DINT','UDINT','LIN
 const WRITE_TYPES=new Set(['BOOL','SINT','USINT','INT','UINT','DINT','UDINT','LINT','ULINT','REAL','LREAL']);
 const NUMERIC_TYPES=new Set(['SINT','USINT','INT','UINT','DINT','UDINT','LINT','ULINT','REAL','LREAL']);
 const BOOL_WIDGETS=new Set(['lamp','motor','pump','valve','conveyor','sensor']);
-const IMAGE_MAX_BYTES=64*1024,IMAGE_TOTAL_MAX_BYTES=256*1024,HTML_MAX_BYTES=512*1024;
+const IMAGE_MAX_BYTES=64*1024,IMAGE_TOTAL_MAX_BYTES=256*1024,HTML_MAX_BYTES=512*1024,IMAGE_OPTIMIZE_MAX_DIM=1024;
 const enc=new TextEncoder();
 function dataUrlBytes(data){const s=String(data||''),i=s.indexOf(',');if(i<0)return enc.encode(s).length;const meta=s.slice(0,i),body=s.slice(i+1);if(/;base64$/i.test(meta)){const clean=body.replace(/\s/g,'');const pad=clean.endsWith('==')?2:clean.endsWith('=')?1:0;return Math.max(0,Math.floor(clean.length*3/4)-pad);}try{return enc.encode(decodeURIComponent(body)).length}catch{return enc.encode(body).length;}}
 const id=()=>Math.random().toString(36).slice(2,10);
@@ -26,5 +26,5 @@ function validate(input){const p=normalize(input),e=[];if(!Number.isInteger(+p.p
  const alarmIds=new Set();for(const a of p.alarms){if(alarmIds.has(a.id))e.push('ID de alarma duplicado.');alarmIds.add(a.id);const v=vm.get(a.binding);if(!v)e.push('Alarma '+a.name+': variable no válida.');if(!['eq','ne','gt','ge','lt','le'].includes(a.operator))e.push('Alarma '+a.name+': operador no válido.');if(v)try{typedFor(v,a.value)}catch{e.push('Alarma '+a.name+': umbral no válido.');}}
  for(const r of p.recipes){if(!r.name)e.push('Receta sin nombre.');for(const [name,val] of Object.entries(r.values||{})){const v=vm.get(name);if(!v||v.access!=='RW'||!v.writeSupported)e.push('Receta '+r.name+': '+name+' debe ser RW compatible.');else try{typedFor(v,val)}catch{e.push('Receta '+r.name+': valor inválido en '+name);}}}
  return [...new Set(e)];}
-root.NXST=Object.assign(root.NXST||{},{LIVE_TYPES,WRITE_TYPES,NUMERIC_TYPES,BOOL_WIDGETS,IMAGE_MAX_BYTES,IMAGE_TOTAL_MAX_BYTES,HTML_MAX_BYTES,dataUrlBytes,id,copy,esc,typeInfo,nameOK,parseDelimited,importSysmac,newProject,newScreen,newObject,demoProject,normalize,typedFor,validate});
+root.NXST=Object.assign(root.NXST||{},{LIVE_TYPES,WRITE_TYPES,NUMERIC_TYPES,BOOL_WIDGETS,IMAGE_MAX_BYTES,IMAGE_TOTAL_MAX_BYTES,HTML_MAX_BYTES,IMAGE_OPTIMIZE_MAX_DIM,dataUrlBytes,id,copy,esc,typeInfo,nameOK,parseDelimited,importSysmac,newProject,newScreen,newObject,demoProject,normalize,typedFor,validate});
 })(globalThis);
