@@ -69,6 +69,10 @@ test('selector único y botón Alarmas comparten la barra de navegación', () =>
   assert.deepEqual(Array.from(get('screenSelect').children, el => el.textContent), project.screens.map(s => s.name));
   assert.equal(get('screenSelect').value, '0');
   assert.ok(html.indexOf('id="screenSelect"') < html.indexOf('id="alarmOpen"'));
+  const nav = html.match(/<nav id="nav"[\s\S]*?<\/nav>/)?.[0] || '';
+  assert.ok(nav.indexOf('id="alarmOpen"') < nav.indexOf('id="alarmbar"'));
+  assert.match(nav, /id="alarmbar"/);
+  assert.doesNotMatch(html, /<\/nav><div id="alarmbar"/);
   assert.doesNotMatch(html, /<nav id="nav"><\/nav>/);
 });
 test('el desplegable y botones de navegación internos mantienen la selección', () => {
