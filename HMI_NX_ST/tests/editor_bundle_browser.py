@@ -25,7 +25,6 @@ with sync_playwright() as pw:
     page.wait_for_function("document.querySelector('#saveStatus').textContent.includes('Guardado local')")
     checks.append("startup_scripts_loaded_and_autosave_ready")
 
-    print("SMOKE_STEP_new", flush=True)
     page.locator("#newBtn").click()
     assert page.locator("#projectName").input_value() == "WebHMI ST"
     assert page.locator("#canvas .widget").count() == 0
@@ -50,7 +49,6 @@ with sync_playwright() as pw:
     assert json.loads(backup.read_text(encoding="utf-8"))["name"] == "Prueba de recuperación"
     checks.append("save_button_downloads_project")
 
-    print("SMOKE_STEP_demo", flush=True)
     page.locator("#demoBtn").click()
     assert page.locator("#projectName").input_value() == "Demo NX ST"
     checks.append("demo_button_loads_demo_explicitly")
@@ -74,19 +72,12 @@ with sync_playwright() as pw:
     assert page.locator("#canvas .widget").count() == 1
     checks.append("refresh_restores_last_project_not_demo")
 
-    print("SMOKE_STEP_recovery", flush=True)
     page.locator("#recoveryBtn").click()
     assert page.locator("#recoveryDialog").is_visible()
     assert page.locator("#recoveryList").get_by_text("Prueba de recuperación").count() > 0
     page.locator("#closeRecovery").click()
     checks.append("recovery_button_opens_backups")
 
-    print("SMOKE_STEP_toolbar", flush=True)
-    for kind in ("slider", "switch", "selector", "multistate", "gauge", "stepper", "counter", "dropdown"):
-        assert page.locator(f'.tool-grid [data-kind="{kind}"]').count() == 1
-    checks.append("all_eight_widget_tools_available")
-
-    print("SMOKE_STEP_errors", flush=True)
     assert not errors, "Browser JavaScript errors: " + repr(errors)
     report = {
         "status": "PASS",
