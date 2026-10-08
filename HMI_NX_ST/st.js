@@ -20,6 +20,23 @@ function buildST(input){
    Seguridad funcional e interlocks permanecen en el programa de máquina.
 *)
 
+IF Web_State = Web_PrevState THEN
+    IF (Web_State <> UINT#10) AND (Web_StateTicks < UDINT#4294967294) THEN
+        Web_StateTicks := Web_StateTicks + UDINT#1;
+    END_IF;
+ELSE
+    Web_PrevState := Web_State;
+    Web_StateTicks := UDINT#0;
+END_IF;
+
+IF (Web_State <> UINT#10) AND (Web_StateTicks > Web_WatchdogLimit) THEN
+    Web_Accept(Execute:=FALSE, SrcTcpPort:=UINT#${p.port}, TimeOut:=UINT#0);
+    Web_Rcv(Execute:=FALSE, Socket:=Web_Socket, TimeOut:=UINT#0, Size:=UINT#0, RcvDat:=Web_Rx[0]);
+    Web_Send(Execute:=FALSE, Socket:=Web_Socket, SendDat:=Web_Tx[0], Size:=UINT#0);
+    Web_State := UINT#90;
+    Web_StateTicks := UDINT#0;
+END_IF;
+
 CASE Web_State OF
 0:
     Web_Accept(Execute:=FALSE, SrcTcpPort:=UINT#${p.port}, TimeOut:=UINT#0);
@@ -68,8 +85,11 @@ CASE Web_State OF
         Web_Chunk := UINT#0;
 
     2:
-        Web_ApiBody := '';
+        Web_Seq := Web_Seq + UDINT#1;
+        IF Web_Seq = UDINT#0 THEN Web_Seq := UDINT#1; END_IF;
+        Web_ApiBody := CONCAT('SEQ=', UDINT_TO_STRING(Web_Seq), '$n');
         ${read.join('\n        ')}
+        Web_ApiBody := CONCAT(Web_ApiBody, 'END=', UDINT_TO_STRING(Web_Seq), '$n');
         Web_TxText := 'HTTP/1.0 200 OK$r$nContent-Type: text/plain; charset=utf-8$r$nCache-Control: no-store$r$nConnection: close$r$n$r$n';
 
     3:
@@ -171,6 +191,10 @@ function referencedVariables(p){const n=C.normalize(p),set=new Set(n.variables.f
 function externalVariablesTSV(p){return referencedVariables(p).map(v=>[v.name,v.type].join('\t')).join('\r\n');}
 function localVariablesTSV(){const rows=[
 ['Web_State','UINT','0','','','','Estado servidor HTTP'],
+['Web_PrevState','UINT','0','','','','Estado anterior watchdog'],
+['Web_StateTicks','UDINT','0','','','','Ciclos en estado actual'],
+['Web_WatchdogLimit','UDINT','5000','','','','Límite ciclos watchdog'],
+['Web_Seq','UDINT','0','','','','Secuencia snapshot API'],
 ['Web_Request','UINT','0','','','','Ruta solicitada'],
 ['Web_Chunk','UINT','0','','','','Fragmento HTML'],
 ['Web_WriteId','UINT','0','','','','ID escritura/receta'],
@@ -213,6 +237,7 @@ INSTALACIÓN
 - Abrir http://IP_DEL_NX:${p.port}/
 
 FUNCIONES
+- Comunicación robusta: snapshots SEQ/END, actualización atómica y watchdog de estados.
 - Escritura directa BOOL, numérica y STRING RW.
 - Botones SET/RESET/TOGGLE.
 - Varias pantallas.
@@ -225,6 +250,7 @@ LÍMITES ACTUALES
 - 1 cliente simultáneo.
 - HTTP/1.0 con Connection: close.
 - Petición <=1900 bytes en una recepción.
+- Web_WatchdogLimit es un límite en ciclos de tarea (5000 por defecto), no tiempo absoluto.
 - Alarmas: estado actual, sin histórico/ACK persistente todavía.
 - Recetas: valores compilados con la exportación; editar una receta exige regenerar/transferir ST.
 - Sin HTTPS ni gestión de usuarios todavía.
