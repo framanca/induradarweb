@@ -3,10 +3,10 @@ name: HMI NX validation
 on:
   push:
     branches: [main, feature/hmi-nx-v2-operations-20260923, test/hmi-nx-v2-acceptance-20260923]
-    paths: ['HMI_NX/**', '.github/workflows/hmi-nx-tests.yml', 'scripts/build_static_site.sh']
+    paths: ['HMI_NX/**', 'HMI_NX_ST/**', '.github/workflows/hmi-nx-tests.yml', 'scripts/build_static_site.sh', 'scripts/verify_webhmi_bundle.cjs']
   pull_request:
     branches: [main]
-    paths: ['HMI_NX/**', '.github/workflows/hmi-nx-tests.yml', 'scripts/build_static_site.sh']
+    paths: ['HMI_NX/**', 'HMI_NX_ST/**', '.github/workflows/hmi-nx-tests.yml', 'scripts/build_static_site.sh', 'scripts/verify_webhmi_bundle.cjs']
   workflow_dispatch:
 
 permissions:
@@ -43,6 +43,19 @@ jobs:
           HMI_BROWSER_ORIGIN=http://127.0.0.1:8765/HMI_NX/ \
           HMI_TEST_OUTPUT=HMI_NX_TEST_RESULTS \
           python -u HMI_NX/tests/acceptance_browser.py
+      - name: Verify published WebHMI ST editor buttons in Chromium
+        run: |
+          bash scripts/build_static_site.sh build/site > /tmp/hmi-site-build.log
+          (cd build/site && python -m http.server 8766 --bind 127.0.0.1 > /tmp/hmi-st-http.log 2>&1) &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" || true' EXIT
+          for attempt in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:8766/HMI_NX_ST/ > /dev/null; then break; fi
+            sleep 1
+          done
+          HMI_ST_BROWSER_ORIGIN=http://127.0.0.1:8766/HMI_NX_ST/ \
+          HMI_ST_TEST_OUTPUT=HMI_NX_ST_TEST_RESULTS \
+          python -u HMI_NX_ST/tests/editor_bundle_browser.py
       - name: Archive reviewed sources and acceptance evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -51,6 +64,9 @@ jobs:
           path: |
             HMI_NX/
             HMI_NX_TEST_RESULTS/
+            HMI_NX_ST/
+            HMI_NX_ST_TEST_RESULTS/
+            scripts/verify_webhmi_bundle.cjs
             scripts/build_static_site.sh
             .github/workflows/hmi-nx-tests.yml
           include-hidden-files: true
