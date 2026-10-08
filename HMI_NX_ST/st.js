@@ -2,8 +2,8 @@
 function stLiteral(s){return String(s).replace(/\$/g,()=> '$$').replace(/'/g,()=> "$'").replace(/\r/g,()=> '$r').replace(/\n/g,()=> '$n');}
 function chunks(text,max=1400){const out=[];for(let i=0;i<text.length;i+=max)out.push(text.slice(i,i+max));return out;}
 function toStringExpr(v){if(v.type==='BOOL')return null;if(v.type==='STRING')return v.name;return v.type+'_TO_STRING('+v.name+')';}
-function fromStringExpr(v){if(v.type==='BOOL')return null;return 'STRING_TO_'+v.type+'(Web_ValueText)';}
-function stTyped(v,value){if(v.type==='BOOL')return (value===true||String(value)==='1'||String(value).toLowerCase()==='true')?'TRUE':'FALSE';if(v.type==='REAL'||v.type==='LREAL'){const n=Number(value);return v.type+'#'+(Number.isInteger(n)?n.toFixed(1):String(n));}if(C.NUMERIC_TYPES.has(v.type))return v.type+'#'+String(Math.trunc(Number(value)));throw new Error('Tipo no escribible: '+v.type);}
+function fromStringExpr(v){if(v.type==='BOOL')return null;if(v.type==='STRING')return 'Web_ValueText';return 'STRING_TO_'+v.type+'(Web_ValueText)';}
+function stTyped(v,value){if(v.type==='BOOL')return (value===true||String(value)==='1'||String(value).toLowerCase()==='true')?'TRUE':'FALSE';if(v.type==='STRING')return "'"+stLiteral(String(value))+"'";if(v.type==='REAL'||v.type==='LREAL'){const n=Number(value);return v.type+'#'+(Number.isInteger(n)?n.toFixed(1):String(n));}if(C.NUMERIC_TYPES.has(v.type))return v.type+'#'+String(Math.trunc(Number(value)));throw new Error('Tipo no escribible: '+v.type);}
 function alarmExpr(v,a){const op={eq:'=',ne:'<>',gt:'>',ge:'>=',lt:'<',le:'<='}[a.operator]||'=';return '('+v.name+' '+op+' '+stTyped(v,a.value)+')';}
 function buildST(input){
  const p=C.normalize(input),html=C.buildRuntimeHTML(p),parts=chunks(html),exposed=p.variables.filter(v=>v.expose&&v.live),rw=exposed.filter(v=>v.access==='RW'&&v.writeSupported),vm=new Map(p.variables.map(v=>[v.name,v]));
@@ -74,12 +74,12 @@ CASE Web_State OF
 
     3:
         Web_PosId := FIND(Web_RxText, '?id=');
-        Web_PosVal := FIND(Web_RxText, '&v=');
         Web_PosEnd := FIND(Web_RxText, ' HTTP/');
+        Web_PosBody := FIND(Web_RxText, '$r$n$r$n');
         Web_Found := FALSE;
-        IF (Web_PosId > 0) AND (Web_PosVal > Web_PosId) AND (Web_PosEnd > Web_PosVal) THEN
-            Web_IdText := MID(In:=Web_RxText, L:=Web_PosVal-(Web_PosId+UINT#4), P:=Web_PosId+UINT#4);
-            Web_ValueText := MID(In:=Web_RxText, L:=Web_PosEnd-(Web_PosVal+UINT#3), P:=Web_PosVal+UINT#3);
+        IF (Web_PosId > 0) AND (Web_PosEnd > Web_PosId) AND (Web_PosBody > 0) THEN
+            Web_IdText := MID(In:=Web_RxText, L:=Web_PosEnd-(Web_PosId+UINT#4), P:=Web_PosId+UINT#4);
+            Web_ValueText := MID(In:=Web_RxText, L:=LEN(Web_RxText)-(Web_PosBody+UINT#3), P:=Web_PosBody+UINT#4);
             Web_WriteId := STRING_TO_UINT(Web_IdText);
             CASE Web_WriteId OF
             ${writes||'0: ;'}
@@ -177,6 +177,7 @@ function localVariablesTSV(){const rows=[
 ['Web_PosId','UINT','0','','','','Posición id'],
 ['Web_PosVal','UINT','0','','','','Posición valor'],
 ['Web_PosEnd','UINT','0','','','','Fin request line'],
+['Web_PosBody','UINT','0','','','','Inicio cuerpo HTTP'],
 ['Web_TxSize','UINT','0','','','','Bytes a enviar'],
 ['Web_Found','BOOL','FALSE','','','','Ruta/ID válido'],
 ['Web_Rx','ARRAY[0..1999] OF BYTE','','','','','Buffer RX'],
@@ -185,7 +186,7 @@ function localVariablesTSV(){const rows=[
 ['Web_TxText','STRING[1985]','','','','','Respuesta/fragmento'],
 ['Web_ApiBody','STRING[1985]','','','','','Datos API'],
 ['Web_IdText','STRING[12]','','','','','ID parseado'],
-['Web_ValueText','STRING[128]','','','','','Valor parseado'],
+['Web_ValueText','STRING[512]','','','','','Valor de escritura'],
 ['Web_Socket','_sSOCKET','','','','','Socket aceptado'],
 ['Web_Accept','SktTCPAccept','','','','','Accept TCP'],
 ['Web_Rcv','SktTCPRcv','','','','','Receive TCP'],
@@ -212,12 +213,12 @@ INSTALACIÓN
 - Abrir http://IP_DEL_NX:${p.port}/
 
 FUNCIONES
-- Escritura directa BOOL y numérica RW.
+- Escritura directa BOOL, numérica y STRING RW.
 - Botones SET/RESET/TOGGLE.
 - Varias pantallas.
 - Imágenes embebidas como data URL.
 - Widgets: motor, bomba, válvula, depósito, cinta, sensor.
-- Alarmas actuales evaluadas en ST y enviadas en /api/read.
+- Alarmas actuales evaluadas en ST, enviadas en /api/read y mostradas en ventana de alarmas.
 - Recetas compiladas en ST y aplicadas en una sola ejecución del CASE de receta.
 
 LÍMITES ACTUALES
