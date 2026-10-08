@@ -41,3 +41,7 @@ test('navigation button rejects missing target screen',()=>{const p=C.demoProjec
 test('image budgets are strict per image and project total',()=>{const p=C.demoProject();const mk=n=>'data:image/png;base64,'+Buffer.alloc(n).toString('base64');p.assets=[{id:'big',name:'big.png',data:mk(C.IMAGE_MAX_BYTES+1)}];assert.ok(C.validate(p).some(x=>x.includes('64 KB')));p.assets=Array.from({length:5},(_,i)=>({id:'i'+i,name:'i'+i+'.png',data:mk(60*1024)}));assert.ok(C.validate(p).some(x=>x.includes('256 KB')));});
 
 test('export hard-blocks embedded HTML above 512 KB',()=>{const p=C.demoProject();p.screens[0].objects.push(Object.assign(C.newObject('text'),{text:'X'.repeat(C.HTML_MAX_BYTES)}));assert.throws(()=>C.exportPackage(p),/512 KB/);});
+
+test('editor warns before image embedding and auto-optimizes to WebP',()=>{const app=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8');assert.match(app,/confirm\('La imagen se incrusta dentro del programa del NX/);assert.match(app,/async function optimizeImage/);assert.match(app,/image\/webp/);assert.match(app,/IMAGE_OPTIMIZE_MAX_DIM/);assert.match(app,/Imagen optimizada:/);});
+
+test('image optimizer keeps conservative 1024 px ceiling',()=>{assert.equal(C.IMAGE_OPTIMIZE_MAX_DIM,1024);});
