@@ -95,6 +95,8 @@ test('writes are queued, retried only within TTL and confirmed by readback',()=>
 
 test('input Enter uses the same write path as Apply',()=>{const h=C.buildRuntimeHTML(C.demoProject());assert.match(h,/i\.addEventListener\("keydown",e=>\{if\(e\.key==="Enter"\)/);assert.match(h,/const send=\(\)=>write\(o\.binding,i\.value,\{min:o\.inputMin,max:o\.inputMax,node:n\}\)/);});
 
+test('numeric input hides native spinners and blinks while an edit is not submitted',()=>{const h=C.buildRuntimeHTML(C.demoProject());assert.match(h,/-moz-appearance:textfield/);assert.match(h,/::-webkit-inner-spin-button/);assert.match(h,/@keyframes input-dirty-blink/);assert.match(h,/i\.addEventListener\("input",\(\)=>\{n\.inputDirty=true/);assert.match(h,/classList\.toggle\("input-dirty",Boolean\(n\.inputDirty\)\)/);assert.match(h,/!n\.inputDirty&&document\.activeElement!==n\.entry/);assert.match(h,/if\(write\(o\.binding,i\.value,\{min:o\.inputMin,max:o\.inputMax,node:n\}\)\)\{n\.inputDirty=false;paint\(\)\}/);});
+
 test('server ST includes a cycle watchdog recovery path',()=>{const s=C.buildST(C.demoProject());assert.match(s,/Web_StateTicks > Web_WatchdogLimit/);assert.match(s,/Web_State := UINT#90/);const vars=C.localVariablesTSV();assert.match(vars,/Web_PrevState\tUINT/);assert.match(vars,/Web_StateTicks\tUDINT/);assert.match(vars,/Web_WatchdogLimit\tUDINT\t5000/);});
 
 test('recipes remain single-shot and are not automatically retried',()=>{const h=C.buildRuntimeHTML(C.demoProject());assert.match(h,/ERROR RECETA \| no reintentada/);assert.match(h,/if\(pendingRecipe\)/);assert.ok(!/retry.*recipe/i.test(h));});
