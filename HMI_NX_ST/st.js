@@ -216,7 +216,7 @@ FUNCIONES
 - Escritura directa BOOL, numérica y STRING RW.
 - Botones SET/RESET/TOGGLE.
 - Varias pantallas.
-- Imágenes embebidas como data URL.
+- Imágenes embebidas como data URL, estáticas o con cambio OFF/ON gobernado por BOOL.
 - Widgets: motor, bomba, válvula, depósito, cinta, sensor.
 - Alarmas actuales evaluadas en ST, enviadas en /api/read y mostradas en ventana de alarmas.
 - Recetas compiladas en ST y aplicadas en una sola ejecución del CASE de receta.
