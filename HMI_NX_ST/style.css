@@ -5,3 +5,5 @@
 .top-actions{align-items:center}
 .top-actions button:disabled{opacity:.45;cursor:not-allowed}
 @media(max-width:850px){.topbar{align-items:flex-start}.top-actions{width:100%}}
+
+.widget-menu{position:fixed;z-index:1500;min-width:170px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:5px;box-shadow:0 10px 30px #0003}.widget-menu[hidden]{display:none}.widget-menu button{display:block;width:100%;border:0;text-align:left;background:transparent;padding:9px 11px}.widget-menu button:hover{background:#eff6ff}.widget-menu button:disabled{opacity:.4;cursor:not-allowed}
