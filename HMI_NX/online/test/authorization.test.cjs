@@ -7,6 +7,7 @@ const request=(body,token='valid',origin='https://induradar.com')=>new Request('
 test('frontend ships no compiler sources or calls',()=>{
  const html=fs.readFileSync(path.join(base,'public/index.html'),'utf8'),app=fs.readFileSync(path.join(base,'public/app.js'),'utf8');
  for(const file of ['st.js','zip.js','runtime.js','compiler.js']){assert.ok(!html.includes(file));assert.ok(!fs.existsSync(path.join(base,'public',file)));}
+ assert.ok(html.includes('id="previewFrame" sandbox="allow-scripts"'));
  assert.ok(!app.includes('exportPackage'));assert.ok(!app.includes('buildRuntimeHTML'));
 });
 test('missing identity, anonymous and unapproved accounts are denied',async()=>{

@@ -76,7 +76,7 @@
   </aside>
 </main>
 <dialog id="pasteDialog"><form method="dialog"><h2>Importar variables de Sysmac</h2><textarea id="pasteText" rows="16"></textarea><div id="pasteError" class="error"></div><div class="dialog-actions"><button value="cancel">Cancelar</button><button id="pasteImport" type="button" class="primary">Importar</button></div></form></dialog>
-<dialog id="previewDialog"><div class="dialog-wide"><div class="dialog-title"><h2>Vista previa</h2><button id="closePreview">✕</button></div><iframe id="previewFrame"></iframe></div></dialog>
+<dialog id="previewDialog"><div class="dialog-wide"><div class="dialog-title"><h2>Vista previa</h2><button id="closePreview">✕</button></div><iframe id="previewFrame" sandbox="allow-scripts"></iframe></div></dialog>
 <dialog id="recoveryDialog"><div class="recovery-panel"><div class="dialog-title"><h2>Copias automáticas</h2><button id="closeRecovery">✕</button></div><p class="hint">Las copias se guardan sólo en este navegador. Recuperar sustituye el proyecto abierto, guardándolo antes como copia de seguridad.</p><div id="recoveryList"></div><div class="dialog-actions"><button id="discardDrafts" class="danger">Borrar copias locales</button><button id="closeRecovery2">Cerrar</button></div></div></dialog>
 <input id="projectFile" type="file" accept=".json,.nxst" hidden>
 <div id="widgetMenu" class="widget-menu" role="menu" hidden><button type="button" role="menuitem" data-widget-action="copy">Copiar · Ctrl+C</button><button type="button" role="menuitem" data-widget-action="paste">Pegar · Ctrl+V</button></div>

@@ -22,6 +22,7 @@ def build(dest):
                 text=replace(text,f'<script defer src="{module}"></script>\n','')
             text=replace(text,'<script defer src="app.js"></script>','<script defer src="config.js"></script>\n<script defer src="online.js"></script>\n<script defer src="app.js"></script>')
             text=replace(text,'<link rel="stylesheet" href="style.css">','<link rel="stylesheet" href="style.css"><link rel="stylesheet" href="online.css">')
+            text=replace(text,'<iframe id="previewFrame">','<iframe id="previewFrame" sandbox="allow-scripts">')
             text=text.replace('HMI NX ST','HMI NX Online')
         if name == 'app.js':
             text=replace(text,"let p=C.demoProject()", "let p=C.newProject()")
