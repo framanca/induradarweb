@@ -24,6 +24,49 @@ function importSysmac(text){const trimmed=String(text||'').trim();if(!trimmed)th
 function newScreen(name='Principal',number=null){return{id:id(),name,number,background:'#ffffff',useBase:false,objects:[]};}
 function newBaseScreen(){return newScreen('Pantalla base',null);}
 function screenObjects(project,screen){return project.baseScreen&&screen!==project.baseScreen&&screen.useBase?[...project.baseScreen.objects,...screen.objects]:screen.objects;}
+function setScreenMode(project,screenId,mode){
+ if(!['normal','base','useBase'].includes(mode))throw new Error('Tipo de pantalla desconocido.');
+ const base=project.baseScreen&&project.baseScreen.id===screenId;
+ const screen=base?project.baseScreen:project.screens.find(s=>s.id===screenId);
+ if(!screen)throw new Error('Pantalla no encontrada.');
+ if(mode==='base'){
+  if(base)return screen;
+  if(project.baseScreen)throw new Error('Ya hay una pantalla base. Desmarca primero su propiedad.');
+  const originalIndex=project.screens.indexOf(screen);
+  project.screens.splice(originalIndex,1);
+  if(!project.screens.length){
+   const name=screen.name.toLowerCase()==='principal'?'Pantalla principal':'Principal';
+   project.screens.push(newScreen(name,screen.number));
+  }
+  screen.previousNumber=screen.number;
+  screen.previousIndex=originalIndex;
+  screen.number=null;
+  screen.useBase=false;
+  project.baseScreen=screen;
+  const fallback=project.screens[0];
+  for(const s of [...project.screens,screen])for(const object of s.objects||[]){
+   if(object.kind==='button'&&object.actionType==='navigate'&&object.targetScreenId===screenId)object.targetScreenId=fallback.id;
+  }
+  return screen;
+ }
+ if(base){
+  if(mode==='useBase')throw new Error('Una pantalla base no puede heredarse a sí misma.');
+  project.baseScreen=null;
+  const desired=Number(screen.previousNumber);
+  screen.number=Number.isInteger(desired)&&desired>=1&&desired<=MAX_SCREEN_NUMBER&&!project.screens.some(s=>s.number===desired)
+   ?desired:nextScreenNumber(project.screens);
+  const index=Number.isInteger(screen.previousIndex)?Math.max(0,Math.min(screen.previousIndex,project.screens.length)):project.screens.length;
+  delete screen.previousNumber;
+  delete screen.previousIndex;
+  screen.useBase=false;
+  project.screens.splice(index,0,screen);
+  for(const s of project.screens)s.useBase=false;
+  return screen;
+ }
+ if(mode==='useBase'&&!project.baseScreen)throw new Error('Primero convierte una pantalla en pantalla base.');
+ screen.useBase=mode==='useBase';
+ return screen;
+}
 function nextScreenNumber(screens){const used=new Set(screens.map(s=>Number(s.number)));for(let n=1;n<=MAX_SCREEN_NUMBER;n++)if(!used.has(n))return n;throw new Error('No quedan números de pantalla disponibles.');}
 function duplicateScreen(original,name,number=null){const clone=copy(original);clone.id=id();clone.name=name;clone.number=number;clone.objects=(clone.objects||[]).map(o=>({...o,id:id(),targetScreenId:o.actionType==='navigate'&&o.targetScreenId===original.id?clone.id:o.targetScreenId}));return clone;}
 function newProject(){return{name:'WebHMI ST',port:8080,pollMs:500,width:1024,height:600,minDisplayWidth:480,maxDisplayWidth:1920,screenBinding:'',variables:[],screens:[newScreen('Principal',1)],baseScreen:null,assets:[],alarms:[],recipes:[]};}
@@ -37,6 +80,6 @@ function validate(input){const p=normalize(input),e=[];if(!Number.isInteger(+p.p
  const alarmIds=new Set();for(const a of p.alarms){if(alarmIds.has(a.id))e.push('ID de alarma duplicado.');alarmIds.add(a.id);const v=vm.get(a.binding);if(!v)e.push('Alarma '+a.name+': variable no válida.');if(!['eq','ne','gt','ge','lt','le'].includes(a.operator))e.push('Alarma '+a.name+': operador no válido.');if(v&&v.type==='STRING'&&!['eq','ne'].includes(a.operator))e.push('Alarma '+a.name+': STRING sólo admite = o ≠.');if(v)try{typedFor(v,a.value)}catch{e.push('Alarma '+a.name+': umbral no válido.');}}
  for(const r of p.recipes){if(!r.name)e.push('Receta sin nombre.');for(const [name,val] of Object.entries(r.values||{})){const v=vm.get(name);if(!v||v.access!=='RW'||!v.writeSupported)e.push('Receta '+r.name+': '+name+' debe ser RW compatible.');else try{typedFor(v,val)}catch{e.push('Receta '+r.name+': valor inválido en '+name);}}}
  return [...new Set(e)];}
-root.NXST=Object.assign(root.NXST||{},{LIVE_TYPES,WRITE_TYPES,NUMERIC_TYPES,INTEGER_TYPES,MAX_SCREEN_NUMBER,BOOL_WIDGETS,STATUS_SYMBOLS,STATUS_LABELS,LEGACY_STATUS_KINDS,statusSvg,optionalNumber,IMAGE_MAX_BYTES,IMAGE_TOTAL_MAX_BYTES,HTML_MAX_BYTES,IMAGE_OPTIMIZE_MAX_DIM,dataUrlBytes,id,copy,esc,typeInfo,nameOK,parseDelimited,importSysmac,newProject,newScreen,newBaseScreen,screenObjects,nextScreenNumber,duplicateScreen,newObject,demoProject,normalize,typedFor,validate});
+root.NXST=Object.assign(root.NXST||{},{LIVE_TYPES,WRITE_TYPES,NUMERIC_TYPES,INTEGER_TYPES,MAX_SCREEN_NUMBER,BOOL_WIDGETS,STATUS_SYMBOLS,STATUS_LABELS,LEGACY_STATUS_KINDS,statusSvg,optionalNumber,IMAGE_MAX_BYTES,IMAGE_TOTAL_MAX_BYTES,HTML_MAX_BYTES,IMAGE_OPTIMIZE_MAX_DIM,dataUrlBytes,id,copy,esc,typeInfo,nameOK,parseDelimited,importSysmac,newProject,newScreen,newBaseScreen,screenObjects,setScreenMode,nextScreenNumber,duplicateScreen,newObject,demoProject,normalize,typedFor,validate});
 })(globalThis);
 
