@@ -36,7 +36,7 @@ with sync_playwright() as pw:
     assert page.locator("#screenSettingsDialog").is_visible()
     page.locator("#screenSettingsName").fill("Principal personalizada")
     page.locator("#screenSettingsNumber").fill("5")
-    page.locator("#screenSettingsBackground").fill("#cceeff")
+    page.locator("#screenSettingsBackground").evaluate("(el) => { el.value = '#cceeff'; el.dispatchEvent(new Event('input', {bubbles:true})); }")
     page.locator("#screenSettingsForm button[type=submit]").click()
     assert not page.locator("#screenSettingsDialog").is_visible()
     assert "5 · Principal personalizada" in page.locator("#screenSelect option").first.inner_text()
