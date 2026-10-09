@@ -119,6 +119,18 @@ function importSysmac(text){
 function validate(input){
  const errors=previousValidate(input),p=C.normalize(input);
  const found=new Set(),roots=new Map();
+ for(const r of p.recipes||[])for(const [name,value] of Object.entries(r.values||{})){
+  const variable=p.variables.find(v=>v.name===name);
+  if(!variable)continue;
+  if(variable.enumValues&&!Object.values(variable.enumValues).includes(Number(value)))errors.push('Receta '+r.name+': valor de enumeracion no definido en '+name);
+  if([...BIT_TYPES,...LONG_TYPES,'TIME','SINT','USINT','INT','UINT','DINT','UDINT',...DATE_TYPES].includes(variable.type))try{canonicalWrite(variable.type,value)}catch(e){errors.push('Receta '+r.name+' / '+name+': '+e.message)}
+ }
+ for(const alarm of p.alarms||[]){
+  const variable=p.variables.find(v=>v.name===alarm.binding);
+  if(!variable)continue;
+  if(variable.enumValues&&!Object.values(variable.enumValues).includes(Number(alarm.value)))errors.push('Alarma '+alarm.name+': valor de enumeracion no definido');
+  if([...BIT_TYPES,...LONG_TYPES,'TIME','SINT','USINT','INT','UINT','DINT','UDINT',...DATE_TYPES].includes(variable.type))try{canonicalWrite(variable.type,alarm.value)}catch(e){errors.push('Alarma '+alarm.name+': '+e.message)}
+ }
  for(const v of p.variables){
   if(!/^[A-Za-z_]\w*(?:\[-?\d+(?:,-?\d+){0,2}\])?(?:\.[A-Za-z_]\w*(?:\[-?\d+(?:,-?\d+){0,2}\])?)*$/.test(v.name))errors.push('Nombre Sysmac de variable no valido: '+v.name);
   if(found.has(v.name))errors.push('Variable duplicada: '+v.name);
