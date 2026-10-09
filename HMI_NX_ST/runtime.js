@@ -91,7 +91,7 @@ function paintAlarms(){
   name.textContent="["+String(a.severity).toUpperCase()+"] "+a.name;
   const ops={eq:"=",ne:"!=",gt:">",ge:">=",lt:"<",le:"<="};
   cond.textContent=a.binding+" "+(ops[a.operator]||a.operator)+" "+String(a.value);
-  ack.textContent=isAck?"✓ ACK":"Reconocer";
+  ack.textContent=isAck?"ACK OK":"Reconocer";
   ack.disabled=!isActive||isAck||comm.state!=="ONLINE"||pendingAck!==null;
   ack.onclick=()=>acknowledge(a.wireId);
   row.append(state,name,cond,ack);alarmList.append(row);
