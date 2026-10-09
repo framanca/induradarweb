@@ -187,7 +187,7 @@ CASE Web_State OF
 END_CASE;
 `;
 }
-function referencedVariables(p){const n=C.normalize(p),set=new Set(n.variables.filter(v=>v.expose&&v.live).map(v=>v.name));for(const s of n.screens)for(const o of s.objects){if(o.binding)set.add(o.binding);if(o.feedbackBinding)set.add(o.feedbackBinding);}for(const a of n.alarms)if(a.binding)set.add(a.binding);for(const r of n.recipes)for(const k of Object.keys(r.values||{}))set.add(k);return n.variables.filter(v=>set.has(v.name));}
+function referencedVariables(p){const n=C.normalize(p),set=new Set(n.variables.filter(v=>v.expose&&v.live).map(v=>v.name));if(n.screenBinding)set.add(n.screenBinding);for(const s of n.screens)for(const o of s.objects){if(o.binding)set.add(o.binding);if(o.feedbackBinding)set.add(o.feedbackBinding);}for(const a of n.alarms)if(a.binding)set.add(a.binding);for(const r of n.recipes)for(const k of Object.keys(r.values||{}))set.add(k);return n.variables.filter(v=>set.has(v.name));}
 function externalVariablesTSV(p){return referencedVariables(p).map(v=>[v.name,v.type].join('\t')).join('\r\n');}
 function localVariablesTSV(){const rows=[
 ['Web_State','UINT','0','','','','Estado servidor HTTP'],
@@ -240,7 +240,8 @@ FUNCIONES
 - Comunicación robusta: snapshots SEQ/END, actualización atómica y watchdog de estados.
 - Escritura directa BOOL, numérica y STRING RW; entradas numéricas con límites mínimo/máximo validados en navegador.
 - Botones SET/RESET/TOGGLE.
-- Varias pantallas.
+- Varias pantallas con número único, color de fondo y selección opcional por variable entera leída del PLC.
+- Si se configura control PLC, el valor de esa variable gobierna siempre la pantalla; si no coincide con ningún número (o es inválido), se muestra la principal. Sin comunicación válida, se mantiene la última pantalla y se indica pérdida de comunicación.
 - Imágenes embebidas como data URL, estáticas o con cambio OFF/ON gobernado por BOOL.
 - Estado BOOL con símbolos SVG integrados OFF/ON: lámpara, motor, bomba, válvula, cinta y sensor; mapeo TRUE/FALSE invertible.
 - Alarmas actuales evaluadas en ST, enviadas en /api/read y mostradas en ventana de alarmas.
