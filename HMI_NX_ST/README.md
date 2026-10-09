@@ -44,6 +44,21 @@ Prueba de regresión: `node --test HMI_NX_ST/tests/navigation.test.cjs`.
 
 En el editor, selecciona la pantalla y pulsa **✎ Editar pantalla** para cambiar su **nombre**, **número** (entero positivo único entre 1 y 65535) y **color de fondo**. El color se aplica tanto al lienzo como al HTML generado. Al copiar una pantalla se conservan el fondo y los widgets, pero se asigna un número nuevo para evitar colisiones; la primera pantalla de la lista es siempre la **principal**.
 
+
+### Pantalla base compartida
+
+No hay un botón independiente de «Pantalla base». Abre **✎ Editar pantalla** para elegir una de estas tres opciones:
+
+- **Ninguna casilla**: pantalla normal, con sus elementos propios.
+- **Convertir en pantalla base**: convierte la pantalla actual (conservando sus widgets, fondo y nombre) en la única base del proyecto. La base no se puede seleccionar mediante el número de pantalla del PLC.
+- **Utilizar pantalla base**: añade debajo de sus propios widgets los elementos de la base como capa bloqueada, actualizada automáticamente al editar su origen.
+
+Las dos casillas son excluyentes; no se permite crear una segunda base. Para recuperar la pantalla base como pantalla normal, desmarca **Convertir en pantalla base**. Las pantallas que la utilizaban dejan de heredarla, pero ningún widget del origen se elimina.
+
+Si se convierte en base la última pantalla normal, se genera otra pantalla navegable vacía y se reserva el número anterior para facilitar una posible reversión. Los botones que navegaban a la pantalla convertida se redirigen a la principal. Se guarda una copia local de recuperación antes de cambiar de tipo, y Deshacer permite volver atrás en la sesión.
+
+Ver `tests/base_screen.test.cjs` y `tests/editor_bundle_browser.py` para regresiones de herencia, exportación y persistencia.
+
 En **Proyecto → Control de pantalla desde PLC**, elige una variable entera importada de Sysmac (SINT, USINT, INT, UINT, DINT, UDINT, LINT o ULINT). El editor la marca como expuesta y el exportador la incluye en las variables Externals y en `/api/read`. El mapeo es por el **número configurado de pantalla**, no por índice del desplegable ni por nombre.
 
 Ejemplo: principal n.º 1, ajustes n.º 10, alarmas n.º 20. Si `CurrentScreen : UINT` vale 10, se muestra Ajustes. Con 20, Alarmas. Si vale 0, 999 o un número sin pantalla, se muestra la principal. La variable se monitoriza en cada snapshot válido del PLC.

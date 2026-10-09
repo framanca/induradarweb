@@ -178,30 +178,44 @@ with sync_playwright() as pw:
     page.locator("#closeRecovery").click()
     checks.append("recovery_button_opens_backups")
 
-    # La pantalla base se edita una vez y se hereda bajo los widgets propios.
+    # Convertir una pantalla ya creada en base desde el editor de propiedades.
     page.locator("#newBtn").click()
     main_id = page.locator("#screenSelect option").first.get_attribute("value")
-    page.locator("#baseScreenBtn").click()
-    base_id = page.locator("#screenSelect").input_value()
-    assert base_id != main_id
-    assert page.locator("#screenSelect option").count() == 2
+    assert page.locator("#baseScreenBtn").count() == 0
     page.locator("#editScreen").click()
-    assert not page.locator("#screenSettingsNumberRow").is_visible()
-    assert not page.locator("#screenSettingsUseBaseRow").is_visible()
+    assert not page.locator("#screenSettingsIsBase").is_checked()
+    assert not page.locator("#screenSettingsUseBase").is_checked()
+    assert page.locator("#screenSettingsUseBase").is_disabled()
     page.locator("#screenSettingsCancel").click()
+    page.locator("#addScreen").click()
+    source_id = page.locator("#screenSelect").input_value()
     select_sidebar("elements")
     page.locator(".tool-grid [data-kind='text']").click()
     page.locator("#properties [data-p='text']").fill("Cabecera compartida")
     page.locator("#properties [data-p='text']").press("Tab")
+    page.locator("#editScreen").click()
+    page.locator("#screenSettingsIsBase").check()
+    assert not page.locator("#screenSettingsUseBase").is_checked()
+    assert not page.locator("#screenSettingsNumberRow").is_visible()
+    page.locator("#screenSettingsForm button[type=submit]").click()
+    assert page.locator("#screenSelect").input_value() == source_id
+    assert page.locator("#screenSelect option").count() == 2
+    assert page.locator("#canvas .widget").count() == 1
+    page.locator("#editScreen").click()
+    assert page.locator("#screenSettingsIsBase").is_checked()
+    assert page.locator("#screenSettingsUseBase").is_disabled()
+    page.locator("#screenSettingsCancel").click()
     page.locator("#screenSelect").select_option(main_id)
     assert page.locator("#canvas .widget.inherited").count() == 0
     page.locator("#editScreen").click()
-    assert page.locator("#screenSettingsUseBaseRow").is_visible()
+    assert page.locator("#screenSettingsIsBase").is_disabled()
+    assert page.locator("#screenSettingsUseBase").is_visible()
     page.locator("#screenSettingsUseBase").check()
+    assert not page.locator("#screenSettingsIsBase").is_checked()
     page.locator("#screenSettingsForm button[type=submit]").click()
     assert page.locator("#canvas .widget.inherited").count() == 1
     assert "Cabecera compartida" in page.locator("#canvas .widget.inherited").inner_text()
-    page.locator("#screenSelect").select_option(base_id)
+    page.locator("#screenSelect").select_option(source_id)
     page.locator("#canvas .widget").click()
     page.locator("#properties [data-p='text']").fill("Cabecera actualizada")
     page.locator("#properties [data-p='text']").press("Tab")
@@ -215,8 +229,17 @@ with sync_playwright() as pw:
     page.locator("#screenSettingsUseBase").uncheck()
     page.locator("#screenSettingsForm button[type=submit]").click()
     assert page.locator("#canvas .widget.inherited").count() == 0
-    checks.append("base_layer_inheritance_updates_and_persists_without_copying")
-
+    # Desmarcar ambas opciones de la pantalla base la devuelve a una pantalla normal.
+    page.locator("#screenSelect").select_option(source_id)
+    page.locator("#editScreen").click()
+    page.locator("#screenSettingsIsBase").uncheck()
+    assert not page.locator("#screenSettingsUseBase").is_checked()
+    assert page.locator("#screenSettingsNumberRow").is_visible()
+    page.locator("#screenSettingsForm button[type=submit]").click()
+    assert page.locator("#screenSelect").input_value() == source_id
+    assert page.locator("#canvas .widget").count() == 1
+    assert page.locator("#screenSelect option").count() == 2
+    checks.append("screen_properties_convert_and_inherit_base_without_widget_loss")
 
     assert not errors, "Browser JavaScript errors: " + repr(errors)
     report = {
