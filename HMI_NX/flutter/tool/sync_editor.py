@@ -7,7 +7,7 @@ APP = Path(__file__).resolve().parents[1]
 REPO = APP.parents[1]
 SOURCE = REPO / "HMI_NX_ST"
 DEST = APP / "assets" / "editor"
-FILES = ["index.html", "style.css", "model.js", "runtime.js", "st.js", "zip.js", "history.js", "app.js"]
+FILES = ["index.html", "style.css", "expressions.js", "model.js", "runtime.js", "st.js", "zip.js", "history.js", "app.js"]
 
 
 def once(text, before, after):
