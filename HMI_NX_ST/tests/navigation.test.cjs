@@ -65,7 +65,7 @@ function prepare(options={}) {
     document: { getElementById: get, createElement: tag => new FakeElement(tag), activeElement: null },
     window: { innerWidth: 480, addEventListener() {} },
     fetch: async () => ({ ok: true, text: async () => snapshotText }),
-    setTimeout() {}, clearTimeout() {},
+    setTimeout() {}, clearTimeout() {}, AbortController,
     TextEncoder
   };
   vm.runInNewContext(script + ';globalThis.__ui={P,showScreen,showScreenById,alarmVals,paintAlarms,readSnapshot,failComm,comm}', context, {timeout: 2000});
