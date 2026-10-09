@@ -38,6 +38,9 @@ mkdir -p "$output_dir/HMI_NX_ST"
 for source in index.html style.css "${hmi_st_scripts[@]}"; do
   cp "HMI_NX_ST/$source" "$output_dir/HMI_NX_ST/$source"
 done
+# Separate online alternative. Copy only the public client, never server sources.
+python3 HMI_NX/online/tool/build.py "$output_dir/HMI_NX_Online"
+node --test HMI_NX/online/test/*.test.cjs
 # Catch missing JS dependencies in both published editors before Pages deployment.
 node scripts/verify_webhmi_bundle.cjs "$output_dir"
 
@@ -73,3 +76,4 @@ config_json="$(LEAD_ENDPOINT="$lead_endpoint" CONTACT_ENDPOINT="$contact_endpoin
 printf 'window.INDURADAR_CONFIG = Object.freeze(%s);\n' "$config_json" > "$output_dir/config.js"
 rm "$output_dir/config.template.js"
 rm "$output_dir/package.json"
+

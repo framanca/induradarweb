@@ -1,0 +1,26 @@
+name: omron_webhmi_offline
+description: Editor Omron WebHMI ST con proyectos locales y exportación Sysmac offline.
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_inappwebview: 6.1.5
+  desktop_webview_window: 0.3.0
+  file_picker: 10.3.10
+  path_provider: ^2.1.5
+  path: ^1.9.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/editor/
