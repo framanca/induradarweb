@@ -35,6 +35,24 @@ with sync_playwright() as pw:
             assert page.locator(f"#sidebar-tab-{other}").get_attribute("aria-selected") == ("true" if other == tab else "false")
 
     assert page.locator(".left-tabs [role='tab']").count() == 5
+    # Five compact icons must fit on the same row, without visible labels.
+    def assert_compact_icon_row():
+        tabs = page.locator(".left-tabs [role='tab']")
+        bars = [tabs.nth(i).bounding_box() for i in range(5)]
+        assert all(box is not None for box in bars)
+        assert max(box["y"] for box in bars) - min(box["y"] for box in bars) <= 1
+        assert max(box["height"] for box in bars) <= 46
+        for idx, label in enumerate(("Proyecto", "Variables", "Elementos", "Alarmas", "Recetas")):
+            tab = tabs.nth(idx)
+            assert tab.get_attribute("aria-label") == label
+            assert tab.get_attribute("title") == label
+            assert tab.locator("svg").count() == 1
+            assert tab.locator("span").count() == 0
+    assert_compact_icon_row()
+    page.set_viewport_size({"width": 990, "height": 800})
+    assert_compact_icon_row()
+    page.set_viewport_size({"width": 1440, "height": 900})
+    checks.append("five_compact_icon_only_tabs_fit_on_one_row")
     assert page.locator(".left-panels [role='tabpanel']:visible").count() == 1
     assert page.locator("#sidebar-tab-project").get_attribute("aria-selected") == "true"
     select_sidebar("variables")
