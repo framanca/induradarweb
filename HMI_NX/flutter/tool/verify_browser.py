@@ -62,6 +62,7 @@ with tempfile.TemporaryDirectory(prefix="webhmi-browser-") as temporary, sync_pl
         checks.append("first_launch_empty_project_no_demo")
         page.locator("#projectName").fill("Proyecto offline real")
         page.locator("#projectName").press("Tab")
+        page.locator("#sidebar-tab-elements").click()
         page.locator(".tool-grid [data-kind='text']").click()
         assert page.locator("#canvas .widget").count() == 1
         checks.append("editing_commits_to_native_storage")
@@ -121,12 +122,14 @@ with tempfile.TemporaryDirectory(prefix="webhmi-browser-") as temporary, sync_pl
         assert page.locator(".right").is_visible()
         page.get_by_role("button", name="Herramientas", exact=True).click()
         assert page.locator(".left").is_visible()
-        assert page.locator(".tool-grid button").count() == 16
+        assert page.locator(".tool-grid button").count() == 17
         checks.append("all_widgets_and_properties_accessible_on_phone")
         page.locator("#newBtn").click()
+        page.locator("#sidebar-tab-variables").click()
         page.locator("#importFileBtn").click()
         expect(page.locator("#varList .var-row")).to_have_count(2)
         checks.append("native_variables_import")
+        page.locator("#sidebar-tab-elements").click()
         page.locator("#imageBtn").click()
         expect(page.locator("#toast")).to_contain_text("Imagen añadida")
         assert page.locator("#canvas .widget.image").count() == 1
