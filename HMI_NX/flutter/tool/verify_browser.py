@@ -135,6 +135,19 @@ with tempfile.TemporaryDirectory(prefix="webhmi-browser-") as temporary, sync_pl
         page.screenshot(path=str(OUT / "phone-editor.png"), full_page=True)
         page.set_viewport_size({"width": 1440, "height": 1000})
         page.screenshot(path=str(OUT / "desktop-editor.png"), full_page=True)
+        malicious = json.loads(demo)
+        malicious["name"] = "Prueba de entrada no confiable"
+        injected = 'x" onerror="document.getElementById(\'projectName\').value=\'XSS_OCCURRED\''
+        malicious["assets"] = [{"id": injected, "name": "unsafe.png", "data": 'data:image/png;base64,AAAA" onerror="alert(1)'}]
+        malicious["screens"][0]["id"] = injected
+        malicious["screens"][0]["objects"] = [{"id": "safe-image", "kind": "image", "assetId": injected, "text": "unsafe", "x": 0, "y": 0, "w": 80, "h": 80}]
+        (directory / "import.nxst").write_text(json.dumps(malicious))
+        page.locator("#loadBtn").click()
+        expect(page.locator("#projectName")).to_have_value("Prueba de entrada no confiable")
+        page.locator("#canvas .widget.image").click()
+        expect(page.locator("#diagnostics")).to_contain_text("formato embebido no válido")
+        assert page.locator("[onerror]").count() == 0
+        checks.append("imported_project_markup_never_executes_and_invalid_images_are_blocked")
         assert not errors, errors
         assert all(address.startswith("http://127.0.0.1:") or address.startswith(("data:", "blob:", "about:")) for address in requests), requests
         checks.append("no_external_requests_and_no_javascript_errors")

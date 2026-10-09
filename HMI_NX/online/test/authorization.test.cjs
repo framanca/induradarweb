@@ -44,3 +44,10 @@ test('invalid input, unknown action, oversized stream and quota are rejected',as
  assert.equal((await h(request({action:'compile',project:{screens:[],variables:[]},padding:'x'.repeat(2*1024*1024)}))).status,413);
  let result;for(let i=0;i<21;i++)result=await h(request({action:'access'}));assert.equal(result.status,429);
 });
+
+test('server refuses an image that injects HTML attributes',async()=>{
+ const project=ctx.NXST.demoProject();
+ project.assets=[{id:'unsafe',name:'unsafe.png',data:'data:image/png;base64,AAAA" onerror="alert(1)'}];
+ const h=await handler({id:'a',app_metadata:{webhmi_compile:true}});
+ assert.equal((await h(request({action:'compile',project}))).status,422);
+});
