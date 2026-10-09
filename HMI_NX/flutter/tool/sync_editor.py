@@ -36,10 +36,10 @@ def bundle():
             text = text[:start] + "function download(name,data,type='application/octet-stream'){return NXOffline.download(name,data,type);}" + text[end:]
             start = text.index("$('#saveBtn').onclick=")
             end = text.index(";$('#loadBtn').onclick=", start)
-            text = text[:start] + """$('#saveBtn').onclick=async()=>{syncProjectInputs();try{p0Snapshot('antes-guardado',true);const data=JSON.stringify(C.normalize(p),null,2);const saved=await download((p.name||'project').replace(/[^A-Za-z0-9_-]+/g,'_')+'.nxst',data,'application/json');if(saved){p0Checkpoint();p0Snapshot('guardado-manual',true);toast('Proyecto guardado')}}catch(error){toast('No se pudo guardar: '+error.message)}}""" + text[end:]
+            text = text[:start] + """$('#saveBtn').onclick=async()=>{syncProjectInputs();try{p0Snapshot('antes-guardado',true);const expected=p0JSON(),data=JSON.stringify(C.normalize(p),null,2);const saved=await download((p.name||'project').replace(/[^A-Za-z0-9_-]+/g,'_')+'.nxst',data,'application/json');if(saved){if(p0JSON()===expected)p0Checkpoint();p0Snapshot('guardado-manual',true);toast('Proyecto guardado')}}catch(error){toast('No se pudo guardar: '+error.message)}}""" + text[end:]
             start = text.index("$('#exportBtn').onclick=")
             end = text.index(";\n$('#undoBtn').onclick=", start)
-            text = text[:start] + """$('#exportBtn').onclick=async()=>{syncProjectInputs();try{const out=C.exportPackage(p),name=(p.name||'WebHMI_ST').replace(/[^A-Za-z0-9_-]+/g,'_')+'_Sysmac.zip';p0Snapshot('antes-exportar',true);const saved=await download(name,out.zip,'application/zip');if(saved){p0Checkpoint();p0Snapshot('exportado-sysmac',true);toast('Paquete Sysmac guardado')}}catch(error){toast(error.message)}}""" + text[end:]
+            text = text[:start] + """$('#exportBtn').onclick=async()=>{syncProjectInputs();try{const expected=p0JSON(),out=C.exportPackage(p),name=(p.name||'WebHMI_ST').replace(/[^A-Za-z0-9_-]+/g,'_')+'_Sysmac.zip';p0Snapshot('antes-exportar',true);const saved=await download(name,out.zip,'application/zip');if(saved){if(p0JSON()===expected)p0Checkpoint();p0Snapshot('exportado-sysmac',true);toast('Paquete Sysmac guardado')}}catch(error){toast(error.message)}}""" + text[end:]
             # The runtime places a newline before </script>; match the invocation itself.
             start = text.index('function preview()')
             end = text.index('\n', start)

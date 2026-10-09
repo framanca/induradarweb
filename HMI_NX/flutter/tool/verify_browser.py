@@ -7,7 +7,7 @@ import tempfile
 import time
 import zipfile
 from pathlib import Path
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, expect
 
 APP = Path(__file__).resolve().parents[1]
 DART = os.environ.get("DART", "dart")
@@ -57,7 +57,7 @@ with tempfile.TemporaryDirectory(prefix="webhmi-browser-") as temporary, sync_pl
     page.on("dialog", lambda dialog: dialog.accept())
     try:
         page.goto(url, wait_until="load")
-        page.wait_for_function("document.querySelector('#saveStatus').textContent.includes('Guardado en disco')")
+        expect(page.locator("#saveStatus")).to_contain_text("Guardado en disco")
         assert page.locator("#canvas .widget").count() == 0
         checks.append("first_launch_empty_project_no_demo")
         page.locator("#projectName").fill("Proyecto offline real")
@@ -86,14 +86,14 @@ with tempfile.TemporaryDirectory(prefix="webhmi-browser-") as temporary, sync_pl
         assert page.locator("#projectName").input_value() == "Proyecto offline real"
         checks.append("app_restart_with_different_origin_restores_disk_project")
         page.locator("#saveBtn").click()
-        page.wait_for_function("document.querySelector('#toast').textContent === 'Proyecto guardado'")
+        expect(page.locator("#toast")).to_have_text("Proyecto guardado")
         assert json.loads((directory / "Proyecto_offline_real.nxst").read_text())["name"] == "Proyecto offline real"
         checks.append("native_project_export_bytes")
         page.locator("#loadBtn").click()
-        page.wait_for_function("document.querySelector('#projectName').value === 'Demo NX ST'")
+        expect(page.locator("#projectName")).to_have_value("Demo NX ST")
         checks.append("native_project_picker_import")
         page.locator("#exportBtn").click()
-        page.wait_for_function("document.querySelector('#toast').textContent === 'Paquete Sysmac guardado'")
+        expect(page.locator("#toast")).to_have_text("Paquete Sysmac guardado")
         with zipfile.ZipFile(directory / "Demo_NX_ST_Sysmac.zip") as archive:
             assert "WebHMI_Server.st" in archive.namelist()
             assert "HMI_Embedded.html" in archive.namelist()
@@ -118,10 +118,11 @@ with tempfile.TemporaryDirectory(prefix="webhmi-browser-") as temporary, sync_pl
         checks.append("all_widgets_and_properties_accessible_on_phone")
         page.locator("#newBtn").click()
         page.locator("#importFileBtn").click()
-        page.wait_for_function("document.querySelectorAll('#varList .var-row').length === 2")
+        expect(page.locator("#varList .var-row")).to_have_count(2)
         checks.append("native_variables_import")
         page.locator("#imageBtn").click()
-        page.wait_for_function("window.NXOfflineEditor.getProject().assets.length === 1")
+        expect(page.locator("#toast")).to_contain_text("Imagen añadida")
+        assert page.locator("#canvas .widget.image").count() == 1
         checks.append("native_image_import")
         page.get_by_role("button", name="Lienzo", exact=True).click()
         page.screenshot(path=str(OUT / "phone-editor.png"), full_page=True)
