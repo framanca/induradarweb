@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="style.css">
 <script defer src="expressions.js"></script>
 <script defer src="model.js"></script>
+<script defer src="sysmac-types.js"></script>
 <script defer src="runtime.js"></script>
 <script defer src="st.js"></script>
 <script defer src="zip.js"></script>
@@ -53,8 +54,9 @@
       <h2>Variables Sysmac</h2>
       <p class="hint">Importa CSV/TSV/TXT o pega la tabla de variables globales.</p>
       <div class="row"><button id="importFileBtn">Archivo</button><button id="pasteBtn">Pegar tabla</button></div>
-      <input id="varsFile" type="file" accept=".csv,.tsv,.txt" hidden>
+      <input id="varsFile" type="file" accept=".csv,.tsv,.txt,.st" hidden>
       <div id="varSummary" class="summary"></div>
+      <p class="hint">Importa tablas Sysmac o declaraciones ST con TYPE/STRUCT/UNION/ENUM y VAR_GLOBAL. Los ARRAY se expanden por índice (máx. 3 dimensiones). Selecciona hasta 32 miembros para comunicar con el PLC; el ZIP declara sus variables globales raíz.</p>
       <div id="varList" class="var-list"></div>
       <div class="section-title"><h2>Variables internas</h2><button id="addInternalVar">+ Interna</button></div>
       <div id="internalVarList"></div>
@@ -102,7 +104,7 @@
   </aside>
 </main>
 <dialog id="screenSettingsDialog"><form id="screenSettingsForm"><h2>Editar pantalla</h2><label>Nombre<input id="screenSettingsName" type="text" maxlength="80" required autocomplete="off"></label><label id="screenSettingsNumberRow">Número de pantalla<input id="screenSettingsNumber" type="number" min="1" max="65535" step="1" required></label><label>Color de fondo<input id="screenSettingsBackground" type="color" value="#ffffff"></label><div class="screen-mode-options"><label id="screenSettingsIsBaseRow" class="base-setting"><input id="screenSettingsIsBase" type="checkbox"> Convertir en pantalla base</label><label id="screenSettingsUseBaseRow" class="base-setting"><input id="screenSettingsUseBase" type="checkbox"> Utilizar pantalla base</label></div><p id="screenSettingsNote" class="hint">El número es único en el proyecto (1–65535). El PLC usa este número para elegir la pantalla, no su posición en el desplegable.</p><div id="screenSettingsError" class="error" role="alert"></div><div class="dialog-actions"><button id="screenSettingsCancel" type="button">Cancelar</button><button type="submit" class="primary">Guardar cambios</button></div></form></dialog>
-<dialog id="pasteDialog"><form method="dialog"><h2>Importar variables de Sysmac</h2><textarea id="pasteText" rows="16"></textarea><div id="pasteError" class="error"></div><div class="dialog-actions"><button value="cancel">Cancelar</button><button id="pasteImport" type="button" class="primary">Importar</button></div></form></dialog>
+<dialog id="pasteDialog"><form method="dialog"><h2>Importar variables de Sysmac</h2><p class="hint">Acepta Name + Data Type de Sysmac o definiciones ST completas. Para estructuras, incluye TYPE ST_Motor : STRUCT ... END_STRUCT; END_TYPE y VAR_GLOBAL Motor : ST_Motor; END_VAR.</p><textarea id="pasteText" rows="16" placeholder="TYPE ST_Motor : STRUCT&#10;  Marcha : BOOL;&#10;  Consigna : REAL;&#10;END_STRUCT; END_TYPE&#10;VAR_GLOBAL&#10;  Motor1 : ST_Motor;&#10;END_VAR"></textarea><div id="pasteError" class="error"></div><div class="dialog-actions"><button value="cancel">Cancelar</button><button id="pasteImport" type="button" class="primary">Importar</button></div></form></dialog>
 <dialog id="previewDialog"><div class="dialog-wide"><div class="dialog-title"><h2>Vista previa</h2><button id="closePreview">✕</button></div><iframe id="previewFrame"></iframe></div></dialog>
 <dialog id="recoveryDialog"><div class="recovery-panel"><div class="dialog-title"><h2>Copias automáticas</h2><button id="closeRecovery">✕</button></div><p class="hint">Las copias se guardan sólo en este navegador. Recuperar sustituye el proyecto abierto, guardándolo antes como copia de seguridad.</p><div id="recoveryList"></div><div class="dialog-actions"><button id="discardDrafts" class="danger">Borrar copias locales</button><button id="closeRecovery2">Cerrar</button></div></div></dialog>
 <input id="projectFile" type="file" accept=".json,.nxst" hidden>

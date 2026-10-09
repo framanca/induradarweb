@@ -1,19 +1,52 @@
 (function(root){'use strict';const C=root.NXST,enc=new TextEncoder();
 function stLiteral(s){return String(s).replace(/\$/g,()=> '$$').replace(/'/g,()=> "$'").replace(/\r/g,()=> '$r').replace(/\n/g,()=> '$n');}
 function chunks(text,max=1400){const out=[];for(let i=0;i<text.length;i+=max)out.push(text.slice(i,i+max));return out;}
-function toStringExpr(v){if(v.type==='BOOL')return null;if(v.type==='STRING')return v.name;return v.type+'_TO_STRING('+v.name+')';}
-function fromStringExpr(v){if(v.type==='BOOL')return null;if(v.type==='STRING')return 'Web_ValueText';return 'STRING_TO_'+v.type+'(Web_ValueText)';}
-function stTyped(v,value){if(v.type==='BOOL')return (value===true||String(value)==='1'||String(value).toLowerCase()==='true')?'TRUE':'FALSE';if(v.type==='STRING')return "'"+stLiteral(String(value))+"'";if(v.type==='REAL'||v.type==='LREAL'){const n=Number(value);return v.type+'#'+(Number.isInteger(n)?n.toFixed(1):String(n));}if(C.NUMERIC_TYPES.has(v.type))return v.type+'#'+String(Math.trunc(Number(value)));throw new Error('Tipo no escribible: '+v.type);}
-function alarmExpr(v,a){const op={eq:'=',ne:'<>',gt:'>',ge:'>=',lt:'<',le:'<='}[a.operator]||'=';return '('+v.name+' '+op+' '+stTyped(v,a.value)+')';}
+function toStringExpr(v){
+ if(v.type==='BOOL')return null;
+ if(v.enumType)return 'DINT_TO_STRING(EnumToNum('+v.name+'))';
+ if(v.type==='STRING')return v.name;
+ if(v.type==='TIME')return 'LINT_TO_STRING(TimeToNanoSec('+v.name+'))';
+ if(v.type==='DATE')return 'DateToString('+v.name+')';
+ if(v.type==='TIME_OF_DAY')return 'TodToString('+v.name+')';
+ if(v.type==='DATE_AND_TIME')return 'DtToString('+v.name+')';
+ return v.type+'_TO_STRING('+v.name+')';
+}
+function fromStringExpr(v){
+ if(v.type==='BOOL')return null;
+ if(v.type==='STRING')return 'Web_ValueText';
+ if(v.type==='TIME')return 'NanoSecToTime(STRING_TO_LINT(Web_ValueText))';
+ if(v.type==='DATE')return 'SecToDate(STRING_TO_LINT(Web_ValueText))';
+ if(v.type==='TIME_OF_DAY')return 'SecToTod(STRING_TO_LINT(Web_ValueText))';
+ if(v.type==='DATE_AND_TIME')return 'SecToDt(STRING_TO_LINT(Web_ValueText))';
+ return 'STRING_TO_'+v.type+'(Web_ValueText)';
+}
+function stTyped(v,value){
+ const t=v.type,canonical=C.sysmacTypes&&C.sysmacTypes.canonicalWrite;
+ if(t==='BOOL')return (value===true||String(value)==='1'||String(value).toLowerCase()==='true')?'TRUE':'FALSE';
+ if(t==='STRING')return "'"+stLiteral(String(value))+"'";
+ if(t==='REAL'||t==='LREAL'){const n=Number(value);if(!Number.isFinite(n))throw Error(t+': valor invalido');return t+'#'+(Number.isInteger(n)?n.toFixed(1):String(n));}
+ if(['BYTE','WORD','DWORD','LWORD'].includes(t))return t+'#16#'+(canonical?canonical(t,value):String(value));
+ if(t==='TIME')return 'NanoSecToTime(LINT#'+(canonical?canonical(t,value):String(value))+')';
+ if(t==='DATE'){if(!/^\d{4}-\d{2}-\d{2}$/.test(String(value)))throw Error('DATE: formato YYYY-MM-DD');return 'D#'+value}
+ if(t==='TIME_OF_DAY'){if(!/^\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?$/.test(String(value)))throw Error('TOD: formato HH:mm:ss');return 'TOD#'+value}
+ if(t==='DATE_AND_TIME'){if(!/^\d{4}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?$/.test(String(value)))throw Error('DT: formato YYYY-MM-DD-HH:mm:ss');return 'DT#'+value}
+ if(C.NUMERIC_TYPES.has(t))return t+'#'+(canonical?canonical(t,value):String(Math.trunc(Number(value))));
+ throw Error('Tipo no soportado en constante ST: '+t);
+}
+function alarmExpr(v,a){const op={eq:'=',ne:'<>',gt:'>',ge:'>=',lt:'<',le:'<='}[a.operator]||'=';const lhs=v.enumType?'EnumToNum('+v.name+')':v.type==='TIME'?'TimeToNanoSec('+v.name+')':v.name;const rhs=v.type==='TIME'?'LINT#'+(C.sysmacTypes?C.sysmacTypes.canonicalWrite('TIME',a.value):String(a.value)):stTyped(v,a.value);return '('+lhs+' '+op+' '+rhs+')';}
 function buildST(input){
  const p=C.normalize(input),html=C.buildRuntimeHTML(p),parts=chunks(html),exposed=p.variables.filter(v=>v.expose&&v.live),rw=exposed.filter(v=>v.access==='RW'&&v.writeSupported),vm=new Map(p.variables.map(v=>[v.name,v]));
  const read=[];for(const v of exposed){if(v.type==='BOOL'){read.push(`IF ${v.name} THEN\n    Web_ApiBody := CONCAT(Web_ApiBody, '${v.id}=1$n');\nELSE\n    Web_ApiBody := CONCAT(Web_ApiBody, '${v.id}=0$n');\nEND_IF;`);}else{read.push(`Web_ApiBody := CONCAT(Web_ApiBody, '${v.id}=', ${toStringExpr(v)}, '$n');`);}}
  for(const [i,a] of p.alarms.entries()){const v=vm.get(a.binding);if(!v)continue;read.push(`IF ${alarmExpr(v,a)} THEN\n    Web_ApiBody := CONCAT(Web_ApiBody, 'A${i+1}=1$n');\nELSE\n    Web_ApiBody := CONCAT(Web_ApiBody, 'A${i+1}=0$n');\nEND_IF;\nIF Web_AlarmAck[${i+1}] THEN\n    Web_ApiBody := CONCAT(Web_ApiBody, 'K${i+1}=1$n');\nELSE\n    Web_ApiBody := CONCAT(Web_ApiBody, 'K${i+1}=0$n');\nEND_IF;`);}
- const writes=rw.map(v=>{if(v.type==='BOOL')return `${v.id}:\n                ${v.name} := (Web_ValueText = '1') OR (Web_ValueText = 'TRUE') OR (Web_ValueText = 'true');\n                Web_Found := TRUE;`;return `${v.id}:\n                ${v.name} := ${fromStringExpr(v)};\n                Web_Found := TRUE;`;}).join('\n            ');
+ const writes=rw.map(v=>{
+ if(v.type==='BOOL')return `${v.id}:\n                ${v.name} := (Web_ValueText = '1') OR (Web_ValueText = 'TRUE') OR (Web_ValueText = 'true');\n                Web_Found := TRUE;`;
+ const statement=v.enumType?'NumToEnum(STRING_TO_DINT(Web_ValueText), '+v.name+')':v.name+' := '+fromStringExpr(v);
+ return `${v.id}:\n                ${statement};\n                Web_Found := TRUE;`;
+ }).join('\n            ');
  const alarmReset=p.alarms.map((a,i)=>{const v=vm.get(a.binding);return v?`IF NOT ${alarmExpr(v,a)} THEN Web_AlarmAck[${i+1}] := FALSE; END_IF;`:''}).filter(Boolean).join('\n');
  const alarmAckCases=p.alarms.map((a,i)=>{const v=vm.get(a.binding);return v?`${i+1}:\n IF ${alarmExpr(v,a)} THEN Web_AlarmAck[${i+1}] := TRUE; END_IF;\n Web_Found := TRUE;`:''}).filter(Boolean).join('\n');
  const alarmAckAll=p.alarms.map((a,i)=>{const v=vm.get(a.binding);return v?`IF ${alarmExpr(v,a)} THEN Web_AlarmAck[${i+1}] := TRUE; END_IF;`:''}).filter(Boolean).join('\n');
- const recipeCases=p.recipes.map((r,i)=>{const assigns=[];for(const [name,value] of Object.entries(r.values||{})){const v=vm.get(name);if(v&&v.access==='RW'&&v.writeSupported)assigns.push(`${v.name} := ${stTyped(v,value)};`);}return `${i+1}:\n                ${assigns.join('\n                ')||';'}\n                Web_Found := TRUE;`;}).join('\n            ');
+ const recipeCases=p.recipes.map((r,i)=>{const assigns=[];for(const [name,value] of Object.entries(r.values||{})){const v=vm.get(name);if(v&&v.access==='RW'&&v.writeSupported)assigns.push(v.enumType?`NumToEnum(${stTyped(v,value)}, ${v.name});`:`${v.name} := ${stTyped(v,value)};`);}return `${i+1}:\n                ${assigns.join('\n                ')||';'}\n                Web_Found := TRUE;`;}).join('\n            ');
  const chunkCases=parts.map((c,i)=>`${i}: Web_TxText := '${stLiteral(c)}';`).join('\n            ');
  return `(* HMI NX ST · servidor WebHMI generado
    Proyecto: ${p.name}
@@ -221,7 +254,15 @@ END_CASE;
 `;
 }
 function referencedVariables(p){const n=C.normalize(p),set=new Set(n.variables.filter(v=>v.expose&&v.live).map(v=>v.name));if(n.screenBinding)set.add(n.screenBinding);for(const s of n.screens)for(const o of C.screenObjects(n,s)){if(o.binding)set.add(o.binding);if(o.feedbackBinding)set.add(o.feedbackBinding);}for(const a of n.alarms)if(a.binding)set.add(a.binding);for(const r of n.recipes)for(const k of Object.keys(r.values||{}))set.add(k);return n.variables.filter(v=>set.has(v.name));}
-function externalVariablesTSV(p){return referencedVariables(p).map(v=>[v.name,v.type].join('\t')).join('\r\n');}
+function externalVariablesTSV(p){
+ const roots=new Map();
+ for(const v of referencedVariables(p)){
+  const name=v.plcRoot||v.name,type=v.plcRootType||v.type;
+  if(roots.has(name)&&roots.get(name)!==type)throw Error('Tipo externo conflictivo: '+name);
+  roots.set(name,type);
+ }
+ return [...roots].map(([name,type])=>name+'\t'+type).join('\r\n');
+}
 function localVariablesTSV(input){const p=C.normalize(input);const rows=[
 ['Web_State','UINT','0','','','','Estado servidor HTTP'],
 ['Web_PrevState','UINT','0','','','','Estado anterior watchdog'],
@@ -267,12 +308,16 @@ INSTALACIÓN
 - Pegar WebHMI_LocalVariables.tsv en Internals.
 - Pegar WebHMI_ExternalVariables.tsv en Externals.
 - Las variables referenciadas deben existir como Global Variables con el mismo nombre/tipo.
+- Si importaste una estructura, union, enumeracion o ARRAY, crea su tipo en Data Types de Sysmac y declara la raiz global. El TSV Externals contiene SOLO esa raiz, no miembros sueltos.
 - Asignar el Program a una tarea y transferir al NX.
 - Abrir http://IP_DEL_NX:${p.port}/
 
 FUNCIONES
 - Comunicación robusta: snapshots SEQ/END, actualización atómica y watchdog de estados.
-- Escritura directa BOOL, numérica y STRING RW; entradas numéricas con límites mínimo/máximo validados en navegador.
+- Lectura de los 20 tipos basicos NX, y de miembros de ARRAY/STRUCT/UNION/ENUM mediante variables raiz.
+- Escritura directa BOOL, numeros, bitstrings hexadecimales, TIME como nanosegundos, STRING y enumeraciones (NumToEnum).
+- DATE, TIME_OF_DAY y DATE_AND_TIME: lectura formateada y escritura con resolucion de 1 segundo usando SecToDate/SecToTod/SecToDt.
+- Importante: la escritura DATE/DT/TOD trunca/substituye fracciones de segundo; DATE/DT admiten desde 1970 y se interpretan sin zona horaria.
 - Botones SET/RESET/TOGGLE.
 - Varias pantallas con número único, color de fondo y selección opcional por variable entera leída del PLC.
 - Si se configura control PLC, el valor de esa variable gobierna siempre la pantalla; si no coincide con ningún número (o es inválido), se muestra la principal. Sin comunicación válida, se mantiene la última pantalla y se indica pérdida de comunicación.
