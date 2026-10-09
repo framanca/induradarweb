@@ -25,6 +25,40 @@ with sync_playwright() as pw:
     page.wait_for_function("document.querySelector('#saveStatus').textContent.includes('Guardado local')")
     checks.append("startup_scripts_loaded_and_autosave_ready")
 
+    def select_sidebar(tab):
+        button = page.locator(f"#sidebar-tab-{tab}")
+        button.click()
+        assert button.get_attribute("aria-selected") == "true"
+        assert page.locator(f"#sidebar-panel-{tab}").is_visible()
+        assert page.locator(".left-panels [role='tabpanel']:visible").count() == 1
+        for other in ("project", "variables", "elements", "alarms", "recipes"):
+            assert page.locator(f"#sidebar-tab-{other}").get_attribute("aria-selected") == ("true" if other == tab else "false")
+
+    assert page.locator(".left-tabs [role='tab']").count() == 5
+    assert page.locator(".left-panels [role='tabpanel']:visible").count() == 1
+    assert page.locator("#sidebar-tab-project").get_attribute("aria-selected") == "true"
+    select_sidebar("variables")
+    assert page.locator("#importFileBtn").is_visible()
+    select_sidebar("elements")
+    assert page.locator(".tool-grid [data-kind='slider']").is_visible()
+    select_sidebar("alarms")
+    assert page.locator("#addAlarm").is_visible()
+    select_sidebar("recipes")
+    assert page.locator("#addRecipe").is_visible()
+    select_sidebar("project")
+    assert page.locator("#projectName").is_visible()
+    checks.append("five_icon_tabs_keep_only_active_panel_visible")
+
+    page.locator("#sidebar-tab-project").focus()
+    page.keyboard.press("ArrowRight")
+    assert page.locator("#sidebar-tab-variables").get_attribute("aria-selected") == "true"
+    assert page.locator("#sidebar-tab-variables").evaluate("(e) => document.activeElement === e")
+    page.keyboard.press("End")
+    assert page.locator("#sidebar-tab-recipes").get_attribute("aria-selected") == "true"
+    page.keyboard.press("Home")
+    assert page.locator("#sidebar-tab-project").get_attribute("aria-selected") == "true"
+    checks.append("sidebar_tabs_support_keyboard_navigation")
+
     page.locator("#newBtn").click()
     assert page.locator("#projectName").input_value() == "WebHMI ST"
     assert page.locator("#canvas .widget").count() == 0
@@ -51,13 +85,16 @@ with sync_playwright() as pw:
     checks.append("copy_screen_preserves_background_and_assigns_unique_number")
 
     # Import a PLC integer variable and bind it as the screen controller.
+    select_sidebar("variables")
     page.locator("#pasteBtn").click()
     page.locator("#pasteText").fill("Name,Data Type\nPantallaActual,UINT\n")
     page.locator("#pasteImport").click()
+    select_sidebar("project")
     page.locator("#screenBinding").select_option("PantallaActual")
     assert page.locator("#screenBinding").input_value() == "PantallaActual"
     checks.append("screen_binding_selects_integer_plc_variable")
 
+    select_sidebar("elements")
     page.locator(".tool-grid [data-kind='button']").click()
     assert page.locator("#canvas .widget").count() == 1
     page.locator("#undoBtn").click()
@@ -65,6 +102,23 @@ with sync_playwright() as pw:
     page.locator("#redoBtn").click()
     assert page.locator("#canvas .widget").count() == 1
     checks.append("undo_and_redo_buttons_work")
+
+    # Alarmas y recetas siguen siendo editables; cambiar de pestaña no altera el lienzo.
+    select_sidebar("alarms")
+    alarm_count = page.locator("#alarmEditor .editor-card").count()
+    page.locator("#addAlarm").click()
+    assert page.locator("#alarmEditor .editor-card").count() == alarm_count + 1
+    page.locator("#undoBtn").click()
+    assert page.locator("#alarmEditor .editor-card").count() == alarm_count
+    select_sidebar("recipes")
+    recipe_count = page.locator("#recipeEditor .editor-card").count()
+    page.locator("#addRecipe").click()
+    assert page.locator("#recipeEditor .editor-card").count() == recipe_count + 1
+    page.locator("#undoBtn").click()
+    assert page.locator("#recipeEditor .editor-card").count() == recipe_count
+    assert page.locator("#canvas .widget").count() == 1
+    select_sidebar("project")
+    checks.append("tab_switching_preserves_widgets_and_alarm_recipe_actions")
 
     page.locator("#projectName").fill("Prueba de recuperación")
     page.locator("#projectName").press("Tab")
