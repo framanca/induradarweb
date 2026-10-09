@@ -89,6 +89,13 @@ with tempfile.TemporaryDirectory(prefix="webhmi-browser-") as temporary, sync_pl
         expect(page.locator("#toast")).to_have_text("Proyecto guardado")
         assert json.loads((directory / "Proyecto_offline_real.nxst").read_text())["name"] == "Proyecto offline real"
         checks.append("native_project_export_bytes")
+        # A failing persistence API must prevent replacing the current project.
+        page.route("**/_native/storage", lambda route: route.fulfill(status=507, content_type="application/json", body='{"error":"Fallo de disco simulado"}'))
+        page.locator("#loadBtn").click()
+        expect(page.locator("#toast")).to_contain_text("No se puede respaldar")
+        assert page.locator("#projectName").input_value() == "Proyecto offline real"
+        page.unroute("**/_native/storage")
+        checks.append("failed_backup_prevents_project_replacement")
         page.locator("#loadBtn").click()
         expect(page.locator("#projectName")).to_have_value("Demo NX ST")
         checks.append("native_project_picker_import")

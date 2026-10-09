@@ -45,6 +45,8 @@ def bundle():
             end = text.index('\n', start)
             preview = text[start:end].replace('startComm();</script>', 'startComm();').replace('paint();</script>', 'paint();')
             text = text[:start] + preview + text[end:]
+            text = once(text, "p0Snapshot('antes-abrir-archivo',true);if(p0Dirty()", "if(!p0Snapshot('antes-abrir-archivo',true)){toast('No se puede respaldar el proyecto actual. Guarda una copia antes de abrir otro.');e.target.value='';return}if(p0Dirty()")
+            text = once(text, "p0Snapshot('antes-recuperar',true);p=C.normalize", "if(!p0Snapshot('antes-recuperar',true)){toast('No se puede respaldar el proyecto actual. Recuperación cancelada.');return}p=C.normalize")
             text = text.replace("Guardado local", "Guardado en disco")
             # A native recovery enters through the same model/history paths as a normal open.
             api = """window.NXOfflineEditor={copyWidget,pasteWidget,flush:()=>p0Snapshot('app-oculta',false),getProject:()=>C.copy(p),openProject:q=>{if(!p0Snapshot('antes-recuperar-disco',true))return false;if(!confirm('¿Recuperar esta versión? El proyecto actual se conserva en las copias.'))return false;p=C.normalize(q);screenId=p.screens[0].id;selected=null;editReset();render();p0Checkpoint();p0Snapshot('recuperado-disco',true);return true}};
