@@ -36,7 +36,7 @@ function setScreenMode(project,screenId,mode){
   project.screens.splice(originalIndex,1);
   if(!project.screens.length){
    const name=screen.name.toLowerCase()==='principal'?'Pantalla principal':'Principal';
-   project.screens.push(newScreen(name,screen.number));
+   project.screens.push(newScreen(name,nextScreenNumber([screen])));
   }
   screen.previousNumber=screen.number;
   screen.previousIndex=originalIndex;
