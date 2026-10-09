@@ -30,6 +30,34 @@ with sync_playwright() as pw:
     assert page.locator("#canvas .widget").count() == 0
     checks.append("new_button_creates_empty_project")
 
+    # Screen configuration is edited in a modal, not an inline name field.
+    first_id = page.locator("#screenSelect option").first.get_attribute("value")
+    page.locator("#editScreen").click()
+    assert page.locator("#screenSettingsDialog").is_visible()
+    page.locator("#screenSettingsName").fill("Principal personalizada")
+    page.locator("#screenSettingsNumber").fill("5")
+    page.locator("#screenSettingsBackground").evaluate("(el) => { el.value = '#cceeff'; el.dispatchEvent(new Event('input', {bubbles:true})); }")
+    page.locator("#screenSettingsForm button[type=submit]").click()
+    assert not page.locator("#screenSettingsDialog").is_visible()
+    assert "5 · Principal personalizada" in page.locator("#screenSelect option").first.inner_text()
+    assert page.locator("#canvas").evaluate("(e) => getComputedStyle(e).backgroundColor") == "rgb(204, 238, 255)"
+    checks.append("screen_dialog_edits_name_number_and_background")
+
+    page.locator("#copyScreen").click()
+    assert page.locator("#screenSelect option").count() == 2
+    assert "1 · Principal personalizada (copia)" in page.locator("#screenSelect option").last.inner_text()
+    assert page.locator("#canvas").evaluate("(e) => getComputedStyle(e).backgroundColor") == "rgb(204, 238, 255)"
+    page.locator("#screenSelect").select_option(first_id)
+    checks.append("copy_screen_preserves_background_and_assigns_unique_number")
+
+    # Import a PLC integer variable and bind it as the screen controller.
+    page.locator("#pasteBtn").click()
+    page.locator("#pasteText").fill("Name,Data Type\nPantallaActual,UINT\n")
+    page.locator("#pasteImport").click()
+    page.locator("#screenBinding").select_option("PantallaActual")
+    assert page.locator("#screenBinding").input_value() == "PantallaActual"
+    checks.append("screen_binding_selects_integer_plc_variable")
+
     page.locator(".tool-grid [data-kind='button']").click()
     assert page.locator("#canvas .widget").count() == 1
     page.locator("#undoBtn").click()

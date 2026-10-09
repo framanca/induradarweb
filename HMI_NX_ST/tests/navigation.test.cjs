@@ -8,7 +8,7 @@ require('../model.js');
 require('../runtime.js');
 const C = globalThis.NXST;
 
-function prepare() {
+function prepare(options={}) {
   const project = C.newProject();
   project.name = 'Pantallas de prueba';
   project.screens = [
@@ -16,6 +16,15 @@ function prepare() {
     C.newScreen('Configuración'),
     C.newScreen('Producción')
   ];
+  if(options.plc){
+    project.screenBinding='CurrentScreen';
+    project.variables=[{id:1,name:'CurrentScreen',type:'UINT',access:'R',expose:true,live:true,writeSupported:true}];
+    project.screens[0].number=1;
+    project.screens[1].number=10;
+    project.screens[2].number=20;
+    project.screens[1].background='#ddeecc';
+    project.screens[2].background='#112233';
+  }
   project.alarms = [{
     id: C.id(), name: 'Fallo de motor', binding: 'Machine_Running',
     operator: 'eq', value: true, severity: 'high'
@@ -51,15 +60,16 @@ function prepare() {
     return elements.get(id);
   };
   get('alarmWindow').hidden = true;
+  let snapshotText='SEQ=1\n1=1\nA1=0\nEND=1\n';
   const context = {
     document: { getElementById: get, createElement: tag => new FakeElement(tag), activeElement: null },
     window: { innerWidth: 480, addEventListener() {} },
-    fetch: async () => ({ ok: true, text: async () => '' }),
-    setTimeout() {},
+    fetch: async () => ({ ok: true, text: async () => snapshotText }),
+    setTimeout() {}, clearTimeout() {}, AbortController,
     TextEncoder
   };
-  vm.runInNewContext(script + ';globalThis.__ui={P,showScreen,showScreenById,alarmVals,paintAlarms}', context, {timeout: 2000});
-  return {html, get, project, ui: context.__ui};
+  vm.runInNewContext(script + ';globalThis.__ui={P,showScreen,showScreenById,alarmVals,paintAlarms,readSnapshot,failComm,comm}', context, {timeout: 2000});
+  return {html, get, project, ui: context.__ui, setSnapshot: value => {snapshotText='SEQ=1\n1='+value+'\nA1=0\nEND=1\n';}};
 }
 
 test('selector único y botón Alarmas comparten la barra de navegación', () => {
@@ -108,4 +118,49 @@ test('contador de alarmas permanece activo y visible en la navegación', () => {
   ui.paintAlarms();
   assert.equal(get('alarmCount').textContent, '0');
   assert.equal(get('alarmOpen').classList.contains('active'), false);
+});
+
+test('la variable entera del PLC gobierna la navegación y actualiza el color de fondo', async () => {
+  const {get, project, ui, setSnapshot} = prepare({plc:true});
+  const select = get('screenSelect'), stage = get('stage');
+  assert.equal(select.disabled, true);
+  assert.equal(select.value, '0');
+  setSnapshot(10);
+  await ui.readSnapshot();
+  assert.equal(select.value, '1');
+  assert.equal(stage.style.backgroundColor, '#ddeecc');
+  assert.equal(ui.comm.state, 'ONLINE');
+  setSnapshot(20);
+  await ui.readSnapshot();
+  assert.equal(select.value, '2');
+  assert.equal(stage.style.backgroundColor, '#112233');
+  ui.showScreenById(project.screens[0].id);
+  assert.equal(select.value, '2', 'la navegación manual no prevalece sobre el PLC');
+  select.value = '0';
+  select.onchange();
+  assert.equal(select.value, '2', 'el selector manual se restaura a la pantalla PLC');
+});
+
+test('un valor PLC sin pantalla asignada vuelve a principal y conserva el color', async () => {
+  const {get, ui, setSnapshot} = prepare({plc:true});
+  const select = get('screenSelect');
+  for(const value of [20, 999, 10, 0, -1, 1, 1.5]){
+    setSnapshot(value);
+    await ui.readSnapshot();
+    const expected = value===20?'2':value===10?'1':'0';
+    assert.equal(select.value,expected,'valor '+value);
+  }
+  assert.equal(get('stage').style.backgroundColor, '#ffffff');
+});
+
+test('una lectura fallida mantiene la última pantalla válida sin usar datos caducados para navegar', async () => {
+  const {get, ui, setSnapshot} = prepare({plc:true});
+  setSnapshot(20);
+  await ui.readSnapshot();
+  assert.equal(get('screenSelect').value,'2');
+  ui.failComm();
+  assert.equal(get('screenSelect').value,'2');
+  setSnapshot('abc');
+  await assert.rejects(ui.readSnapshot());
+  assert.equal(get('screenSelect').value,'2');
 });

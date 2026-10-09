@@ -38,3 +38,18 @@ Pruebas del historial: `node HMI_NX_ST/tests/history.test.cjs`. Además de estas
 La cabecera de operación presenta una única barra de navegación con el selector **Pantalla** y, a su lado, el botón **Alarmas**, que mantiene el indicador del número de alarmas activas. Al seleccionar una pantalla se conserva la navegación por los botones internos configurados por el diseñador, actualizándose siempre la selección del desplegable. La vista de alarmas sigue siendo una ventana superpuesta; abrirla no cambia la pantalla activa. Se mantiene un diseño responsive con controles táctiles adecuados para móvil.
 
 Prueba de regresión: `node --test HMI_NX_ST/tests/navigation.test.cjs`.
+
+
+## Propiedades de pantalla y selección desde el PLC
+
+En el editor, selecciona la pantalla y pulsa **✎ Editar pantalla** para cambiar su **nombre**, **número** (entero positivo único entre 1 y 65535) y **color de fondo**. El color se aplica tanto al lienzo como al HTML generado. Al copiar una pantalla se conservan el fondo y los widgets, pero se asigna un número nuevo para evitar colisiones; la primera pantalla de la lista es siempre la **principal**.
+
+En **Proyecto → Control de pantalla desde PLC**, elige una variable entera importada de Sysmac (SINT, USINT, INT, UINT, DINT, UDINT, LINT o ULINT). El editor la marca como expuesta y el exportador la incluye en las variables Externals y en `/api/read`. El mapeo es por el **número configurado de pantalla**, no por índice del desplegable ni por nombre.
+
+Ejemplo: principal n.º 1, ajustes n.º 10, alarmas n.º 20. Si `CurrentScreen : UINT` vale 10, se muestra Ajustes. Con 20, Alarmas. Si vale 0, 999 o un número sin pantalla, se muestra la principal. La variable se monitoriza en cada snapshot válido del PLC.
+
+Con esta opción activada, el PLC tiene la autoridad: los controles de navegación manual de la HMI operativa quedan deshabilitados, para evitar que la pantalla cambie inmediatamente de vuelta tras pulsarlos. No se escribe automáticamente en el PLC al navegar. Si no se configura la variable, sigue disponible la navegación manual de siempre. Ante un fallo de comunicación se mantiene la última pantalla válida y se indica el estado degradado; no se toma una decisión nueva con datos obsoletos.
+
+Los proyectos anteriores que no tenían número ni color se normalizan con números 1, 2, 3… y fondo blanco. Las operaciones son reversibles mediante Deshacer en la sesión y quedan incluidas en el autoguardado de proyecto.
+
+Pruebas: `node --test HMI_NX_ST/tests/screens.test.cjs HMI_NX_ST/tests/navigation.test.cjs`.

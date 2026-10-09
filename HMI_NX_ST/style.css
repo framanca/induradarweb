@@ -11,5 +11,9 @@
 .canvas-head{height:auto;min-height:46px;flex-wrap:wrap;padding-top:6px;padding-bottom:6px}
 .canvas-head span{min-width:45px}
 
-.canvas-head .screen-name-label{display:inline;margin:0;white-space:nowrap;font-size:12px}
-.canvas-head #screenName{width:160px;min-width:120px;max-width:200px;flex:0 1 160px}
+.canvas-head .icon-button{min-width:36px;min-height:35px;font-size:20px;line-height:1;padding:4px 8px}
+#screenSettingsDialog form{width:min(420px,90vw);max-height:85vh;overflow:auto}
+#screenSettingsDialog h2{font-size:18px;margin:0 0 14px}
+#screenSettingsDialog label{font-size:13px;font-weight:600;margin:12px 0}
+#screenSettingsDialog input[type=color]{height:44px;padding:3px;cursor:pointer}
+#screenSettingsError:not(:empty){padding:8px 0}
