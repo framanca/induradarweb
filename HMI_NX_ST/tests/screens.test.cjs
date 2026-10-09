@@ -55,14 +55,62 @@ test('self-navigation points to copied screen; external navigation remains untou
   assert.equal(source.objects[0].targetScreenId, source.id);
 });
 
-test('selected screen has an editable name field and a change handler', () => {
+test('editor uses edit icon, modal metadata and PLC binding instead of inline screen name', () => {
   const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
   const editor = fs.readFileSync(path.join(__dirname, '../app.js'), 'utf8');
-  assert.match(html, /<label for="screenName"[^>]*>Nombre<\/label>/);
-  assert.match(html, /<input id="screenName" type="text" maxlength="80"/);
-  assert.match(editor, /\$\('#screenName'\)\.onchange=/);
-  assert.match(editor, /editAction\(\(\)=>\{s\.name=name;renderScreens\(\);renderDiag\(\);\},e\.target\)/);
-  assert.match(editor, /el\.id==='screenName'/);
+  assert.match(html, /id="editScreen"[^>]*>✎<\/button>/);
+  assert.match(html, /id="screenSettingsDialog"/);
+  assert.match(html, /id="screenSettingsName"/);
+  assert.match(html, /id="screenSettingsNumber"/);
+  assert.match(html, /id="screenSettingsBackground"/);
+  assert.match(html, /id="screenBinding"/);
+  assert.doesNotMatch(html, /id="screenName"/);
+  assert.match(editor, /\$\('#screenSettingsForm'\)\.onsubmit=/);
+  assert.match(editor, /\$\('#screenBinding'\)\.onchange=/);
+});
+
+test('legacy projects receive stable unique screen numbers and white backgrounds', () => {
+  const old = C.newProject();
+  old.screens = [{id:'a', name:'Principal', objects:[]}, {id:'b', name:'Ajustes', objects:[]}];
+  const normalized = C.normalize(old);
+  assert.deepEqual(normalized.screens.map(x => x.number), [1, 2]);
+  assert.deepEqual(normalized.screens.map(x => x.background), ['#ffffff', '#ffffff']);
+  assert.equal(normalized.screenBinding, '');
+  assert.deepEqual(C.normalize(normalized), normalized);
+  assert.deepEqual(C.validate(normalized), []);
+});
+
+test('new and cloned screens receive unique numbers and preserve colors independently', () => {
+  const original = C.newScreen('Principal', 3);
+  original.background = '#004488';
+  const next = C.nextScreenNumber([original]);
+  assert.equal(next, 1);
+  const duplicate = C.duplicateScreen(original, 'Copia', next);
+  assert.notEqual(duplicate.id, original.id);
+  assert.equal(duplicate.number, 1);
+  assert.equal(duplicate.background, '#004488');
+  duplicate.background = '#ffeeaa';
+  assert.equal(original.background, '#004488');
+});
+
+test('validator rejects duplicated or invalid screen numbers and wrong PLC binding type', () => {
+  const project = C.newProject();
+  project.screens.push(C.newScreen('Segundo', 1));
+  assert.match(C.validate(project).join(';'), /Número de pantalla duplicado/);
+  project.screens[1].number = 0;
+  assert.match(C.validate(project).join(';'), /Número de pantalla no válido/);
+  project.screens[1].number = 2.5;
+  assert.match(C.validate(project).join(';'), /Número de pantalla no válido/);
+  project.screens[1].number = 2;
+  project.screenBinding = 'NoExiste';
+  assert.match(C.validate(project).join(';'), /variable no encontrada/);
+  project.variables.push({id:1,name:'NoExiste',type:'REAL',access:'R',expose:true});
+  assert.match(C.validate(project).join(';'), /variable entera expuesta/);
+  project.variables[0].type = 'INT';
+  project.variables[0].expose = false;
+  assert.match(C.validate(project).join(';'), /variable entera expuesta/);
+  project.variables[0].expose = true;
+  assert.deepEqual(C.validate(project), []);
 });
 
 test('renaming a screen preserves widget IDs, bindings and navigation references after saving', () => {
@@ -76,8 +124,14 @@ test('renaming a screen preserves widget IDs, bindings and navigation references
   screen.objects.push(button);
   const screenId = target.id, buttonId = button.id;
   target.name = 'Configuración';
+  target.number = 7;
+  target.background = '#102030';
+  project.screenBinding = 'CurrentScreen';
   const restored = C.normalize(JSON.parse(JSON.stringify(project)));
   assert.equal(restored.screens[1].name, 'Configuración');
+  assert.equal(restored.screens[1].number, 7);
+  assert.equal(restored.screens[1].background, '#102030');
+  assert.equal(restored.screenBinding, 'CurrentScreen');
   assert.equal(restored.screens[1].id, screenId);
   assert.equal(restored.screens[0].objects[0].id, buttonId);
   assert.equal(restored.screens[0].objects[0].targetScreenId, screenId);
