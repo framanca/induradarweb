@@ -187,7 +187,7 @@ CASE Web_State OF
 END_CASE;
 `;
 }
-function referencedVariables(p){const n=C.normalize(p),set=new Set(n.variables.filter(v=>v.expose&&v.live).map(v=>v.name));if(n.screenBinding)set.add(n.screenBinding);for(const s of n.screens)for(const o of s.objects){if(o.binding)set.add(o.binding);if(o.feedbackBinding)set.add(o.feedbackBinding);}for(const a of n.alarms)if(a.binding)set.add(a.binding);for(const r of n.recipes)for(const k of Object.keys(r.values||{}))set.add(k);return n.variables.filter(v=>set.has(v.name));}
+function referencedVariables(p){const n=C.normalize(p),set=new Set(n.variables.filter(v=>v.expose&&v.live).map(v=>v.name));if(n.screenBinding)set.add(n.screenBinding);for(const s of n.screens)for(const o of C.screenObjects(n,s)){if(o.binding)set.add(o.binding);if(o.feedbackBinding)set.add(o.feedbackBinding);}for(const a of n.alarms)if(a.binding)set.add(a.binding);for(const r of n.recipes)for(const k of Object.keys(r.values||{}))set.add(k);return n.variables.filter(v=>set.has(v.name));}
 function externalVariablesTSV(p){return referencedVariables(p).map(v=>[v.name,v.type].join('\t')).join('\r\n');}
 function localVariablesTSV(){const rows=[
 ['Web_State','UINT','0','','','','Estado servidor HTTP'],

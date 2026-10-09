@@ -178,6 +178,46 @@ with sync_playwright() as pw:
     page.locator("#closeRecovery").click()
     checks.append("recovery_button_opens_backups")
 
+    # La pantalla base se edita una vez y se hereda bajo los widgets propios.
+    page.locator("#newBtn").click()
+    main_id = page.locator("#screenSelect option").first.get_attribute("value")
+    page.locator("#baseScreenBtn").click()
+    base_id = page.locator("#screenSelect").input_value()
+    assert base_id != main_id
+    assert page.locator("#screenSelect option").count() == 2
+    page.locator("#editScreen").click()
+    assert not page.locator("#screenSettingsNumberRow").is_visible()
+    assert not page.locator("#screenSettingsUseBaseRow").is_visible()
+    page.locator("#screenSettingsCancel").click()
+    select_sidebar("elements")
+    page.locator(".tool-grid [data-kind='text']").click()
+    page.locator("#properties [data-p='text']").fill("Cabecera compartida")
+    page.locator("#properties [data-p='text']").press("Tab")
+    page.locator("#screenSelect").select_option(main_id)
+    assert page.locator("#canvas .widget.inherited").count() == 0
+    page.locator("#editScreen").click()
+    assert page.locator("#screenSettingsUseBaseRow").is_visible()
+    page.locator("#screenSettingsUseBase").check()
+    page.locator("#screenSettingsForm button[type=submit]").click()
+    assert page.locator("#canvas .widget.inherited").count() == 1
+    assert "Cabecera compartida" in page.locator("#canvas .widget.inherited").inner_text()
+    page.locator("#screenSelect").select_option(base_id)
+    page.locator("#canvas .widget").click()
+    page.locator("#properties [data-p='text']").fill("Cabecera actualizada")
+    page.locator("#properties [data-p='text']").press("Tab")
+    page.locator("#screenSelect").select_option(main_id)
+    assert "Cabecera actualizada" in page.locator("#canvas .widget.inherited").inner_text()
+    page.reload(wait_until="load")
+    assert page.locator("#canvas .widget.inherited").count() == 1
+    assert "Cabecera actualizada" in page.locator("#canvas .widget.inherited").inner_text()
+    page.locator("#editScreen").click()
+    assert page.locator("#screenSettingsUseBase").is_checked()
+    page.locator("#screenSettingsUseBase").uncheck()
+    page.locator("#screenSettingsForm button[type=submit]").click()
+    assert page.locator("#canvas .widget.inherited").count() == 0
+    checks.append("base_layer_inheritance_updates_and_persists_without_copying")
+
+
     assert not errors, "Browser JavaScript errors: " + repr(errors)
     report = {
         "status": "PASS",
