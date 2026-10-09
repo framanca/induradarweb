@@ -140,3 +140,11 @@ test('eight HMI widgets validate, export their properties and compile standalone
  const script=h.match(/<script>([\s\S]*)<\/script>/)[1];
  assert.doesNotThrow(()=>new Function(script));
 });
+
+
+ test('image data cannot inject HTML attributes into a project',()=>{
+ const p=C.demoProject();
+ p.assets=[{id:'unsafe',name:'unsafe.png',data:'data:image/png;base64,AAAA" onerror="alert(1)'}];
+ assert.ok(C.validate(p).some(x=>x.includes('formato embebido no válido')));
+ assert.throws(()=>C.exportPackage(p),/formato embebido no válido/);
+ });

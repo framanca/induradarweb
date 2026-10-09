@@ -1,0 +1,19 @@
+.widget { touch-action: none; }
+.offline-panels { display: none; }
+.offline-versions { padding: 20px; width: min(760px, 95vw); max-height: 85vh; overflow: auto; }
+.canvas-head { height: auto; min-height: 46px; flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+.top-actions button { min-height: 36px; }
+@media (max-width: 1100px) {
+  .offline-panels { display: flex; background: white; gap: 8px; padding: 8px; }
+  .offline-panels .active { background: #2563eb; color: white; }
+  .layout { display: block; height: auto; }
+  .left, .right { display: none; min-height: 50vh; }
+  .center { display: none; height: 65vh; min-height: 420px; }
+  body[data-panel="tools"] .left { display: block; }
+  body[data-panel="canvas"] .center { display: flex; }
+  body[data-panel="properties"] .right { display: block; }
+  .topbar { padding: 10px; }
+  .canvas-wrap { padding: 12px; touch-action: pan-x pan-y; }
+  input, select, textarea { font-size: 16px; min-height: 38px; }
+  button { min-height: 40px; }
+}

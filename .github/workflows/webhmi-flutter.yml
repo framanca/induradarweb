@@ -1,0 +1,137 @@
+name: WebHMI Flutter offline
+
+on:
+  push:
+    branches: [main, 'feature/webhmi-flutter-*']
+    paths: ['HMI_NX/flutter/**', 'HMI_NX_ST/**', '.github/workflows/webhmi-flutter.yml']
+  pull_request:
+    paths: ['HMI_NX/flutter/**', 'HMI_NX_ST/**', '.github/workflows/webhmi-flutter.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: webhmi-flutter-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: 'true'
+  BOT: 'true'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: HMI_NX/flutter
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.7'
+          channel: stable
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Sync editor and check source model
+        run: |
+          python tool/sync_editor.py
+          node --test ../../HMI_NX_ST/tests/*.test.cjs
+          node --check assets/editor/app.js
+          node --check assets/editor/offline.js
+      - name: Analyze and test native app
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+      - name: Browser tests against the native Dart server
+        run: |
+          python -m pip install playwright==1.57.0
+          python -m playwright install --with-deps chromium
+          python tool/verify_browser.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: webhmi-offline-test-results
+          path: HMI_NX/flutter/test-results/
+          if-no-files-found: ignore
+
+  build:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: windows
+            command: flutter build windows --release
+            artifact: HMI_NX/flutter/build/windows/x64/runner/Release/
+          - os: macos-latest
+            target: macos
+            command: flutter build macos --release
+            artifact: HMI_NX/flutter/build/macos/Build/Products/Release/*.app
+          - os: ubuntu-latest
+            target: linux
+            command: flutter build linux --release
+            artifact: HMI_NX/flutter/build/linux/x64/release/bundle/
+          - os: ubuntu-latest
+            target: android
+            command: flutter build apk --release
+            artifact: HMI_NX/flutter/build/app/outputs/flutter-apk/app-release.apk
+          - os: macos-latest
+            target: ios-simulator
+            command: flutter build ios --simulator --no-codesign
+            artifact: HMI_NX/flutter/build/ios/iphonesimulator/*.app
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: HMI_NX/flutter
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.7'
+          channel: stable
+          cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@v4
+        if: matrix.target == 'android'
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Linux dependencies
+        if: matrix.target == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libsoup-3.0-dev
+      - name: Windows NuGet
+        if: matrix.target == 'windows'
+        run: choco install nuget.commandline --no-progress -y
+      - name: Prepare offline assets and packages
+        run: |
+          python tool/sync_editor.py
+          flutter pub get
+      - name: Build
+        run: ${{ matrix.command }}
+      - name: Archive bundles with native file modes
+        if: matrix.target == 'linux' || matrix.target == 'macos' || matrix.target == 'ios-simulator'
+        shell: bash
+        run: |
+          if [ '${{ matrix.target }}' = linux ]; then tar -czf webhmi-linux.tar.gz -C build/linux/x64/release bundle; fi
+          if [ '${{ matrix.target }}' = macos ]; then tar -czf webhmi-macos.tar.gz -C build/macos/Build/Products/Release omron_webhmi_offline.app; fi
+          if [ '${{ matrix.target }}' = ios-simulator ]; then tar -czf webhmi-ios-simulator.tar.gz -C build/ios/iphonesimulator Runner.app; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: webhmi-offline-${{ matrix.target }}
+          path: |
+            ${{ matrix.artifact }}
+            HMI_NX/flutter/webhmi-${{ matrix.target }}.tar.gz
+          if-no-files-found: error
+          retention-days: 14
