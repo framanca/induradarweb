@@ -100,9 +100,80 @@ test('base widgets are validated and can navigate only to real screens', () => {
 test('editor contains one base editor and per-screen layer toggle', () => {
   const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
   const app = fs.readFileSync(path.join(__dirname, '../app.js'), 'utf8');
-  assert.match(html, /id="baseScreenBtn"/);
-  assert.match(html, /id="screenSettingsUseBase"/);
+  assert.doesNotMatch(html, /id="baseScreenBtn"/);
+  assert.match(html, /id="screenSettingsIsBase" type="checkbox"> Convertir en pantalla base/);
+  assert.match(html, /id="screenSettingsUseBase" type="checkbox"> Utilizar pantalla base/);
+  assert.match(app, /refreshScreenSettingsMode\('convert'\)/);
+  assert.match(app, /refreshScreenSettingsMode\('use'\)/);
   assert.match(app, /function isBaseScreen\(\)/);
   assert.match(app, /inheritedWidget/);
   assert.match(app, /p\.screens\.forEach\(s=>\{s\.useBase=false\}\)/);
+});
+
+test('converting an existing screen to base preserves its widgets and creates a safe navigable fallback', () => {
+ const project = C.newProject(), original = project.screens[0];
+ const text = {...C.newObject('text'), text:'Top navigation'};
+ const self = {...C.newObject('button'),text:'Home',actionType:'navigate',targetScreenId:original.id};
+ original.objects.push(text,self);
+ const id=original.id, number=original.number;
+ const base=C.setScreenMode(project,id,'base');
+ assert.equal(base.id,id);
+ assert.equal(project.baseScreen, original);
+ assert.equal(project.baseScreen.number,null);
+ assert.equal(project.baseScreen.previousNumber,number);
+ assert.equal(project.baseScreen.objects[0].id,text.id);
+ assert.equal(project.screens.length,1);
+ assert.notEqual(project.screens[0].id,id);
+ assert.equal(self.targetScreenId,project.screens[0].id);
+ assert.equal(project.screens[0].useBase,false);
+ assert.deepEqual(C.validate(project),[]);
+});
+
+test('only one base can exist and no screen can use itself as base', () => {
+ const project = C.newProject(),a=project.screens[0],b=C.newScreen('B',2);
+ project.screens.push(b);
+ C.setScreenMode(project,a.id,'base');
+ assert.throws(()=>C.setScreenMode(project,b.id,'base'),/Ya hay una pantalla base/);
+ assert.throws(()=>C.setScreenMode(project,a.id,'useBase'),/no puede heredarse/);
+ assert.equal(project.baseScreen.id,a.id);
+ assert.equal(project.screens[0].id,b.id);
+});
+
+test('converting back to normal clears inheritance but preserves all widgets',()=>{
+ const project=fixture(), main=project.screens[0],other=project.screens[1],base=project.baseScreen;
+ main.useBase=true;other.useBase=true;
+ assert.equal(C.screenObjects(project,main).length,2);
+ const baseWidget=base.objects[0].id;
+ C.setScreenMode(project,base.id,'normal');
+ assert.equal(project.baseScreen,null);
+ assert.equal(base.useBase,false);
+ assert.equal(main.useBase,false);
+ assert.equal(other.useBase,false);
+ assert.equal(project.screens.length,3);
+ assert.ok(project.screens.some(s=>s.id===base.id&&s.objects[0].id===baseWidget));
+ assert.equal(C.screenObjects(project,main).length,1);
+ assert.deepEqual(C.validate(project),[]);
+});
+
+test('explicit normal, base and inherited states retain unique numbers after undo-like JSON restore',()=>{
+ const project=C.newProject();
+ const shared=C.newScreen('Shared',3);
+ project.screens.push(shared);
+ const originalId=shared.id;
+ C.setScreenMode(project,originalId,'base');
+ C.setScreenMode(project,project.screens[0].id,'useBase');
+ assert.equal(project.screens[0].useBase,true);
+ const roundtrip=C.normalize(JSON.parse(JSON.stringify(project)));
+ assert.equal(roundtrip.baseScreen.id,originalId);
+ assert.equal(roundtrip.screens[0].useBase,true);
+ C.setScreenMode(roundtrip,originalId,'normal');
+ assert.equal(roundtrip.screens.find(s=>s.id===originalId).number,3);
+ assert.deepEqual(C.validate(roundtrip),[]);
+});
+
+test('inheritance cannot activate without a base, and any screen can remain independent',()=>{
+ const project=C.newProject(),s=project.screens[0];
+ assert.throws(()=>C.setScreenMode(project,s.id,'useBase'),/Primero convierte/);
+ C.setScreenMode(project,s.id,'normal');
+ assert.equal(s.useBase,false);
 });
