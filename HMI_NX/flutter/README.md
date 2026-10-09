@@ -54,7 +54,7 @@ En Ubuntu/Debian, preparar Linux con:
 sudo apt-get install clang cmake ninja-build pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libsoup-3.0-dev
 ```
 
-Android usa API mínima 23. iOS usa versión mínima 15 y macOS versión mínima 12. Las plataformas Apple requieren Xcode y CocoaPods. Los permisos de red de la app sirven para su servidor **127.0.0.1**, nunca expuesto a la LAN. Los diálogos de archivos de macOS tienen el permiso de archivos seleccionados por el usuario.
+Android usa API mínima 23. El build fija AGP 8.13.2, Gradle 8.14.3 y Kotlin 2.3.0 para mantener la compatibilidad con el plugin WebView estable (AGP 9 retira una configuración ProGuard que todavía utiliza ese plugin). iOS usa versión mínima 15 y macOS versión mínima 12. Las plataformas Apple requieren Xcode y CocoaPods. Los permisos de red de la app sirven para su servidor **127.0.0.1**, nunca expuesto a la LAN. Los diálogos de archivos de macOS tienen el permiso de archivos seleccionados por el usuario.
 
 En Linux, el editor se abre en una ventana WebKitGTK propia. La ventana Flutter inicial mantiene el servidor local: debe permanecer abierta mientras se edita. En las otras cuatro plataformas, el editor está integrado dentro de la ventana Flutter.
 
@@ -98,3 +98,5 @@ python3 tool/verify_browser.py
 `verify_native.dart` verifica reinicios, fallo de escritura, recuperación de corrupción, retención, conflictos de revisión, importaciones/exportaciones y rechazo de accesos ajenos al editor. `verify_browser.py` verifica edición, deshacer/rehacer, restauración con otro proceso y puerto, formatos de archivos reales y acceso a propiedades desde móvil. Los resultados y capturas se producen en `test-results/`.
 
 Las pruebas de modelo y almacenamiento no equivalen a validación en los cinco dispositivos reales. Mantener la validación en NX de cada evolución del HTML/ST exportado.
+
+El CMake de Windows incluye una compatibilidad acotada al plugin WebView para el encabezado de corutinas legado en MSVC reciente. Al actualizar el plugin a C++20, debe retirarse esa definición.

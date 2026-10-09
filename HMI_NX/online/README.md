@@ -8,7 +8,7 @@ El paquete público contiene únicamente `index.html`, estilos, modelo, historia
 
 La interfaz web siempre puede descargarse. Copiarla o alterar su pantalla de login no permite compilar: el servidor verifica la identidad y el permiso en cada petición. Las cuentas anónimas se rechazan. Los metadatos editables por el usuario no conceden permisos. Revocar autorización impide la siguiente petición, aunque el JWT anterior no haya caducado. Un resultado ya descargado no se puede recuperar remotamente.
 
-**Limitación durante la coexistencia:** el repositorio `framanca/induradarweb` es público y las versiones anteriores incluyen el compilador local. Por tanto, conservarlas públicas deja disponible ese código. Esta alternativa protege el uso de su servicio online, pero no impide utilizar la copia antigua. Para proteger una futura evolución, el repositorio del backend y los nuevos algoritmos deberán ser privados y habrá que decidir qué versiones se siguen distribuyendo. No se cambia la visibilidad ni se retira ningún formato en esta entrega.
+**Limitación durante la coexistencia:** el repositorio `framanca/induradarweb` es público y las versiones anteriores incluyen el compilador local. La app Flutter offline también lo incorpora, porque necesita compilar sin servidor. Por tanto, conservarlas públicas deja disponible ese código. Esta alternativa protege el uso de su servicio online, pero no impide utilizar la copia antigua. Para proteger una futura evolución, el repositorio del backend y los nuevos algoritmos deberán ser privados y habrá que decidir qué versiones se siguen distribuyendo. No se cambia la visibilidad ni se retira ningún formato en esta entrega.
 
 ## Autorizar y revocar cuentas
 
