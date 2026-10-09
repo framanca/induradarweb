@@ -136,3 +136,19 @@ test('renaming a screen preserves widget IDs, bindings and navigation references
   assert.equal(restored.screens[0].objects[0].id, buttonId);
   assert.equal(restored.screens[0].objects[0].targetScreenId, screenId);
 });
+
+test('la variable de selección se exporta a Externals y al snapshot del PLC', () => {
+  require('../runtime.js');
+  require('../st.js');
+  const p = C.newProject();
+  p.variables.push({id:7,name:'PantallaActual',type:'INT',access:'R',expose:true,live:true,writeSupported:true});
+  p.screenBinding='PantallaActual';
+  const externals=C.externalVariablesTSV(p);
+  const st=C.buildST(p);
+  const html=C.buildRuntimeHTML(p);
+  assert.match(externals, /PantallaActual\tINT/);
+  assert.match(st, /Web_ApiBody := CONCAT\(Web_ApiBody, '7=', INT_TO_STRING\(PantallaActual\), '\$n'\)/);
+  assert.match(html, /"screenBinding":"PantallaActual"/);
+  assert.match(html, /"number":1/);
+  assert.match(html, /"background":"#ffffff"/);
+});
