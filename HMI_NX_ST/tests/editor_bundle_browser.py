@@ -2,6 +2,7 @@
 Exercise buttons that stopped working when history.js was not published.
 Never touches a real user's IndexedDB/localStorage or a PLC.
 """
+import base64
 import json
 import os
 from pathlib import Path
@@ -120,6 +121,36 @@ with sync_playwright() as pw:
     page.locator("#redoBtn").click()
     assert page.locator("#canvas .widget").count() == 1
     checks.append("undo_and_redo_buttons_work")
+
+    # An uploaded image must use the same pointer drag as other widgets.
+    # Without preventing native <img> dragging the browser steals pointermove events.
+    page.locator("#imageFile").set_input_files({
+        "name": "drag-test.png",
+        "mimeType": "image/png",
+        "buffer": base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6M9sAAAAASUVORK5CYII=")
+    })
+    image_widget = page.locator("#canvas .widget.image")
+    image_widget.wait_for()
+    assert image_widget.locator("img").get_attribute("draggable") == "false"
+    assert image_widget.locator("img").evaluate("(el) => getComputedStyle(el).pointerEvents") == "none"
+    x_before = image_widget.evaluate("(el) => parseFloat(el.style.left)")
+    y_before = image_widget.evaluate("(el) => parseFloat(el.style.top)")
+    rect = image_widget.bounding_box()
+    assert rect is not None
+    px = rect["x"] + rect["width"] / 2
+    py = rect["y"] + rect["height"] / 2
+    page.mouse.move(px, py)
+    page.mouse.down()
+    page.mouse.move(px + 55, py + 35, steps=8)
+    page.mouse.up()
+    assert image_widget.evaluate("(el) => parseFloat(el.style.left)") >= x_before + 40
+    assert image_widget.evaluate("(el) => parseFloat(el.style.top)") >= y_before + 25
+    page.locator("#undoBtn").click()
+    assert image_widget.evaluate("(el) => parseFloat(el.style.left)") == x_before
+    assert image_widget.evaluate("(el) => parseFloat(el.style.top)") == y_before
+    page.locator("#undoBtn").click()
+    assert page.locator("#canvas .widget.image").count() == 0
+    checks.append("images_drag_with_mouse_like_other_widgets_and_support_undo")
 
     # Alarmas y recetas siguen siendo editables; cambiar de pestaña no altera el lienzo.
     select_sidebar("alarms")
