@@ -108,7 +108,7 @@ function refreshScreenSettingsMode(source=''){
 $('#editScreen').onclick=()=>{
  const s=activeScreen(),base=isBaseScreen();
  $('#screenSettingsName').value=s.name;
- $('#screenSettingsNumber').value=String(base?(s.previousNumber||C.nextScreenNumber(p.screens)):s.number);
+ const previous=Number(s.previousNumber);const available=Number.isInteger(previous)&&previous>=1&&previous<=C.MAX_SCREEN_NUMBER&&!p.screens.some(x=>x.number===previous)?previous:C.nextScreenNumber(p.screens);$('#screenSettingsNumber').value=String(base?available:s.number);
  $('#screenSettingsBackground').value=s.background;
  $('#screenSettingsIsBase').checked=base;
  $('#screenSettingsUseBase').checked=!base&&s.useBase===true;
