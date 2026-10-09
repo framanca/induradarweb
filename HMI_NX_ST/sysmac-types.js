@@ -110,7 +110,7 @@ function importSysmac(text){
   seen.add(d.name);
   for(const leaf of expand(d.name,d.type,parsed.defs)){
    if(result.some(v=>v.name===leaf.name))throw Error('Miembro duplicado: '+leaf.name);
-   const originalType=leaf.type,writeSupported=!DATE_TYPES.has(originalType)&&(originalType!=='STRING'||leaf.stringLength<=512);
+   const originalType=leaf.type,writeSupported=originalType!=='STRING'||leaf.stringLength<=512;
    result.push({id:result.length+1,...leaf,comment:d.comment||'',access:'R',expose:active++<32,live:true,writeSupported});
   }
  }
@@ -137,7 +137,7 @@ function normalize(input){
  const p=previousNormalize(input);
  for(const v of p.variables){
   const t=shortType(v.type);
-  if(BASIC.has(t)){v.type=t;v.live=true;v.writeSupported=!DATE_TYPES.has(t)&&(t!=='STRING'||v.stringLength<=512)}
+  if(BASIC.has(t)){v.type=t;v.live=true;v.writeSupported=t!=='STRING'||v.stringLength<=512}
   if(v.enumType){v.type='DINT';v.live=true;v.writeSupported=true}
  }
  return p;
@@ -157,7 +157,20 @@ function canonicalWrite(type,value){
   if(limit&&(n<limit[0]||n>limit[1]))throw Error(t+': fuera de rango');
   return n.toString();
  }
- if(DATE_TYPES.has(t))throw Error(t+': la escritura directa aun no esta disponible, use el PLC');
+ if(DATE_TYPES.has(t)){
+  const text=String(value).trim();
+  const datePattern=/^\d{4}-\d{2}-\d{2}$/;
+  const timePattern=/^([01]\d|2[0-3]):([0-5]\d):([0-5]\d)$/;
+  if(t==='TIME_OF_DAY'){const match=text.match(timePattern);if(!match)throw Error('TOD: formato HH:mm:ss, resolucion 1 s');return String(Number(match[1])*3600+Number(match[2])*60+Number(match[3]))}
+  const date=t==='DATE'?text:text.slice(0,10),clock=t==='DATE'?'00:00:00':text.slice(11);
+  if(!datePattern.test(date)||(t==='DATE_AND_TIME'&&(!/^\d{4}-\d{2}-\d{2}-(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d$/.test(text)||!timePattern.test(clock))))throw Error('DATE/DT: usa YYYY-MM-DD o YYYY-MM-DD-HH:mm:ss sin fracciones');
+  const [year,month,day]=date.split('-').map(Number),[hh,mm,ss]=clock.split(':').map(Number);
+  if(year<1970||year>9999)throw Error('Fecha fuera del rango 1970..9999');
+  const ms=Date.UTC(year,month-1,day,hh,mm,ss);
+  const actual=new Date(ms);
+  if(!Number.isFinite(ms)||actual.getUTCFullYear()!==year||actual.getUTCMonth()!==month-1||actual.getUTCDate()!==day)throw Error('Fecha no valida');
+  return String(Math.floor(ms/1000));
+ }
  return String(value);
 }
 C.importSysmac=importSysmac;C.normalize=normalize;C.validate=validate;
