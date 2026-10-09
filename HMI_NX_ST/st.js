@@ -15,7 +15,9 @@ function fromStringExpr(v){
  if(v.type==='BOOL')return null;
  if(v.type==='STRING')return 'Web_ValueText';
  if(v.type==='TIME')return 'NanoSecToTime(STRING_TO_LINT(Web_ValueText))';
- if(['DATE','DATE_AND_TIME','TIME_OF_DAY'].includes(v.type))throw Error(v.type+': escritura directa no soportada');
+ if(v.type==='DATE')return 'SecToDate(STRING_TO_LINT(Web_ValueText))';
+ if(v.type==='TIME_OF_DAY')return 'SecToTod(STRING_TO_LINT(Web_ValueText))';
+ if(v.type==='DATE_AND_TIME')return 'SecToDt(STRING_TO_LINT(Web_ValueText))';
  return 'STRING_TO_'+v.type+'(Web_ValueText)';
 }
 function stTyped(v,value){
@@ -314,7 +316,8 @@ FUNCIONES
 - Comunicación robusta: snapshots SEQ/END, actualización atómica y watchdog de estados.
 - Lectura de los 20 tipos basicos NX, y de miembros de ARRAY/STRUCT/UNION/ENUM mediante variables raiz.
 - Escritura directa BOOL, numeros, bitstrings hexadecimales, TIME como nanosegundos, STRING y enumeraciones (NumToEnum).
-- DATE, TIME_OF_DAY y DATE_AND_TIME se leen; la escritura online directa queda deshabilitada hasta verificar conversiones en hardware.
+- DATE, TIME_OF_DAY y DATE_AND_TIME: lectura formateada y escritura con resolucion de 1 segundo usando SecToDate/SecToTod/SecToDt.
+- Importante: la escritura DATE/DT/TOD trunca/substituye fracciones de segundo; DATE/DT admiten desde 1970 y se interpretan sin zona horaria.
 - Botones SET/RESET/TOGGLE.
 - Varias pantallas con número único, color de fondo y selección opcional por variable entera leída del PLC.
 - Si se configura control PLC, el valor de esa variable gobierna siempre la pantalla; si no coincide con ningún número (o es inválido), se muestra la principal. Sin comunicación válida, se mantiene la última pantalla y se indica pérdida de comunicación.
