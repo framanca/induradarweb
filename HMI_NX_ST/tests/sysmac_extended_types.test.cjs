@@ -83,7 +83,7 @@ test('generated runtime retains exact bitstrings, wide integers and date strings
  const p=C.newProject();
  p.variables=C.importSysmac('Name\tData Type\nFlags\tDWORD\nWide\tULINT\nT\tTIME\nDateValue\tDATE');
  const html=C.buildRuntimeHTML(p);
- a.match(html,/tag\.type==="TIME"/);a.match(html,/BigInt\(raw\)/);
+ a.match(html,/"LWORD","TIME","DATE"/);a.match(html,/BigInt\(raw\)/);
  a.match(html,/TIME_OF_DAY/);a.match(html,/LWORD/);
  a.ok([...html].every(x=>x.charCodeAt(0)<128));
  const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
