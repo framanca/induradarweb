@@ -66,6 +66,23 @@ function renderDiag(){syncProjectInputs();const errors=C.validate(p),html=C.buil
 function importText(text){const old=new Map(p.variables.map(v=>[v.name,v]));const vars=C.importSysmac(text);for(const v of vars){const prev=old.get(v.name);if(prev){v.access=prev.access;v.expose=prev.expose;}}editAction(()=>{p.variables=vars;render();toast(vars.length+' variables importadas');});}
 function download(name,data,type='application/octet-stream'){const a=document.createElement('a'),blob=new Blob([data],{type});a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);}
 function preview(){syncProjectInputs();const errors=C.validate(p);if(errors.length){toast('Corrige bloqueos antes de previsualizar');return;}let html=C.buildRuntimeHTML(p);html=html.replace('startComm();</script>','for(const v of P.vars)vals[v.name]=v.type==="BOOL"?false:v.type==="STRING"?"DEMO":55;document.getElementById("status").textContent="PREVIEW local";comm.state="ONLINE";comm.lastGoodAt=Date.now();showScreen(0);fitStage();paint();</script>');$('#previewFrame').srcdoc=html;$('#previewDialog').showModal();}
+const sidebarTabs=[...document.querySelectorAll('[data-sidebar-tab]')];
+function showSidebarTab(name,focus=false){
+ const current=sidebarTabs.find(b=>b.dataset.sidebarTab===name);if(!current)return;
+ for(const b of sidebarTabs){const active=b===current;b.setAttribute('aria-selected',String(active));b.tabIndex=active?0:-1;b.classList.toggle('is-active',active);document.getElementById(b.getAttribute('aria-controls')).hidden=!active;}
+ $('.left-panels').scrollTop=0;if(focus)current.focus();
+}
+sidebarTabs.forEach((tab,index)=>{
+ tab.onclick=()=>showSidebarTab(tab.dataset.sidebarTab);
+ tab.onkeydown=e=>{let next;
+  if(e.key==='ArrowRight')next=sidebarTabs[(index+1)%sidebarTabs.length];
+  else if(e.key==='ArrowLeft')next=sidebarTabs[(index+sidebarTabs.length-1)%sidebarTabs.length];
+  else if(e.key==='Home')next=sidebarTabs[0];
+  else if(e.key==='End')next=sidebarTabs[sidebarTabs.length-1];
+  else return;
+  e.preventDefault();showSidebarTab(next.dataset.sidebarTab,true);
+ };
+});
 document.querySelectorAll('.tool-grid [data-kind]').forEach(b=>b.onclick=()=>editAction(()=>{const o=C.newObject(b.dataset.kind);activeScreen().objects.push(o);selected=o.id;render();}));
 ['projectName','port','pollMs','screenW','screenH','minDisplayWidth','maxDisplayWidth'].forEach(id=>{const input=$('#'+id);input.onchange=()=>editAction(()=>{syncProjectInputs();renderCanvas();renderDiag();},input);});
 function uniqueScreenName(base){const names=new Set(p.screens.map(s=>s.name));if(!names.has(base))return base;for(let i=2;;i++){const name=base+' '+i;if(!names.has(name))return name;}}
