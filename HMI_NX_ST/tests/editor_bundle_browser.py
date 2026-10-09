@@ -52,7 +52,7 @@ with sync_playwright() as pw:
 
     # Import a PLC integer variable and bind it as the screen controller.
     page.locator("#pasteBtn").click()
-    page.locator("#pasteText").fill("Name,Data Type\\nPantallaActual,UINT\\n")
+    page.locator("#pasteText").fill("Name,Data Type\nPantallaActual,UINT\n")
     page.locator("#pasteImport").click()
     page.locator("#screenBinding").select_option("PantallaActual")
     assert page.locator("#screenBinding").input_value() == "PantallaActual"
