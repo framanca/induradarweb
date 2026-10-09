@@ -48,7 +48,7 @@ function typeDefs(text){
  }
  let cleaned=source;
  for(const [start,end] of remove.sort((a,b)=>b[0]-a[0]))cleaned=cleaned.slice(0,start)+cleaned.slice(end);
- cleaned=cleaned.replace(/\bEND_TYPE\b\s*;?/gi,'').replace(/\bTYPE\b(?=\s*(?:VAR|\n|\r))/gi,'');
+ cleaned=cleaned.replace(/\bEND_TYPE\b\s*;?/gi,'');
  return {defs:out,cleaned};
 }
 function variableDeclarations(text){
