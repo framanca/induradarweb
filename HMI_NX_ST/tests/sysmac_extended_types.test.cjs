@@ -25,7 +25,7 @@ test('nested Sysmac arrays, struct members, enum and roots are imported accurate
  a.equal(variables.length,13);
  a.deepEqual(Array.from(variables,v=>v.name).slice(0,5),['Linea.Sensores[0].Enabled','Linea.Sensores[0].Count','Linea.Sensores[0].Bits','Linea.Sensores[0].Duracion','Linea.Sensores[0].Fecha']);
  a.equal(variables.find(v=>v.name==='Modo').enumValues.Automatico,3);
- a.equal(variables.find(v=>v.name==='Linea.Sensores[1].Fecha').writeSupported,false);
+ a.equal(variables.find(v=>v.name==='Linea.Sensores[1].Fecha').writeSupported,true);
  a.equal(variables.find(v=>v.name==='Linea.Sensores[1].Duracion').writeSupported,true);
  const p=C.newProject();p.variables=variables;a.deepEqual(Array.from(C.validate(p)),[]);
  a.equal(C.externalVariablesTSV(p).split('\r\n').length,3);
@@ -47,7 +47,7 @@ test('20 scalar types, including temporal and bitstrings, are importable',()=>{
  a.equal(variables.length,20);
  a.ok(variables.every(v=>v.live));
  a.equal(variables[18].type,'TIME_OF_DAY');a.equal(variables[19].type,'DATE_AND_TIME');
- a.ok(variables.slice(17).every(v=>!v.writeSupported));
+ a.ok(variables.slice(17).every(v=>v.writeSupported));
 });
 test('PLC ST uses valid type-specific conversions and never declares array members as Externals',()=>{
  const p=C.newProject();p.variables=C.importSysmac(src);
@@ -60,6 +60,7 @@ test('PLC ST uses valid type-specific conversions and never declares array membe
  a.match(st,/EnumToNum\(Modo\)/);
  a.match(st,/NumToEnum\(STRING_TO_DINT\(Web_ValueText\), Modo\)/);
  a.match(st,/NanoSecToTime\(STRING_TO_LINT\(Web_ValueText\)\)/);
+ a.match(st,/SecToDate\(STRING_TO_LINT\(Web_ValueText\)\)/);
  a.ok(!C.externalVariablesTSV(p).includes('Linea.Sensores[0]'));
  const pkg=C.exportPackage(p);a.ok(pkg.files['HMI_Embedded.html']);a.ok(pkg.files['WebHMI_Server.st']);
 });
@@ -69,6 +70,11 @@ test('64-bit integers and bitstrings are validated losslessly before browser wri
  a.equal(f('ULINT','18446744073709551615'),'18446744073709551615');
  a.equal(f('LWORD','0xffffffffffffffff'),'FFFFFFFFFFFFFFFF');
  a.equal(f('WORD','1a'),'001A');
+ a.equal(f('DATE','2026-10-10'),'1791590400');
+ a.equal(f('TIME_OF_DAY','08:30:00'),'30600');
+ a.equal(f('DATE_AND_TIME','2026-10-10-08:30:00'),'1791621000');
+ a.throws(()=>f('DATE','2026-02-29'));
+ a.throws(()=>f('DATE_AND_TIME','2026-10-10-08:30:00.123'),/fracciones/);
  a.throws(()=>f('LINT','9223372036854775808'));
  a.throws(()=>f('ULINT','18446744073709551616'));
  a.throws(()=>f('WORD','12345'));
