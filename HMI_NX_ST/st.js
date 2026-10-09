@@ -142,6 +142,33 @@ CASE Web_State OF
             Web_TxText := 'HTTP/1.0 400 Bad Request$r$nContent-Type: text/plain$r$nConnection: close$r$n$r$n';
         END_IF;
 
+
+    5:
+        Web_PosId := FIND(Web_RxText, '?id=');
+        Web_PosEnd := FIND(Web_RxText, ' HTTP/');
+        Web_Found := FALSE;
+        IF (Web_PosId > 0) AND (Web_PosEnd > Web_PosId) THEN
+            Web_IdText := MID(In:=Web_RxText, L:=Web_PosEnd-(Web_PosId+UINT#4), P:=Web_PosId+UINT#4);
+            Web_WriteId := STRING_TO_UINT(Web_IdText);
+            IF Web_WriteId = UINT#0 THEN
+                ${alarmAckAll}
+                Web_Found := TRUE;
+            ELSE
+                CASE Web_WriteId OF
+                ${alarmAckCases||'0: ;'}
+                ELSE
+                    ;
+                END_CASE;
+            END_IF;
+        END_IF;
+        IF Web_Found THEN
+            Web_ApiBody := 'OK';
+            Web_TxText := 'HTTP/1.0 200 OK$r$nContent-Type: text/plain$r$nCache-Control: no-store$r$nConnection: close$r$n$r$n';
+        ELSE
+            Web_ApiBody := 'BAD ACK';
+            Web_TxText := 'HTTP/1.0 400 Bad Request$r$nContent-Type: text/plain$r$nConnection: close$r$n$r$n';
+        END_IF;
+
     ELSE
         Web_ApiBody := 'NOT FOUND';
         Web_TxText := 'HTTP/1.0 404 Not Found$r$nContent-Type: text/plain$r$nConnection: close$r$n$r$n';
@@ -251,7 +278,7 @@ FUNCIONES
 - Si se configura control PLC, el valor de esa variable gobierna siempre la pantalla; si no coincide con ningún número (o es inválido), se muestra la principal. Sin comunicación válida, se mantiene la última pantalla y se indica pérdida de comunicación.
 - Imágenes embebidas como data URL, estáticas o con cambio OFF/ON gobernado por BOOL.
 - Estado BOOL con símbolos SVG integrados OFF/ON: lámpara, motor, bomba, válvula, cinta y sensor; mapeo TRUE/FALSE invertible.
-- Alarmas actuales evaluadas en ST, enviadas en /api/read y mostradas en ventana de alarmas.
+- Alarmas evaluadas en ST con ACK individual/total en /api/ack y estados K en /api/read.
 - Recetas compiladas en ST y aplicadas en una sola ejecución del CASE de receta.
 
 LÍMITES ACTUALES
@@ -259,7 +286,7 @@ LÍMITES ACTUALES
 - HTTP/1.0 con Connection: close.
 - Petición <=1900 bytes en una recepción.
 - Web_WatchdogLimit es un límite en ciclos de tarea (5000 por defecto), no tiempo absoluto.
-- Alarmas: estado actual, sin histórico/ACK persistente todavía.
+- Alarmas: ACK en memoria PLC mientras sigan activas; no retentivas tras reinicio ni historial.
 - Recetas: valores compilados con la exportación; editar una receta exige regenerar/transferir ST.
 - Sin HTTPS ni gestión de usuarios todavía.
 - No usar la HMI para funciones de seguridad.
