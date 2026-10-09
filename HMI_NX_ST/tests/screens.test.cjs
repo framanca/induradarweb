@@ -54,3 +54,31 @@ test('self-navigation points to copied screen; external navigation remains untou
   assert.equal(clone.objects[1].targetScreenId, 'another-screen');
   assert.equal(source.objects[0].targetScreenId, source.id);
 });
+
+test('selected screen has an editable name field and a change handler', () => {
+  const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+  const editor = fs.readFileSync(path.join(__dirname, '../app.js'), 'utf8');
+  assert.match(html, /<label for="screenName"[^>]*>Nombre<\/label>/);
+  assert.match(html, /<input id="screenName" type="text" maxlength="80"/);
+  assert.match(editor, /\$\('#screenName'\)\.onchange=/);
+  assert.match(editor, /editAction\(\(\)=>\{s\.name=name;renderScreens\(\);renderDiag\(\);\},e\.target\)/);
+  assert.match(editor, /el\.id==='screenName'/);
+});
+
+test('renaming a screen preserves widget IDs, bindings and navigation references after saving', () => {
+  const project = C.newProject();
+  const screen = project.screens[0];
+  const target = C.newScreen('Ajustes');
+  project.screens.push(target);
+  const button = C.newObject('button');
+  button.actionType = 'navigate';
+  button.targetScreenId = target.id;
+  screen.objects.push(button);
+  const screenId = target.id, buttonId = button.id;
+  target.name = 'Configuración';
+  const restored = C.normalize(JSON.parse(JSON.stringify(project)));
+  assert.equal(restored.screens[1].name, 'Configuración');
+  assert.equal(restored.screens[1].id, screenId);
+  assert.equal(restored.screens[0].objects[0].id, buttonId);
+  assert.equal(restored.screens[0].objects[0].targetScreenId, screenId);
+});
