@@ -15,7 +15,7 @@ def build(dest):
     dest.mkdir(parents=True, exist_ok=True)
     for stale in ['runtime.js','st.js','zip.js','compiler.js']:
         (dest / stale).unlink(missing_ok=True)
-    for name in ['index.html','style.css','model.js','history.js','app.js']:
+    for name in ['index.html','style.css','expressions.js','model.js','history.js','app.js']:
         text=(SOURCE/name).read_text()
         if name == 'index.html':
             for module in ['runtime.js','st.js','zip.js']:
@@ -41,8 +41,8 @@ def build(dest):
     for name in ['online.js','online.css','config.js']:
         shutil.copyfile(APP/'client'/name,dest/name)
     compiler=APP/'supabase/functions/webhmi-compile/compiler.js'
-    compiler.write_text('\n'.join((SOURCE/name).read_text() for name in ['model.js','runtime.js','st.js','zip.js']))
-    manifest={name:hashlib.sha256((SOURCE/name).read_bytes()).hexdigest() for name in ['model.js','runtime.js','st.js','zip.js']}
+    compiler.write_text('\n'.join((SOURCE/name).read_text() for name in ['expressions.js','model.js','runtime.js','st.js','zip.js']))
+    manifest={name:hashlib.sha256((SOURCE/name).read_bytes()).hexdigest() for name in ['expressions.js','model.js','runtime.js','st.js','zip.js']}
     (APP/'server/source-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
     print('Built online frontend without ST/ZIP/runtime compiler sources:',dest)
 

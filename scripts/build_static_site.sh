@@ -29,7 +29,7 @@ for source in index.html style.css "${hmi_scripts[@]}"; do
 done
 
 # HMI NX ST is a separate experimental editor. It does not replace HMI_NX.
-hmi_st_scripts=(model.js runtime.js st.js zip.js history.js app.js)
+hmi_st_scripts=(expressions.js model.js runtime.js st.js zip.js history.js app.js)
 for source in "${hmi_st_scripts[@]}"; do
   node --check "HMI_NX_ST/$source"
 done

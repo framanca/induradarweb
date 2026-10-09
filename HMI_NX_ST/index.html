@@ -6,6 +6,7 @@
 <meta name="robots" content="noindex,nofollow">
 <title>HMI NX ST · Embedded WebHMI</title>
 <link rel="stylesheet" href="style.css">
+<script defer src="expressions.js"></script>
 <script defer src="model.js"></script>
 <script defer src="runtime.js"></script>
 <script defer src="st.js"></script>
@@ -55,11 +56,13 @@
       <input id="varsFile" type="file" accept=".csv,.tsv,.txt" hidden>
       <div id="varSummary" class="summary"></div>
       <div id="varList" class="var-list"></div>
+      <div class="section-title"><h2>Variables internas</h2><button id="addInternalVar">+ Interna</button></div>
+      <div id="internalVarList"></div>
     </section>
     <section id="sidebar-panel-elements" role="tabpanel" aria-labelledby="sidebar-tab-elements" data-sidebar-panel="elements" tabindex="0" hidden>
       <h2>Elementos</h2>
       <div class="tool-grid">
-        <button data-kind="text">Texto</button><button data-kind="status">Estado</button>
+        <button data-kind="text">Texto</button><button data-kind="dynamicText">Texto dinámico</button><button data-kind="status">Estado</button>
         <button data-kind="value">Valor</button><button data-kind="input">Entrada</button>
         <button data-kind="button">Botón</button><button data-kind="bar">Barra</button>
         <button data-kind="slider">Slider</button><button data-kind="switch">Interruptor</button>

@@ -8,8 +8,11 @@ function alarmExpr(v,a){const op={eq:'=',ne:'<>',gt:'>',ge:'>=',lt:'<',le:'<='}[
 function buildST(input){
  const p=C.normalize(input),html=C.buildRuntimeHTML(p),parts=chunks(html),exposed=p.variables.filter(v=>v.expose&&v.live),rw=exposed.filter(v=>v.access==='RW'&&v.writeSupported),vm=new Map(p.variables.map(v=>[v.name,v]));
  const read=[];for(const v of exposed){if(v.type==='BOOL'){read.push(`IF ${v.name} THEN\n    Web_ApiBody := CONCAT(Web_ApiBody, '${v.id}=1$n');\nELSE\n    Web_ApiBody := CONCAT(Web_ApiBody, '${v.id}=0$n');\nEND_IF;`);}else{read.push(`Web_ApiBody := CONCAT(Web_ApiBody, '${v.id}=', ${toStringExpr(v)}, '$n');`);}}
- for(const [i,a] of p.alarms.entries()){const v=vm.get(a.binding);if(!v)continue;read.push(`IF ${alarmExpr(v,a)} THEN\n    Web_ApiBody := CONCAT(Web_ApiBody, 'A${i+1}=1$n');\nELSE\n    Web_ApiBody := CONCAT(Web_ApiBody, 'A${i+1}=0$n');\nEND_IF;`);}
+ for(const [i,a] of p.alarms.entries()){const v=vm.get(a.binding);if(!v)continue;read.push(`IF ${alarmExpr(v,a)} THEN\n    Web_ApiBody := CONCAT(Web_ApiBody, 'A${i+1}=1$n');\nELSE\n    Web_ApiBody := CONCAT(Web_ApiBody, 'A${i+1}=0$n');\nEND_IF;\nIF Web_AlarmAck[${i+1}] THEN\n    Web_ApiBody := CONCAT(Web_ApiBody, 'K${i+1}=1$n');\nELSE\n    Web_ApiBody := CONCAT(Web_ApiBody, 'K${i+1}=0$n');\nEND_IF;`);}
  const writes=rw.map(v=>{if(v.type==='BOOL')return `${v.id}:\n                ${v.name} := (Web_ValueText = '1') OR (Web_ValueText = 'TRUE') OR (Web_ValueText = 'true');\n                Web_Found := TRUE;`;return `${v.id}:\n                ${v.name} := ${fromStringExpr(v)};\n                Web_Found := TRUE;`;}).join('\n            ');
+ const alarmReset=p.alarms.map((a,i)=>{const v=vm.get(a.binding);return v?`IF NOT ${alarmExpr(v,a)} THEN Web_AlarmAck[${i+1}] := FALSE; END_IF;`:''}).filter(Boolean).join('\n');
+ const alarmAckCases=p.alarms.map((a,i)=>{const v=vm.get(a.binding);return v?`${i+1}:\n IF ${alarmExpr(v,a)} THEN Web_AlarmAck[${i+1}] := TRUE; END_IF;\n Web_Found := TRUE;`:''}).filter(Boolean).join('\n');
+ const alarmAckAll=p.alarms.map((a,i)=>{const v=vm.get(a.binding);return v?`IF ${alarmExpr(v,a)} THEN Web_AlarmAck[${i+1}] := TRUE; END_IF;`:''}).filter(Boolean).join('\n');
  const recipeCases=p.recipes.map((r,i)=>{const assigns=[];for(const [name,value] of Object.entries(r.values||{})){const v=vm.get(name);if(v&&v.access==='RW'&&v.writeSupported)assigns.push(`${v.name} := ${stTyped(v,value)};`);}return `${i+1}:\n                ${assigns.join('\n                ')||';'}\n                Web_Found := TRUE;`;}).join('\n            ');
  const chunkCases=parts.map((c,i)=>`${i}: Web_TxText := '${stLiteral(c)}';`).join('\n            ');
  return `(* HMI NX ST · servidor WebHMI generado
@@ -20,6 +23,7 @@ function buildST(input){
    Seguridad funcional e interlocks permanecen en el programa de máquina.
 *)
 
+${alarmReset}
 IF Web_State = Web_PrevState THEN
     IF (Web_State <> UINT#10) AND (Web_StateTicks < UDINT#4294967294) THEN
         Web_StateTicks := Web_StateTicks + UDINT#1;
@@ -69,6 +73,8 @@ CASE Web_State OF
             Web_Request := UINT#3;
         ELSIF FIND(Web_RxText, 'POST /api/recipe?') = 1 THEN
             Web_Request := UINT#4;
+         ELSIF FIND(Web_RxText, 'POST /api/ack?') = 1 THEN
+             Web_Request := UINT#5;
         ELSE
             Web_Request := UINT#9;
         END_IF;
@@ -136,6 +142,33 @@ CASE Web_State OF
             Web_TxText := 'HTTP/1.0 400 Bad Request$r$nContent-Type: text/plain$r$nConnection: close$r$n$r$n';
         END_IF;
 
+
+    5:
+        Web_PosId := FIND(Web_RxText, '?id=');
+        Web_PosEnd := FIND(Web_RxText, ' HTTP/');
+        Web_Found := FALSE;
+        IF (Web_PosId > 0) AND (Web_PosEnd > Web_PosId) THEN
+            Web_IdText := MID(In:=Web_RxText, L:=Web_PosEnd-(Web_PosId+UINT#4), P:=Web_PosId+UINT#4);
+            Web_WriteId := STRING_TO_UINT(Web_IdText);
+            IF Web_WriteId = UINT#0 THEN
+                ${alarmAckAll}
+                Web_Found := TRUE;
+            ELSE
+                CASE Web_WriteId OF
+                ${alarmAckCases||'0: ;'}
+                ELSE
+                    ;
+                END_CASE;
+            END_IF;
+        END_IF;
+        IF Web_Found THEN
+            Web_ApiBody := 'OK';
+            Web_TxText := 'HTTP/1.0 200 OK$r$nContent-Type: text/plain$r$nCache-Control: no-store$r$nConnection: close$r$n$r$n';
+        ELSE
+            Web_ApiBody := 'BAD ACK';
+            Web_TxText := 'HTTP/1.0 400 Bad Request$r$nContent-Type: text/plain$r$nConnection: close$r$n$r$n';
+        END_IF;
+
     ELSE
         Web_ApiBody := 'NOT FOUND';
         Web_TxText := 'HTTP/1.0 404 Not Found$r$nContent-Type: text/plain$r$nConnection: close$r$n$r$n';
@@ -189,12 +222,13 @@ END_CASE;
 }
 function referencedVariables(p){const n=C.normalize(p),set=new Set(n.variables.filter(v=>v.expose&&v.live).map(v=>v.name));if(n.screenBinding)set.add(n.screenBinding);for(const s of n.screens)for(const o of C.screenObjects(n,s)){if(o.binding)set.add(o.binding);if(o.feedbackBinding)set.add(o.feedbackBinding);}for(const a of n.alarms)if(a.binding)set.add(a.binding);for(const r of n.recipes)for(const k of Object.keys(r.values||{}))set.add(k);return n.variables.filter(v=>set.has(v.name));}
 function externalVariablesTSV(p){return referencedVariables(p).map(v=>[v.name,v.type].join('\t')).join('\r\n');}
-function localVariablesTSV(){const rows=[
+function localVariablesTSV(input){const p=C.normalize(input);const rows=[
 ['Web_State','UINT','0','','','','Estado servidor HTTP'],
 ['Web_PrevState','UINT','0','','','','Estado anterior watchdog'],
 ['Web_StateTicks','UDINT','0','','','','Ciclos en estado actual'],
 ['Web_WatchdogLimit','UDINT','5000','','','','Límite ciclos watchdog'],
 ['Web_Seq','UDINT','0','','','','Secuencia snapshot API'],
+ ['Web_AlarmAck',`ARRAY[1..${Math.max(1,p.alarms.length)}] OF BOOL`,'','','','','Alarmas reconocidas; rearme al desactivarse'],
 ['Web_Request','UINT','0','','','','Ruta solicitada'],
 ['Web_Chunk','UINT','0','','','','Fragmento HTML'],
 ['Web_WriteId','UINT','0','','','','ID escritura/receta'],
@@ -244,7 +278,7 @@ FUNCIONES
 - Si se configura control PLC, el valor de esa variable gobierna siempre la pantalla; si no coincide con ningún número (o es inválido), se muestra la principal. Sin comunicación válida, se mantiene la última pantalla y se indica pérdida de comunicación.
 - Imágenes embebidas como data URL, estáticas o con cambio OFF/ON gobernado por BOOL.
 - Estado BOOL con símbolos SVG integrados OFF/ON: lámpara, motor, bomba, válvula, cinta y sensor; mapeo TRUE/FALSE invertible.
-- Alarmas actuales evaluadas en ST, enviadas en /api/read y mostradas en ventana de alarmas.
+- Alarmas evaluadas en ST con ACK individual/total en /api/ack y estados K en /api/read.
 - Recetas compiladas en ST y aplicadas en una sola ejecución del CASE de receta.
 
 LÍMITES ACTUALES
@@ -252,7 +286,7 @@ LÍMITES ACTUALES
 - HTTP/1.0 con Connection: close.
 - Petición <=1900 bytes en una recepción.
 - Web_WatchdogLimit es un límite en ciclos de tarea (5000 por defecto), no tiempo absoluto.
-- Alarmas: estado actual, sin histórico/ACK persistente todavía.
+- Alarmas: ACK en memoria PLC mientras sigan activas; no retentivas tras reinicio ni historial.
 - Recetas: valores compilados con la exportación; editar una receta exige regenerar/transferir ST.
 - Sin HTTPS ni gestión de usuarios todavía.
 - No usar la HMI para funciones de seguridad.
