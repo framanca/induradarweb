@@ -147,7 +147,49 @@ with sync_playwright() as pw:
     status.wait_for()
     page.frame_locator("#previewFrame").locator("#stage .o.button .in").click()
     assert "#15803d" in status.locator("svg").evaluate("(el) => el.innerHTML")
+    # The preview must use only the area BELOW its HMI title, status, nav and recipes.
+    # Resize the dialog in both directions, then via accessible keyboard controls.
+    def assert_preview_fits():
+        page.wait_for_function("""() => {
+            const f = document.getElementById('previewFrame');
+            const d = f.contentDocument;
+            if (!d || !d.getElementById('viewport')) return false;
+            const viewport = d.getElementById('viewport').getBoundingClientRect();
+            const fit = d.getElementById('fit').getBoundingClientRect();
+            const body = d.body;
+            return viewport.height > 80 &&
+                fit.width <= viewport.width + 2 &&
+                fit.height <= viewport.height + 2 &&
+                d.documentElement.scrollHeight <= d.documentElement.clientHeight + 2 &&
+                body.scrollHeight <= body.clientHeight + 2;
+        }""")
+    assert_preview_fits()
+    dlg = page.locator("#previewDialog")
+    original = dlg.bounding_box()
+    grip = page.locator("#previewResizeHandle")
+    assert grip.is_visible()
+    corner = grip.bounding_box()
+    assert corner is not None
+    mx, my = corner["x"] + corner["width"]/2, corner["y"] + corner["height"]/2
+    page.mouse.move(mx, my)
+    page.mouse.down()
+    page.mouse.move(mx - 220, my - 190, steps=12)
+    page.mouse.up()
+    smaller = dlg.bounding_box()
+    assert smaller is not None and original is not None
+    assert smaller["width"] <= original["width"] - 150
+    assert smaller["height"] <= original["height"] - 120
+    assert_preview_fits()
+    grip.focus()
+    page.keyboard.press("Shift+ArrowRight")
+    page.keyboard.press("Shift+ArrowDown")
+    keyboard_size = dlg.bounding_box()
+    assert keyboard_size is not None
+    assert keyboard_size["width"] >= smaller["width"] + 45
+    assert keyboard_size["height"] >= smaller["height"] + 45
+    assert_preview_fits()
     page.locator("#closePreview").click()
+    checks.append("preview_window_resize_pointer_keyboard_and_hmi_auto_fit_below_nav")
     page.locator("#undoBtn").click()  # status positioning
     page.locator("#undoBtn").click()  # status binding
     page.locator("#undoBtn").click()  # status creation
