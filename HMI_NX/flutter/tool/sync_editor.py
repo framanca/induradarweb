@@ -32,7 +32,7 @@ def bundle():
                 raise RuntimeError("Storage hooks changed")
             text = text.replace("localStorage.", "NXOffline.storage.")
             start = text.index("function download(name,")
-            end = text.index("\nfunction preview()", start)
+            end = text.index("\nfunction clampPreviewDialog()", start)
             text = text[:start] + "function download(name,data,type='application/octet-stream'){return NXOffline.download(name,data,type);}" + text[end:]
             start = text.index("$('#saveBtn').onclick=")
             end = text.index(";$('#loadBtn').onclick=", start)
@@ -40,11 +40,8 @@ def bundle():
             start = text.index("$('#exportBtn').onclick=")
             end = text.index(";\n$('#undoBtn').onclick=", start)
             text = text[:start] + """$('#exportBtn').onclick=async()=>{syncProjectInputs();try{const expected=p0JSON(),out=C.exportPackage(p),name=(p.name||'WebHMI_ST').replace(/[^A-Za-z0-9_-]+/g,'_')+'_Sysmac.zip';p0Snapshot('antes-exportar',true);const saved=await download(name,out.zip,'application/zip');if(saved){if(p0JSON()===expected)p0Checkpoint();p0Snapshot('exportado-sysmac',true);toast('Paquete Sysmac guardado')}}catch(error){toast(error.message)}}""" + text[end:]
-            # The runtime places a newline before </script>; match the invocation itself.
-            start = text.index('function preview()')
-            end = text.index('\n', start)
-            preview = text[start:end].replace('startComm();</script>', 'startComm();').replace('paint();</script>', 'paint();')
-            text = text[:start] + preview + text[end:]
+            # Preserve the full multiline preview and its resize helpers.
+            # The native adapter only replaces download/storage operations.
             text = once(text, "p0Snapshot('antes-abrir-archivo',true);if(p0Dirty()", "if(!p0Snapshot('antes-abrir-archivo',true)){toast('No se puede respaldar el proyecto actual. Guarda una copia antes de abrir otro.');e.target.value='';return}if(p0Dirty()")
             text = once(text, "p0Snapshot('antes-recuperar',true);p=C.normalize", "if(!p0Snapshot('antes-recuperar',true)){toast('No se puede respaldar el proyecto actual. Recuperación cancelada.');return}p=C.normalize")
             text = text.replace("Guardado local", "Guardado en disco")
