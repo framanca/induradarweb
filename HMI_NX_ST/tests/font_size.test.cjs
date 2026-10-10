@@ -55,7 +55,7 @@ test('font sizes outside the permitted 8-120px range block export',()=>{
 test('existing popup and screen base objects preserve font sizes',()=>{
  const p=C.demoProject(),base=C.newBaseScreen();
  base.objects=[C.newObject('text'),C.newObject('value')];
- base.objects[0].fontSize=28;base.objects[1].fontSize=43;
+ base.objects[0].fontSize=28;base.objects[1].fontSize=43;base.objects[1].binding='Process_Level';
  p.baseScreen=base;p.screens[0].useBase=true;
  const n=C.normalize(p);
  assert.equal(n.baseScreen.objects[0].fontSize,28);
