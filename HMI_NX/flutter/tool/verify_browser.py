@@ -122,7 +122,7 @@ with tempfile.TemporaryDirectory(prefix="webhmi-browser-") as temporary, sync_pl
         assert page.locator(".right").is_visible()
         page.get_by_role("button", name="Herramientas", exact=True).click()
         assert page.locator(".left").is_visible()
-        assert page.locator(".tool-grid button").count() == 17
+        assert page.locator(".tool-grid button").count() == 16
         checks.append("all_widgets_and_properties_accessible_on_phone")
         page.locator("#newBtn").click()
         page.locator("#sidebar-tab-variables").click()
