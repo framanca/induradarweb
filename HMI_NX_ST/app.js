@@ -169,7 +169,70 @@ function renderRecipes(){const host=$('#recipeEditor');host.innerHTML=p.recipes.
 function renderDiag(){syncProjectInputs();const errors=C.validate(p),html=C.buildRuntimeHTML(p),bytes=new TextEncoder().encode(html).length;let list=[`<div class="diagnostic ${errors.length?'error':'ok'}">${errors.length?'Bloqueos: '+errors.length:'Proyecto exportable'}</div>`];for(const e of errors.slice(0,7))list.push(`<div class="diagnostic error">${C.esc(e)}</div>`);const assetBytes=p.assets.reduce((n,a)=>n+C.dataUrlBytes(a.data),0);list.push(`<div class="diagnostic">HTML: ${(bytes/1024).toFixed(1)} / 512 KB · imágenes: ${(assetBytes/1024).toFixed(1)} / 256 KB · ${p.screens.length} pantallas · ${p.alarms.length} alarmas · ${p.recipes.length} recetas.</div>`);list.push('<div class="diagnostic ok">Base servidor/lectura validada en NX102 real.</div>');if(bytes>C.HTML_MAX_BYTES)list.push('<div class="diagnostic error">HTML supera 512 KB: exportación bloqueada.</div>');$('#diagnostics').innerHTML=list.join('');}
 function importText(text){const old=new Map(p.variables.map(v=>[v.name,v]));const vars=C.importSysmac(text);for(const v of vars){const prev=old.get(v.name);if(prev){v.access=prev.access;v.expose=prev.expose;}}editAction(()=>{p.variables=vars;render();toast(vars.length+' variables importadas');});}
 function download(name,data,type='application/octet-stream'){const a=document.createElement('a'),blob=new Blob([data],{type});a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);}
-function preview(){syncProjectInputs();const errors=C.validate(p);if(errors.length){toast('Corrige bloqueos antes de previsualizar');return;}let html=C.buildRuntimeHTML(p);html=html.replace('startComm();</script>','for(const v of P.vars)vals[v.name]=v.type==="BOOL"?false:v.type==="STRING"?"DEMO":55;document.getElementById("status").textContent="PREVIEW local";comm.state="ONLINE";comm.lastGoodAt=Date.now();showScreen(0);fitStage();paint();</script>');$('#previewFrame').srcdoc=html;$('#previewDialog').showModal();}
+
+function clampPreviewDialog(){
+ const dialog=$('#previewDialog');
+ if(!dialog.open)return;
+ const r=dialog.getBoundingClientRect(),edge=8;
+ const width=Math.min(r.width,Math.max(1,window.innerWidth-2*edge));
+ const height=Math.min(r.height,Math.max(1,window.innerHeight-2*edge));
+ if(r.width>width||r.height>height){dialog.style.width=Math.floor(width)+'px';dialog.style.height=Math.floor(height)+'px'}
+ if(dialog.style.left||dialog.style.top){
+  dialog.style.left=Math.max(edge,Math.min(window.innerWidth-width-edge,r.left))+'px';
+  dialog.style.top=Math.max(edge,Math.min(window.innerHeight-height-edge,r.top))+'px';
+ }
+}
+function previewResizeStart(){
+ const dialog=$('#previewDialog'),rect=dialog.getBoundingClientRect();
+ dialog.style.inset='auto';dialog.style.margin='0';
+ dialog.style.left=Math.round(rect.left)+'px';dialog.style.top=Math.round(rect.top)+'px';
+ return{w:rect.width,h:rect.height};
+}
+function previewResizeTo(width,height){
+ const dialog=$('#previewDialog'),rect=dialog.getBoundingClientRect(),edge=8;
+ const minWidth=Math.min(420,window.innerWidth-edge*2),minHeight=Math.min(280,window.innerHeight-edge*2);
+ const maxWidth=Math.max(minWidth,window.innerWidth-rect.left-edge),maxHeight=Math.max(minHeight,window.innerHeight-rect.top-edge);
+ dialog.style.width=Math.round(Math.max(minWidth,Math.min(maxWidth,width)))+'px';
+ dialog.style.height=Math.round(Math.max(minHeight,Math.min(maxHeight,height)))+'px';
+}
+function preview(){
+ syncProjectInputs();
+ const errors=C.validate(p);
+ if(errors.length){toast('Corrige bloqueos antes de previsualizar');return;}
+ let html=C.buildRuntimeHTML(p);
+ html=html.replace('startComm();</script>','for(const v of P.vars)vals[v.name]=v.type==="BOOL"?false:v.type==="STRING"?"DEMO":55;document.getElementById("status").textContent="PREVIEW local";comm.state="ONLINE";comm.lastGoodAt=Date.now();showScreen(0);fitStage();paint();</script>');
+ $('#previewFrame').srcdoc=html;
+ $('#previewDialog').showModal();
+ clampPreviewDialog();
+}
+{
+ const handle=$('#previewResizeHandle');
+ let initial=null;
+ handle.onpointerdown=e=>{
+  if(e.button!==0||!$('#previewDialog').open)return;
+  e.preventDefault();
+  const size=previewResizeStart();
+  initial={pointerId:e.pointerId,x:e.clientX,y:e.clientY,...size};
+  handle.setPointerCapture(e.pointerId);
+ };
+ handle.onpointermove=e=>{
+  if(!initial||initial.pointerId!==e.pointerId)return;
+  previewResizeTo(initial.w+(e.clientX-initial.x),initial.h+(e.clientY-initial.y));
+ };
+ const finish=e=>{if(initial&&initial.pointerId===e.pointerId)initial=null};
+ handle.onpointerup=finish;
+ handle.onpointercancel=finish;
+ handle.onlostpointercapture=finish;
+ handle.onkeydown=e=>{
+  const delta=e.shiftKey?50:20;
+  const offsets={ArrowRight:[delta,0],ArrowLeft:[-delta,0],ArrowDown:[0,delta],ArrowUp:[0,-delta]};
+  if(!offsets[e.key])return;
+  e.preventDefault();
+  const size=previewResizeStart(),[dx,dy]=offsets[e.key];
+  previewResizeTo(size.w+dx,size.h+dy);
+ };
+ window.addEventListener('resize',clampPreviewDialog);
+}
 const sidebarTabs=[...document.querySelectorAll('[data-sidebar-tab]')];
 function showSidebarTab(name,focus=false){
  const current=sidebarTabs.find(b=>b.dataset.sidebarTab===name);if(!current)return;

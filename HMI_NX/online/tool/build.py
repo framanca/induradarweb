@@ -22,15 +22,15 @@ def build(dest):
                 text=replace(text,f'<script defer src="{module}"></script>\n','')
             text=replace(text,'<script defer src="app.js"></script>','<script defer src="config.js"></script>\n<script defer src="online.js"></script>\n<script defer src="app.js"></script>')
             text=replace(text,'<link rel="stylesheet" href="style.css">','<link rel="stylesheet" href="style.css"><link rel="stylesheet" href="online.css">')
-            text=replace(text,'<iframe id="previewFrame">','<iframe id="previewFrame" sandbox="allow-scripts">')
+            text=replace(text,'<iframe id="previewFrame" title="Previsualización de la HMI">','<iframe id="previewFrame" sandbox="allow-scripts" title="Previsualización de la HMI">')
             text=text.replace('HMI NX ST','HMI NX Online')
         if name == 'app.js':
             text=replace(text,"let p=C.demoProject()", "let p=C.newProject()")
             text=text.replace("'hmi-nx-st:p0:","'hmi-nx-online:p0:")
             start=text.index('function renderDiag()'); end=text.index('\nfunction ',start+10)
             text=text[:start]+'''function renderDiag(){syncProjectInputs();const errors=C.validate(p);$('#diagnostics').innerHTML='<div class="diagnostic '+(errors.length?'error':'ok')+'">'+(errors.length?'Bloqueos: '+errors.length:'Validación local correcta')+'</div>'+errors.slice(0,7).map(e=>'<div class="diagnostic error">'+C.esc(e)+'</div>').join('')+'<div class="diagnostic">Compilación y tamaño HTML se verifican en Supabase al previsualizar o exportar.</div>';}'''+text[end:]
-            start=text.index('function preview()'); end=text.index('\n',start)
-            text=text[:start]+'''async function preview(){syncProjectInputs();try{const result=await NXOnline.request('preview',C.copy(p));$('#previewFrame').srcdoc=result.html;$('#previewDialog').showModal()}catch(error){toast(error.message)}}'''+text[end:]
+            start=text.index('function preview(){'); end=text.index('\n}',start)+2
+            text=text[:start]+'''async function preview(){syncProjectInputs();try{const result=await NXOnline.request('preview',C.copy(p));$('#previewFrame').srcdoc=result.html;$('#previewDialog').showModal();clampPreviewDialog()}catch(error){toast(error.message)}}'''+text[end:]
             start=text.index("$('#exportBtn').onclick=");end=text.index(';\n',start)
             text=text[:start]+'''$('#exportBtn').onclick=async()=>{syncProjectInputs();const snapshot=C.copy(p),json=JSON.stringify(C.normalize(snapshot));try{const out=await NXOnline.request('compile',snapshot);download((snapshot.name||'WebHMI_ST').replace(/[^A-Za-z0-9_-]+/g,'_')+'_Sysmac.zip',out,'application/zip');if(p0JSON()===json)p0Checkpoint();p0Snapshot('exportado-supabase',true);toast('Paquete Sysmac generado en Supabase')}catch(error){toast(error.message)}}'''+text[end:]
             text = replace(text, "p0Snapshot('antes-abrir-archivo',true);if(p0Dirty()", "if(!p0Snapshot('antes-abrir-archivo',true)){toast('No se puede respaldar el proyecto actual. Guarda una copia antes de abrir otro.');e.target.value='';return}if(p0Dirty()")

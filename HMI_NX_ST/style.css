@@ -45,3 +45,14 @@
 #canvas .widget .resize-s{bottom:0;left:50%;transform:translateX(-50%);cursor:ns-resize}
 #canvas .widget .resize-sw{left:0;bottom:0;cursor:nesw-resize}
 #canvas .widget .resize-w{top:50%;left:0;transform:translateY(-50%);cursor:ew-resize}
+
+/* Resizable preview: the iframe must shrink, not force an oversized fixed dialog. */
+#previewDialog{position:fixed;width:min(1200px,calc(100vw - 32px));height:min(850px,calc(100dvh - 32px));min-width:min(420px,calc(100vw - 16px));min-height:min(280px,calc(100dvh - 16px));max-width:calc(100vw - 16px);max-height:calc(100dvh - 16px);overflow:hidden}
+#previewDialog[open]{display:flex;flex-direction:column}
+#previewDialog .dialog-wide{width:100%;height:100%;min-width:0;min-height:0;max-width:none;max-height:none;flex:1 1 auto}
+#previewDialog .dialog-title{flex:0 0 auto;gap:10px}
+#previewDialog .dialog-title .hint{flex:1;text-align:right;margin:0}
+#previewDialog #previewFrame{display:block;width:100%;height:100%;min-width:0;min-height:0;flex:1 1 auto}
+#previewResizeHandle{position:absolute;right:0;bottom:0;width:26px;height:26px;z-index:10;cursor:nwse-resize;touch-action:none;user-select:none;border-radius:0 0 10px 0;background:linear-gradient(135deg,transparent 47%,#475569 49%,#475569 52%,transparent 54%) 13px 14px/8px 8px no-repeat,linear-gradient(135deg,transparent 47%,#475569 49%,#475569 52%,transparent 54%) 6px 7px/14px 14px no-repeat}
+#previewResizeHandle:hover,#previewResizeHandle:focus-visible{background-color:#e0e7ff;outline-offset:-2px}
+@media(max-width:620px){#previewDialog .dialog-title .hint{display:none}}
