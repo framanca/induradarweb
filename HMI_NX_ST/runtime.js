@@ -61,7 +61,7 @@ function fitStage(){
  // Reserve the actual header, navigation and recipe bar first: the canvas
  // must fit into the remaining viewport, not into the full iframe height.
  const available=Math.max(1,viewport.clientWidth||window.innerWidth||P.width);
- const fallbackHeight=window.innerHeight-(document.querySelector("body>header")?.offsetHeight||0)-(document.getElementById("nav")?.offsetHeight||0)-(recipes.offsetHeight||0);
+ const fallbackHeight=(Number(window.innerHeight)||P.height)-(document.querySelector?.("body>header")?.offsetHeight||0)-(document.getElementById("nav")?.offsetHeight||0)-(recipes.offsetHeight||0);
  const availableHeight=Math.max(1,viewport.clientHeight||fallbackHeight);
  const minW=Math.max(320,Number(P.minDisplayWidth)||480);
  const maxW=Math.max(minW,Number(P.maxDisplayWidth)||1920);
