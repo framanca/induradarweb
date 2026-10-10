@@ -32,3 +32,16 @@
 .left-panels>section[hidden]{display:none}
 .left-panels>section{margin-bottom:0;padding-bottom:0;border-bottom:0}
 .left-panels>section:focus-visible{outline:2px solid #2563eb;outline-offset:3px}
+
+/* The edit canvas alone has resize grips. The exported PLC runtime is untouched. */
+#canvas .widget:not(.inherited){cursor:move;touch-action:none}
+#canvas .widget .resize-handle{position:absolute;width:12px;height:12px;border:2px solid #2563eb;background:#fff;border-radius:3px;z-index:12;display:none;touch-action:none;user-select:none}
+#canvas .widget.selected:not(.inherited) .resize-handle{display:block}
+#canvas .widget .resize-nw{top:0;left:0;cursor:nwse-resize}
+#canvas .widget .resize-n{top:0;left:50%;transform:translateX(-50%);cursor:ns-resize}
+#canvas .widget .resize-ne{top:0;right:0;cursor:nesw-resize}
+#canvas .widget .resize-e{top:50%;right:0;transform:translateY(-50%);cursor:ew-resize}
+#canvas .widget .resize-se{right:0;bottom:0;cursor:nwse-resize}
+#canvas .widget .resize-s{bottom:0;left:50%;transform:translateX(-50%);cursor:ns-resize}
+#canvas .widget .resize-sw{left:0;bottom:0;cursor:nesw-resize}
+#canvas .widget .resize-w{top:50%;left:0;transform:translateY(-50%);cursor:ew-resize}
