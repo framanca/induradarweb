@@ -145,12 +145,63 @@ with sync_playwright() as pw:
     page.mouse.up()
     assert image_widget.evaluate("(el) => parseFloat(el.style.left)") >= x_before + 40
     assert image_widget.evaluate("(el) => parseFloat(el.style.top)") >= y_before + 25
-    page.locator("#undoBtn").click()
+
+    # Eight handles are visible when selected. Resize an uploaded image
+    # and verify the same width/height fields can still edit its dimensions.
+    assert image_widget.locator(".resize-handle").count() == 8
+    width_before = image_widget.evaluate("(el) => parseFloat(el.style.width)")
+    height_before = image_widget.evaluate("(el) => parseFloat(el.style.height)")
+    corner = image_widget.locator(".resize-se").bounding_box()
+    assert corner is not None
+    cx, cy = corner["x"] + corner["width"]/2, corner["y"] + corner["height"]/2
+    page.mouse.move(cx, cy)
+    page.mouse.down()
+    page.mouse.move(cx + 54, cy + 36, steps=8)
+    page.mouse.up()
+    assert image_widget.evaluate("(el) => parseFloat(el.style.width)") >= width_before + 45
+    assert image_widget.evaluate("(el) => parseFloat(el.style.height)") >= height_before + 27
+    assert float(page.locator("#properties [data-p='w']").input_value()) >= width_before + 45
+
+    moved_x = image_widget.evaluate("(el) => parseFloat(el.style.left)")
+    moved_y = image_widget.evaluate("(el) => parseFloat(el.style.top)")
+    nw = image_widget.locator(".resize-nw").bounding_box()
+    assert nw is not None
+    page.mouse.move(nw["x"] + nw["width"]/2, nw["y"] + nw["height"]/2)
+    page.mouse.down()
+    page.mouse.move(nw["x"] + nw["width"]/2 + 25, nw["y"] + nw["height"]/2 + 20, steps=8)
+    page.mouse.up()
+    assert image_widget.evaluate("(el) => parseFloat(el.style.left)") >= moved_x + 18
+    assert image_widget.evaluate("(el) => parseFloat(el.style.top)") >= moved_y + 14
+    page.locator("#undoBtn").click()  # NW resize
+    page.locator("#undoBtn").click()  # SE resize
+    assert image_widget.evaluate("(el) => parseFloat(el.style.width)") == width_before
+    assert image_widget.evaluate("(el) => parseFloat(el.style.height)") == height_before
+    page.locator("#undoBtn").click()  # move
     assert image_widget.evaluate("(el) => parseFloat(el.style.left)") == x_before
     assert image_widget.evaluate("(el) => parseFloat(el.style.top)") == y_before
-    page.locator("#undoBtn").click()
+    page.locator("#undoBtn").click()  # insert
     assert page.locator("#canvas .widget.image").count() == 0
-    checks.append("images_drag_with_mouse_like_other_widgets_and_support_undo")
+    checks.append("images_move_and_resize_from_eight_handles_with_undo")
+
+    # Text is now one widget, with optional variable mappings and expressions.
+    assert page.locator(".tool-grid [data-kind='dynamicText']").count() == 0
+    page.locator(".tool-grid [data-kind='text']").click()
+    text_widget = page.locator("#canvas .widget.text")
+    assert text_widget.count() == 1
+    assert page.locator("#properties [data-p='binding']").count() == 1
+    assert page.locator("#properties [data-p='optionsText']").count() == 1
+    assert page.locator("#properties [data-p='expressionText']").count() == 1
+    page.locator("#properties [data-p='w']").fill("318")
+    page.locator("#properties [data-p='w']").press("Tab")
+    page.locator("#properties [data-p='h']").fill("82")
+    page.locator("#properties [data-p='h']").press("Tab")
+    assert text_widget.evaluate("(el) => parseFloat(el.style.width)") == 318
+    assert text_widget.evaluate("(el) => parseFloat(el.style.height)") == 82
+    page.locator("#undoBtn").click()
+    page.locator("#undoBtn").click()
+    page.locator("#undoBtn").click()
+    assert text_widget.count() == 0
+    checks.append("unified_text_and_numeric_width_height_properties")
 
     # Alarmas y recetas siguen siendo editables; cambiar de pestaña no altera el lienzo.
     select_sidebar("alarms")

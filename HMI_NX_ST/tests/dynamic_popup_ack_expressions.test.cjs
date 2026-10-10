@@ -20,7 +20,8 @@ test('dynamic text and internal variables survive normalization and export',()=>
  assert.equal(C.validate(p).length,0);
  const n=C.normalize(p),html=C.buildRuntimeHTML(n);
  assert.equal(n.screens[0].objects.at(-1).expressionBackground,o.expressionBackground);
- assert.match(html,/"Local_Mode"/);assert.match(html,/"dynamicText"/);
+ assert.equal(n.screens[0].objects.at(-1).kind,'text');
+ assert.match(html,/"Local_Mode"/);assert.match(html,/"kind":"text"/);
  assert.match(html,/function currentValue\(name\)/);
  assert.doesNotThrow(()=>new Function(html.match(/<script>([\s\S]*?)<\/script>/)[1]));
 });
