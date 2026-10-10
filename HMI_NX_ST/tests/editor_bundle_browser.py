@@ -122,6 +122,44 @@ with sync_playwright() as pw:
     assert page.locator("#canvas .widget").count() == 1
     checks.append("undo_and_redo_buttons_work")
 
+    # Local variables must be offered by all compatible widget selectors,
+    # not just unified Text. Exercise read, write and feedback with no PLC binding.
+    select_sidebar("variables")
+    page.locator("#addInternalVar").click()  # Internal_1 BOOL
+    page.locator("#addInternalVar").click()  # Internal_2 INT
+    page.locator('#internalVarList [data-iv="1"][data-key="type"]').select_option("INT")
+    page.locator('#internalVarList [data-iv="1"][data-key="value"]').fill("1")
+    page.locator('#internalVarList [data-iv="1"][data-key="value"]').press("Tab")
+    select_sidebar("elements")
+    page.locator("#canvas .widget.button").click()
+    page.locator("#properties [data-p='binding']").select_option("Internal_1")
+    page.locator("#properties [data-p='feedbackBinding']").select_option("Internal_1")
+    assert page.locator("#properties [data-p='feedbackBinding']").input_value() == "Internal_1"
+    page.locator(".tool-grid [data-kind='status']").click()
+    page.locator("#properties [data-p='binding']").select_option("Internal_1")
+    # Widgets start at identical coordinates; place the indicator beside the button.
+    page.locator("#properties [data-p='x']").fill("300")
+    page.locator("#properties [data-p='x']").press("Tab")
+    assert page.locator("#diagnostics .diagnostic.error").count() == 0
+    page.locator("#previewBtn").click()
+    assert page.locator("#previewDialog").is_visible()
+    status = page.frame_locator("#previewFrame").locator("#stage .o.status .status-visual")
+    status.wait_for()
+    page.frame_locator("#previewFrame").locator("#stage .o.button .in").click()
+    assert "#15803d" in status.locator("svg").evaluate("(el) => el.innerHTML")
+    page.locator("#closePreview").click()
+    page.locator("#undoBtn").click()  # status positioning
+    page.locator("#undoBtn").click()  # status binding
+    page.locator("#undoBtn").click()  # status creation
+    page.locator(".tool-grid [data-kind='slider']").click()
+    page.locator("#properties [data-p='binding']").select_option("Internal_2")
+    assert page.locator("#properties [data-p='binding']").input_value() == "Internal_2"
+    assert page.locator("#diagnostics .diagnostic.error").count() == 0
+    page.locator("#undoBtn").click()
+    page.locator("#undoBtn").click()
+    assert page.locator("#canvas .widget").count() == 1
+    checks.append("internal_variables_bind_to_buttons_feedback_status_and_numeric_widgets")
+
     # An uploaded image must use the same pointer drag as other widgets.
     # Without preventing native <img> dragging the browser steals pointermove events.
     page.locator("#imageFile").set_input_files({
