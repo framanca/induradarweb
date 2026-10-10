@@ -197,11 +197,40 @@ with sync_playwright() as pw:
     page.locator("#properties [data-p='h']").press("Tab")
     assert text_widget.evaluate("(el) => parseFloat(el.style.width)") == 318
     assert text_widget.evaluate("(el) => parseFloat(el.style.height)") == 82
-    page.locator("#undoBtn").click()
-    page.locator("#undoBtn").click()
-    page.locator("#undoBtn").click()
+    # A clear field retains the original font, setting px affects the real preview.
+    font_size = page.locator("#properties [data-p='fontSize']")
+    assert font_size.input_value() == ""
+    font_size.fill("38")
+    font_size.press("Tab")
+    assert font_size.input_value() == "38"
+    assert text_widget.locator(".inner").evaluate("(el) => getComputedStyle(el).fontSize") == "38px"
+    page.locator("#undoBtn").click()  # font size
+    assert font_size.input_value() == ""
+    page.locator("#undoBtn").click()  # height
+    page.locator("#undoBtn").click()  # width
+    page.locator("#undoBtn").click()  # insertion
     assert text_widget.count() == 0
     checks.append("unified_text_and_numeric_width_height_properties")
+
+    # Numbers and editable numeric inputs have independent font sizes.
+    page.locator(".tool-grid [data-kind='value']").click()
+    value_widget = page.locator("#canvas .widget.value")
+    font_size = page.locator("#properties [data-p='fontSize']")
+    font_size.fill("44")
+    font_size.press("Tab")
+    assert value_widget.locator(".inner").evaluate("(el) => getComputedStyle(el).fontSize") == "44px"
+    page.locator("#undoBtn").click()
+    page.locator("#undoBtn").click()
+    page.locator(".tool-grid [data-kind='input']").click()
+    input_widget = page.locator("#canvas .widget.input")
+    font_size = page.locator("#properties [data-p='fontSize']")
+    font_size.fill("26")
+    font_size.press("Tab")
+    assert input_widget.locator(".inner").evaluate("(el) => getComputedStyle(el).fontSize") == "26px"
+    page.locator("#undoBtn").click()
+    page.locator("#undoBtn").click()
+    assert page.locator("#canvas .widget").count() == 1
+    checks.append("per_object_font_size_for_static_text_values_and_inputs_with_undo")
 
     # Alarmas y recetas siguen siendo editables; cambiar de pestaña no altera el lienzo.
     select_sidebar("alarms")
