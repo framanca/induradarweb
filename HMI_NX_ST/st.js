@@ -47,6 +47,11 @@ function buildST(input){
  const alarmAckCases=p.alarms.map((a,i)=>{const v=vm.get(a.binding);return v?`${i+1}:\n IF ${alarmExpr(v,a)} THEN Web_AlarmAck[${i+1}] := TRUE; END_IF;\n Web_Found := TRUE;`:''}).filter(Boolean).join('\n');
  const alarmAckAll=p.alarms.map((a,i)=>{const v=vm.get(a.binding);return v?`IF ${alarmExpr(v,a)} THEN Web_AlarmAck[${i+1}] := TRUE; END_IF;`:''}).filter(Boolean).join('\n');
  const recipeCases=p.recipes.map((r,i)=>{const assigns=[];for(const [name,value] of Object.entries(r.values||{})){const v=vm.get(name);if(v&&v.access==='RW'&&v.writeSupported)assigns.push(v.enumType?`NumToEnum(${stTyped(v,value)}, ${v.name});`:`${v.name} := ${stTyped(v,value)};`);}return `${i+1}:\n                ${assigns.join('\n                ')||';'}\n                Web_Found := TRUE;`;}).join('\n            ');
+ const recipeInit=p.recipes.filter(r=>r.scope==='shared').map((r,i)=>{
+  const blob=C.recipeWireJSON(r);
+  if(enc.encode(blob).length>C.RECIPE_BYTES_MAX)throw Error('Receta '+r.name+': exceso de capacidad NX');
+  return 'Web_RecipeData['+(i+1)+'] := \' '+stLiteral(blob)+'\'; Web_RecipeRev['+(i+1)+'] := UDINT#1;'.replace(":= ' ",":= '");
+ }).join('\n    ');
  const chunkCases=parts.map((c,i)=>`${i}: Web_TxText := '${stLiteral(c)}';`).join('\n            ');
  return `(* HMI NX ST · servidor WebHMI generado
    Proyecto: ${p.name}
@@ -57,6 +62,11 @@ function buildST(input){
 *)
 
 ${alarmReset}
+(* Banco de recetas retenido. Validar los atributos Retain de las variables en Sysmac. *)
+IF NOT Web_RecipeInit THEN
+    ${recipeInit}
+    Web_RecipeInit := TRUE;
+END_IF;
 IF Web_State = Web_PrevState THEN
     IF (Web_State <> UINT#10) AND (Web_StateTicks < UDINT#4294967294) THEN
         Web_StateTicks := Web_StateTicks + UDINT#1;
@@ -104,6 +114,12 @@ CASE Web_State OF
             Web_Request := UINT#2;
         ELSIF FIND(Web_RxText, 'POST /api/write?') = 1 THEN
             Web_Request := UINT#3;
+        ELSIF FIND(Web_RxText, 'POST /api/recipe?slot=') = 1 THEN
+            Web_Request := UINT#8;
+        ELSIF FIND(Web_RxText, 'GET /api/recipe?slot=') = 1 THEN
+            Web_Request := UINT#7;
+        ELSIF FIND(Web_RxText, 'GET /api/recipes ') = 1 THEN
+            Web_Request := UINT#6;
         ELSIF FIND(Web_RxText, 'POST /api/recipe?') = 1 THEN
             Web_Request := UINT#4;
          ELSIF FIND(Web_RxText, 'POST /api/ack?') = 1 THEN
@@ -286,6 +302,17 @@ function localVariablesTSV(input){const p=C.normalize(input);const rows=[
 ['Web_ApiBody','STRING[1985]','','','','','Datos API'],
 ['Web_IdText','STRING[12]','','','','','ID parseado'],
 ['Web_ValueText','STRING[512]','','','','','Valor de escritura'],
+['Web_RecipeInit','BOOL','FALSE','','True','','Banco de recetas inicializado - Retain'],
+ ['Web_RecipeData','ARRAY[1..12] OF STRING[512]','','','True','','Contenido ASCII del banco de recetas - Retain'],
+ ['Web_RecipeRev','ARRAY[1..12] OF UDINT','','','True','','Version de recetas - Retain'],
+ ['Web_RecipeSlot','UINT','0','','','','Ranura receta'],
+ ['Web_RecipeIdx','UINT','0','','','','Indice de resumen'],
+ ['Web_RecipeExpected','UDINT','0','','','','Version cliente CAS'],
+ ['Web_PosSlot','UINT','0','','','','Posicion slot'],
+ ['Web_PosRev','UINT','0','','','','Posicion rev'],
+ ['Web_BodyLen','UINT','0','','','','Longitud cuerpo receta'],
+ ['Web_SlotText','STRING[8]','','','','','Ranura'],
+ ['Web_RevText','STRING[16]','','','','','Version cliente'],
 ['Web_Socket','_sSOCKET','','','','','Socket aceptado'],
 ['Web_Accept','SktTCPAccept','','','','','Accept TCP'],
 ['Web_Rcv','SktTCPRcv','','','','','Receive TCP'],
@@ -307,6 +334,10 @@ INSTALACIÓN
 - Pegar WebHMI_Server.st en un Program ST.
 - Pegar WebHMI_LocalVariables.tsv en Internals.
 - Pegar WebHMI_ExternalVariables.tsv en Externals.
+- Comprobar que Web_RecipeInit, Web_RecipeData y Web_RecipeRev tienen la casilla Retain activada. Sin Retain las recetas editadas se perderían al reiniciar.
+- Banco NX: 12 recetas compartidas de hasta 500 bytes ASCII, revisión por ranura para evitar colisiones entre navegadores.
+- Las recetas iniciales se siembran solo si Web_RecipeInit está a FALSE. Antes de borrar Retain o transferir otro proyecto, exportar una copia de las recetas.
+- Recetas locales: quedan almacenadas solo en el navegador.
 - Las variables referenciadas deben existir como Global Variables con el mismo nombre/tipo.
 - Si importaste una estructura, union, enumeracion o ARRAY, crea su tipo en Data Types de Sysmac y declara la raiz global. El TSV Externals contiene SOLO esa raiz, no miembros sueltos.
 - Asignar el Program a una tarea y transferir al NX.
