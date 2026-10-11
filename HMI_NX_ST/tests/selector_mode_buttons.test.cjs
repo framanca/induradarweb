@@ -76,7 +76,10 @@ test('PLC integer selector remains RW and keeps current options and value protoc
  assert.match(st,/Machine_Mode/);
 });
 
-test('editor shows all selector modes without exposing a dropdown in canvas',()=>{
+test('legacy selector still renders but no new Selector can be inserted from the palette',()=>{
+ const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
+ assert.doesNotMatch(html,/data-kind=["']selector["']/);
+ assert.match(html,/data-kind="dropdown"/);
  assert.match(editor,/if\(o\.kind==='selector'\)\{const options=String\(o\.optionsText/);
  assert.match(editor,/class="selector-mock-options"/);
  assert.match(editor,/class="selector-mock-choice"/);
