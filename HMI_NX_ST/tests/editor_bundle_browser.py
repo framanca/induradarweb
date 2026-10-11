@@ -501,7 +501,10 @@ with sync_playwright() as pw:
     assert page.locator("#diagnostics .diagnostic.error").count() == 0
     checks.append("single_figuras_widget_selects_all_svg_shapes_and_edits_triangle_vertices")
 
-    # Selector now exposes the modes as a segmented button group; Desplegable stays a select.
+    # Selector is temporarily absent from the toolbox. Desplegable remains usable.
+    select_sidebar("elements")
+    assert page.locator(".tool-grid [data-kind='selector']").count() == 0
+    assert page.locator(".tool-grid [data-kind='dropdown']").count() == 1
     page.locator("#newBtn").click()
     select_sidebar("variables")
     page.locator("#addInternalVar").click()
@@ -509,41 +512,22 @@ with sync_playwright() as pw:
     page.locator('#internalVarList [data-iv="0"][data-key="value"]').fill("1")
     page.locator('#internalVarList [data-iv="0"][data-key="value"]').press("Tab")
     select_sidebar("elements")
-    page.locator(".tool-grid [data-kind='selector']").click()
-    page.locator("#properties [data-p='binding']").select_option("Internal_1")
-    choices_field = page.locator("#properties [data-p='optionsText']")
-    choices_field.fill("0=Parado\n1=Manual\n2=Automático")
-    choices_field.press("Tab")
-    selector_canvas = page.locator("#canvas .widget.selector")
-    assert selector_canvas.locator(".selector-mock-choice").count() == 3
-    assert selector_canvas.locator(".selector-mock-choice").all_inner_texts() == ["Parado", "Manual", "Automático"]
-    assert selector_canvas.locator("select").count() == 0
     page.locator(".tool-grid [data-kind='dropdown']").click()
     page.locator("#properties [data-p='binding']").select_option("Internal_1")
-    page.locator("#properties [data-p='x']").fill("440")
-    page.locator("#properties [data-p='x']").press("Tab")
+    opts = page.locator("#properties [data-p='optionsText']")
+    opts.fill("0=Parado\\n1=Manual\\n2=Automático")
+    opts.press("Tab")
     assert page.locator("#diagnostics .diagnostic.error").count() == 0
     page.locator("#previewBtn").click()
-    segment = page.frame_locator("#previewFrame").locator("#stage .o.selector")
-    modes = segment.locator(".selector-choice")
-    modes.first.wait_for()
-    assert modes.count() == 3
-    assert segment.locator("select").count() == 0
-    assert modes.all_inner_texts() == ["Parado", "Manual", "Automático"]
-    assert modes.nth(1).get_attribute("aria-pressed") == "true"
-    assert modes.nth(1).evaluate("(el) => getComputedStyle(el).backgroundColor") == "rgb(37, 99, 235)"
-    assert modes.nth(2).get_attribute("aria-pressed") == "false"
-    modes.nth(2).click()
-    assert modes.nth(2).get_attribute("aria-pressed") == "true"
-    assert modes.nth(1).get_attribute("aria-pressed") == "false"
     dropdown = page.frame_locator("#previewFrame").locator("#stage .o.dropdown select")
-    assert dropdown.count() == 1
+    dropdown.wait_for()
+    assert dropdown.locator("option").count() == 3
+    assert dropdown.input_value() == "1"
+    dropdown.select_option("2")
     assert dropdown.input_value() == "2"
-    dropdown.select_option("0")
-    assert modes.nth(0).get_attribute("aria-pressed") == "true"
-    assert modes.nth(2).get_attribute("aria-pressed") == "false"
+    assert page.frame_locator("#previewFrame").locator("#stage .o.selector").count() == 0
     page.locator("#closePreview").click()
-    checks.append("selector_visible_buttons_feedback_write_and_dropdown_stays_select")
+    checks.append("unused_selector_hidden_and_dropdown_still_changes_internal_variable")
 
     assert not errors, "Browser JavaScript errors: " + repr(errors)
     report = {
