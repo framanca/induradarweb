@@ -512,10 +512,10 @@ async function recipeApplySelected(){
    if(!res.ok)throw Error("HTTP "+res.status);
    const txt=await res.text();
    if(!txt.startsWith("RCPV=1"))throw Error("respuesta de banco incompatible");
-   const line=txt.split(/\\r?\\n/).find(x=>x.startsWith(slot+"="));
+   const line=txt.split(/\r?\n/).find(x=>x.startsWith(slot+"="));
    if(!line||Number(line.split("=")[1])!==recipeSlots.get(slot)?.rev)
     throw Error("La receta ha cambiado en otro navegador. Actualiza NX antes de aplicarla");
-  }catch(e){recipeBusy=false;renderRecipeManager();recipeAlert("Aplicaci\\u00f3n bloqueada: "+e.message,true);return}
+  }catch(e){recipeBusy=false;renderRecipeManager();recipeAlert("Aplicaci\u00f3n bloqueada: "+e.message,true);return}
   recipeBusy=false;renderRecipeManager();
  }
  const plc=[],local=[];
