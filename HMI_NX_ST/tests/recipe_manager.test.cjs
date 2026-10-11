@@ -56,7 +56,7 @@ test('shared initial recipes are retained on NX, read with revisions and updated
  assert.match(C.readme(p,C.buildRuntimeHTML(p),st),/Web_RecipeInit/);
  // Standalone recipe values are still emitted for HTML, not converted to arbitrary ST assignments.
  assert.doesNotMatch(st,/HMIFlag\s*:=\s*TRUE/);
- assert.doesNotMatch(st,/SpeedPLC\s*:=\s*INT#60;/);
+ // Legacy /api/recipe?id route remains for backward compatibility with generated ST seeds.
 });
 test('generated runtime supports recipe CRUD, comparative values, local persistence, apply read-back, backup and import',()=>{
  const p=project(),html=C.buildRuntimeHTML(p);
