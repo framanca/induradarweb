@@ -718,6 +718,64 @@ with sync_playwright() as pw:
     page.locator("#closePreview").click()
     checks.append("hmi_internal_alarms_bool_int_offline_ack_all_reset_and_retrigger")
 
+
+    # Recipes: editor whitelists local variables, runtime edits/captures/applies and
+    # persists browser-local recipes without touching PLC APIs.
+    page.locator("#newBtn").click()
+    select_sidebar("variables")
+    page.locator("#addInternalVar").click()
+    page.locator('#internalVarList [data-iv="0"][data-key="type"]').select_option("INT")
+    page.locator('#internalVarList [data-iv="0"][data-key="value"]').fill("0")
+    page.locator('#internalVarList [data-iv="0"][data-key="value"]').press("Tab")
+    select_sidebar("recipes")
+    page.locator('#recipeVariableEditor [data-recipe-var="Internal_1"]').check()
+    page.locator("#addRecipe").click()
+    page.locator('[data-recipe-name="0"]').fill("Nivel inicial")
+    page.locator('[data-recipe-name="0"]').press("Tab")
+    page.locator('[data-recipe-values="0"]').fill("Internal_1=7")
+    page.locator('[data-recipe-values="0"]').press("Tab")
+    assert page.locator('[data-recipe-scope="0"]').input_value() == "local"
+    assert page.locator("#diagnostics .diagnostic.error").count() == 0
+    select_sidebar("elements")
+    page.locator('.tool-grid [data-kind="value"]').click()
+    page.locator("#properties [data-p='binding']").select_option("Internal_1")
+    page.locator("#previewBtn").click()
+    recipe_frame = page.frame_locator("#previewFrame")
+    recipe_frame.locator("#recipeOpen").click()
+    assert recipe_frame.locator("#recipeWindow").is_visible()
+    assert "Nivel inicial" in recipe_frame.locator("#recipeSelect").inner_text()
+    assert recipe_frame.locator('[data-recipe-value="Internal_1"]').input_value() == "7"
+    assert recipe_frame.locator("#recipeApply").is_enabled()
+    recipe_frame.locator("#recipeApply").click()
+    assert recipe_frame.locator("#stage .o.value .in").inner_text() == "7"
+    recipe_frame.locator("#recipeName").fill("Nivel editado")
+    recipe_frame.locator('[data-recipe-value="Internal_1"]').fill("9")
+    recipe_frame.locator("#recipeSave").click()
+    assert "Nivel editado" in recipe_frame.locator("#recipeSelect").inner_text()
+    assert recipe_frame.locator("#recipeApply").is_enabled()
+    recipe_frame.locator("#recipeClose").click()
+    page.locator("#closePreview").click()
+    page.locator("#previewBtn").click()
+    recipe_frame.locator("#recipeOpen").click()
+    assert "Nivel editado" in recipe_frame.locator("#recipeSelect").inner_text()
+    assert recipe_frame.locator('[data-recipe-value="Internal_1"]').input_value() == "9"
+    recipe_frame.locator("#recipeDuplicate").click()
+    assert "(copia)" in recipe_frame.locator("#recipeName").input_value()
+    recipe_frame.locator("#recipeSave").click()
+    assert recipe_frame.locator("#recipeSelect option").count() == 2
+    recipe_frame.locator("#recipeDelete").click()
+    assert recipe_frame.locator("#recipeSelect option").count() == 1
+    recipe_frame.locator("#recipeNew").click()
+    recipe_frame.locator("#recipeName").fill("Receta creada runtime")
+    recipe_frame.locator('[data-recipe-included="Internal_1"]').check()
+    recipe_frame.locator('[data-recipe-value="Internal_1"]').fill("21")
+    recipe_frame.locator("#recipeSave").click()
+    assert recipe_frame.locator("#recipeSelect option").count() == 2
+    recipe_frame.locator("#recipeApply").click()
+    assert recipe_frame.locator("#stage .o.value .in").inner_text() == "21"
+    page.locator("#closePreview").click()
+    checks.append("runtime_recipe_manager_internal_variables_crud_persistence_and_apply_offline")
+
     assert not errors, "Browser JavaScript errors: " + repr(errors)
     report = {
         "status": "PASS",
