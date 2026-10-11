@@ -146,7 +146,8 @@ with sync_playwright() as pw:
     status = page.frame_locator("#previewFrame").locator("#stage .o.status .status-visual")
     status.wait_for()
     page.frame_locator("#previewFrame").locator("#stage .o.button .in").click()
-    assert "#15803d" in status.locator("svg").evaluate("(el) => el.innerHTML")
+    assert status.locator("circle").get_attribute("fill") == "#86efac"
+    assert status.locator("path").count() == 0
     # The preview must use only the area BELOW its HMI title, status, nav and recipes.
     # Resize the dialog in both directions, then via accessible keyboard controls.
     def assert_preview_fits():
@@ -583,6 +584,63 @@ with sync_playwright() as pw:
     assert stage.locator(".o.multistate .reading").inner_text() == "Manual"
     page.locator("#closePreview").click()
     checks.append("runtime_widget_headings_removed_but_data_and_command_text_preserved")
+
+
+    # Lamp stays a single SVG circle and its ON fill comes from Properties.
+    # Overlapping objects are reordered in-place and can be picked when obscured.
+    page.locator("#newBtn").click()
+    select_sidebar("variables")
+    page.locator("#addInternalVar").click()
+    page.locator('#internalVarList [data-iv="0"][data-key="value"]').fill("true")
+    page.locator('#internalVarList [data-iv="0"][data-key="value"]').press("Tab")
+    select_sidebar("elements")
+    page.locator('.tool-grid [data-kind="text"]').click()
+    page.locator("#properties [data-p='text']").fill("Capa Fondo")
+    page.locator("#properties [data-p='text']").press("Tab")
+    page.locator('.tool-grid [data-kind="shape"]').click()
+    page.locator("#properties [data-p='text']").fill("Capa Figura")
+    page.locator("#properties [data-p='text']").press("Tab")
+    page.locator('.tool-grid [data-kind="status"]').click()
+    page.locator("#properties [data-p='binding']").select_option("Internal_1")
+    assert page.locator("#properties [data-p='symbolType']").input_value() == "lamp"
+    assert page.locator("#properties [data-p='lampOnColor']").count() == 1
+    page.locator("#properties [data-p='lampOnColor']").evaluate("""el => {
+      el.value='#ff5500';el.dispatchEvent(new Event('change',{bubbles:true}));
+    }""")
+    assert page.locator("#properties .state-pair > div").count() == 2
+    assert page.locator("#properties .state-pair > div").last.locator("circle").get_attribute("fill") == "#ff5500"
+    assert page.locator("#properties .state-pair path").count() == 0
+    all_widgets=page.locator("#canvas .widget")
+    initial=all_widgets.evaluate_all("(els) => els.map(e=>e.dataset.id)")
+    assert all_widgets.count() == 3
+    assert all_widgets.evaluate_all("(els) => els.map(e=>e.classList[1])") == ["text","shape","status"]
+    # The oldest element is underneath the lamp. Select it from the Layers dropdown.
+    page.locator("#layerSelect").select_option(initial[0])
+    assert page.locator("#properties [data-p='text']").input_value() == "Capa Fondo"
+    assert page.locator("#bringToFront").is_enabled()
+    page.locator("#bringToFront").click()
+    assert all_widgets.evaluate_all("(els) => els.map(e=>e.dataset.id)") == [initial[1], initial[2], initial[0]]
+    assert page.locator("#bringToFront").is_disabled()
+    page.locator("#sendToBack").click()
+    assert all_widgets.evaluate_all("(els) => els.map(e=>e.dataset.id)") == initial
+    page.locator("#undoBtn").click()
+    assert all_widgets.evaluate_all("(els) => els.map(e=>e.dataset.id)") == [initial[1], initial[2], initial[0]]
+    page.locator("#redoBtn").click()
+    assert all_widgets.evaluate_all("(els) => els.map(e=>e.dataset.id)") == initial
+    # The right-click menu offers exactly the same action on the foremost lamp.
+    page.locator("#canvas .widget.status").click(button="right")
+    assert page.locator("#widgetMenu").is_visible()
+    assert page.locator('#widgetMenu [data-widget-action="front"]').is_disabled()
+    page.locator('#widgetMenu [data-widget-action="back"]').click()
+    assert all_widgets.evaluate_all("(els) => els.map(e=>e.dataset.id)") == [initial[2], initial[0], initial[1]]
+    page.locator("#previewBtn").click()
+    lamp=page.frame_locator("#previewFrame").locator("#stage .o.status .status-visual svg")
+    lamp.wait_for()
+    assert lamp.locator("circle").get_attribute("fill") == "#ff5500"
+    assert lamp.locator("path").count() == 0
+    assert page.frame_locator("#previewFrame").locator("#stage .o").evaluate_all("(els) => els.map(e=>e.classList[1])") == ["status","text","shape"]
+    page.locator("#closePreview").click()
+    checks.append("lamp_custom_on_color_no_rays_and_layer_order_undo_redo_preview")
 
     assert not errors, "Browser JavaScript errors: " + repr(errors)
     report = {

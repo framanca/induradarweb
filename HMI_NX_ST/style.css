@@ -68,3 +68,9 @@
 .widget.selector .selector-mock-title{font-size:11px;line-height:14px;color:#475569;text-align:center;flex:0 0 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .widget.selector .selector-mock-options{min-height:0;display:flex;flex:1 1 auto;flex-wrap:wrap;align-content:flex-start;overflow:auto;gap:4px}
 .widget.selector .selector-mock-choice{flex:1 1 65px;min-width:56px;min-height:30px;display:flex;align-items:center;justify-content:center;padding:4px 7px;border:1px solid #94a3b8;border-radius:5px;background:#f1f5f9;color:#334155;font-size:12px;font-weight:600;text-align:center;overflow-wrap:anywhere}
+
+/* Layer controls persist array order without adding z-index metadata to exported HTML. */
+.layer-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:12px 0 9px}
+.layer-actions button{min-width:0;padding:9px 5px;font-size:12px;background:#f0f5ff;border-color:#94b7e8;color:#1e40af}
+.layer-actions button:disabled{opacity:.45;cursor:not-allowed}
+#layerSelect{width:100%}
