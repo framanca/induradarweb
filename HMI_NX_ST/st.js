@@ -218,6 +218,65 @@ CASE Web_State OF
             Web_TxText := 'HTTP/1.0 400 Bad Request$r$nContent-Type: text/plain$r$nConnection: close$r$n$r$n';
         END_IF;
 
+
+    6: (* Consulta ligera: version de las 12 ranuras sin cargar sus valores. *)
+        Web_ApiBody := 'RCPV=1$n';
+        FOR Web_RecipeIdx := UINT#1 TO UINT#12 DO
+            Web_ApiBody := CONCAT(Web_ApiBody, UINT_TO_STRING(Web_RecipeIdx), '=', UDINT_TO_STRING(Web_RecipeRev[Web_RecipeIdx]), '$n');
+        END_FOR;
+        Web_TxText := 'HTTP/1.0 200 OK$r$nContent-Type: text/plain; charset=utf-8$r$nCache-Control: no-store$r$nConnection: close$r$n$r$n';
+
+    7: (* Obtener blob ASCII de una ranura, maximo 500 bytes. *)
+        Web_PosSlot := FIND(Web_RxText, '?slot=');
+        Web_PosEnd := FIND(Web_RxText, ' HTTP/');
+        Web_Found := FALSE;
+        IF (Web_PosSlot > 0) AND (Web_PosEnd > Web_PosSlot + UINT#6) THEN
+            Web_SlotText := MID(In:=Web_RxText, L:=Web_PosEnd-(Web_PosSlot+UINT#6), P:=Web_PosSlot+UINT#6);
+            Web_RecipeSlot := STRING_TO_UINT(Web_SlotText);
+            IF (Web_RecipeSlot >= UINT#1) AND (Web_RecipeSlot <= UINT#12) THEN
+                Web_ApiBody := Web_RecipeData[Web_RecipeSlot];
+                Web_Found := TRUE;
+            END_IF;
+        END_IF;
+        IF Web_Found THEN
+            Web_TxText := 'HTTP/1.0 200 OK$r$nContent-Type: application/json; charset=utf-8$r$nCache-Control: no-store$r$nConnection: close$r$n$r$n';
+        ELSE
+            Web_ApiBody := 'BAD SLOT';
+            Web_TxText := 'HTTP/1.0 400 Bad Request$r$nContent-Type: text/plain$r$nConnection: close$r$n$r$n';
+        END_IF;
+
+    8: (* Escritura de receta atomica por ranura con revision CAS. No se interpreta el JSON en ST. *)
+        Web_PosSlot := FIND(Web_RxText, '?slot=');
+        Web_PosRev := FIND(Web_RxText, '&rev=');
+        Web_PosEnd := FIND(Web_RxText, ' HTTP/');
+        Web_PosBody := FIND(Web_RxText, '$r$n$r$n');
+        Web_Found := FALSE;
+        IF (Web_PosSlot > 0) AND (Web_PosRev > Web_PosSlot) AND (Web_PosEnd > Web_PosRev) AND (Web_PosBody > 0) THEN
+            Web_SlotText := MID(In:=Web_RxText, L:=Web_PosRev-(Web_PosSlot+UINT#6), P:=Web_PosSlot+UINT#6);
+            Web_RevText := MID(In:=Web_RxText, L:=Web_PosEnd-(Web_PosRev+UINT#5), P:=Web_PosRev+UINT#5);
+            Web_RecipeSlot := STRING_TO_UINT(Web_SlotText);
+            Web_RecipeExpected := STRING_TO_UDINT(Web_RevText);
+            Web_BodyLen := LEN(Web_RxText)-(Web_PosBody+UINT#3);
+            IF (Web_RecipeSlot >= UINT#1) AND (Web_RecipeSlot <= UINT#12) AND (Web_BodyLen <= UINT#500) THEN
+                Web_Found := TRUE;
+                IF Web_RecipeRev[Web_RecipeSlot] = Web_RecipeExpected THEN
+                    Web_ValueText := MID(In:=Web_RxText, L:=Web_BodyLen, P:=Web_PosBody+UINT#4);
+                    Web_RecipeData[Web_RecipeSlot] := Web_ValueText;
+                    Web_RecipeRev[Web_RecipeSlot] := Web_RecipeRev[Web_RecipeSlot] + UDINT#1;
+                    IF Web_RecipeRev[Web_RecipeSlot] = UDINT#0 THEN Web_RecipeRev[Web_RecipeSlot] := UDINT#1; END_IF;
+                    Web_ApiBody := CONCAT('REV=', UDINT_TO_STRING(Web_RecipeRev[Web_RecipeSlot]));
+                    Web_TxText := 'HTTP/1.0 200 OK$r$nContent-Type: text/plain$r$nCache-Control: no-store$r$nConnection: close$r$n$r$n';
+                ELSE
+                    Web_ApiBody := CONCAT('CONFLICT REV=', UDINT_TO_STRING(Web_RecipeRev[Web_RecipeSlot]));
+                    Web_TxText := 'HTTP/1.0 409 Conflict$r$nContent-Type: text/plain$r$nConnection: close$r$n$r$n';
+                END_IF;
+            END_IF;
+        END_IF;
+        IF NOT Web_Found THEN
+            Web_ApiBody := 'BAD RECIPE DATA';
+            Web_TxText := 'HTTP/1.0 400 Bad Request$r$nContent-Type: text/plain$r$nConnection: close$r$n$r$n';
+        END_IF;
+
     ELSE
         Web_ApiBody := 'NOT FOUND';
         Web_TxText := 'HTTP/1.0 404 Not Found$r$nContent-Type: text/plain$r$nConnection: close$r$n$r$n';
