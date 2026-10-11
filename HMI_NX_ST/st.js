@@ -260,7 +260,11 @@ CASE Web_State OF
             IF (Web_RecipeSlot >= UINT#1) AND (Web_RecipeSlot <= UINT#12) AND (Web_BodyLen <= UINT#500) THEN
                 Web_Found := TRUE;
                 IF Web_RecipeRev[Web_RecipeSlot] = Web_RecipeExpected THEN
-                    Web_ValueText := MID(In:=Web_RxText, L:=Web_BodyLen, P:=Web_PosBody+UINT#4);
+                    IF Web_BodyLen = UINT#0 THEN
+                        Web_ValueText := '';
+                    ELSE
+                        Web_ValueText := MID(In:=Web_RxText, L:=Web_BodyLen, P:=Web_PosBody+UINT#4);
+                    END_IF;
                     Web_RecipeData[Web_RecipeSlot] := Web_ValueText;
                     Web_RecipeRev[Web_RecipeSlot] := Web_RecipeRev[Web_RecipeSlot] + UDINT#1;
                     IF Web_RecipeRev[Web_RecipeSlot] = UDINT#0 THEN Web_RecipeRev[Web_RecipeSlot] := UDINT#1; END_IF;
