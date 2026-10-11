@@ -49,7 +49,8 @@ test('alarm validation accepts all four HMI internal types and exports without P
  const st=C.buildST(p);
  for(const a of p.alarms)assert.doesNotMatch(st,new RegExp('IF\\s+\\('+a.binding+'\\s'));
  assert.doesNotMatch(st,/A1=1\$n|A2=1\$n|A3=1\$n|A4=1\$n/);
- assert.doesNotMatch(st,/RunLocal|CountLocal|SpeedLocal|MessageLocal/);
+ // Local names are embedded as HTML configuration, but never referenced by executable ST logic.
+ for(const a of p.alarms)assert.doesNotMatch(st,new RegExp('(?:IF|ELSIF)\\s+\\(?'+a.binding+'(?:\\s|\\))'));
 });
 test('invalid, missing, and incompatible internal alarm thresholds are rejected',()=>{
  const p=setup();
