@@ -512,7 +512,7 @@ with sync_playwright() as pw:
     page.locator(".tool-grid [data-kind='selector']").click()
     page.locator("#properties [data-p='binding']").select_option("Internal_1")
     choices_field = page.locator("#properties [data-p='optionsText']")
-    choices_field.fill("0=Parado\\n1=Manual\\n2=Automático")
+    choices_field.fill("0=Parado\n1=Manual\n2=Automático")
     choices_field.press("Tab")
     selector_canvas = page.locator("#canvas .widget.selector")
     assert selector_canvas.locator(".selector-mock-choice").count() == 3
