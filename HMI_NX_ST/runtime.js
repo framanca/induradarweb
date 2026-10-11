@@ -403,6 +403,7 @@ async function recipeSaveDraft(){
  if(recipeBusy)return;
  let record;try{record=recipeReadForm()}catch(e){recipeAlert(e.message,true);return}
  const originalKey=recipeSelected;
+ recipeDraft=recipeClone(record); // Keep unsaved edits intact even if NX save fails or returns 409.
  if(record.scope==="shared"&&!recipeRemoteReady){recipeAlert("Conecta con el NX antes de guardar una receta compartida",true);return}
  recipeBusy=true;renderRecipeManager();
  try{
