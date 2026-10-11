@@ -50,7 +50,7 @@ function buildST(input){
  const recipeInit=p.recipes.filter(r=>r.scope==='shared').map((r,i)=>{
   const blob=C.recipeWireJSON(r);
   if(enc.encode(blob).length>C.RECIPE_BYTES_MAX)throw Error('Receta '+r.name+': exceso de capacidad NX');
-  return 'Web_RecipeData['+(i+1)+'] := \' '+stLiteral(blob)+'\'; Web_RecipeRev['+(i+1)+'] := UDINT#1;'.replace(":= ' ",":= '");
+  return "Web_RecipeData["+(i+1)+"] := '"+stLiteral(blob)+"'; Web_RecipeRev["+(i+1)+"] := UDINT#1;";
  }).join('\n    ');
  const chunkCases=parts.map((c,i)=>`${i}: Web_TxText := '${stLiteral(c)}';`).join('\n            ');
  return `(* HMI NX ST · servidor WebHMI generado
