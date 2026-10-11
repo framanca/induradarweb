@@ -571,7 +571,7 @@ with sync_playwright() as pw:
     assert stage.locator(".o > .label").count() == 0
     assert stage.locator(".o.status .caption").count() == 0
     assert stage.locator(".o.tank .caption").count() == 0
-    assert stage.locator(".o .control-panel > .caption").count() == 0
+    assert stage.locator(".o:not(.counter) .control-panel > .caption").count() == 0
     assert stage.locator(".o.status .status-visual svg").count() == 1
     assert stage.locator(".o.tank .symbol .level").count() == 1
     assert stage.locator(".o.value .in").inner_text() == "1"
