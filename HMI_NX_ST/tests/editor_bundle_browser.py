@@ -432,6 +432,68 @@ with sync_playwright() as pw:
     assert page.locator("#screenSelect option").count() == 2
     checks.append("screen_properties_convert_and_inherit_base_without_widget_loss")
 
+    # Independent feedback captions follow the BOOL value (not the button action text).
+    page.locator("#newBtn").click()
+    select_sidebar("variables")
+    page.locator("#addInternalVar").click()  # Internal_1 = false
+    select_sidebar("elements")
+    page.locator(".tool-grid [data-kind='button']").click()
+    page.locator("#properties [data-p='binding']").select_option("Internal_1")
+    page.locator("#properties [data-p='actionMode']").select_option("toggle")
+    page.locator("#properties [data-p='feedbackBinding']").select_option("Internal_1")
+    off_label = page.locator("#properties [data-p='feedbackTextOff']")
+    off_label.fill("Arrancar")
+    off_label.press("Tab")
+    on_label = page.locator("#properties [data-p='feedbackTextOn']")
+    on_label.fill("Parar")
+    on_label.press("Tab")
+    assert "Arrancar" in page.locator("#canvas .widget.button").inner_text()
+    assert page.locator("#diagnostics .diagnostic.error").count() == 0
+    page.locator("#previewBtn").click()
+    runtime_button = page.frame_locator("#previewFrame").locator("#stage .o.button .in")
+    runtime_button.wait_for()
+    assert runtime_button.inner_text() == "Arrancar"
+    runtime_button.click()
+    page.wait_for_timeout(100)
+    assert runtime_button.inner_text() == "Parar"
+    runtime_button.click()
+    assert runtime_button.inner_text() == "Arrancar"
+    page.locator("#closePreview").click()
+    checks.append("button_feedback_off_on_texts_update_from_internal_bool")
+
+    # All vector shapes are native SVG, with free deformation and no image assets.
+    for shape in ["rect", "ellipse", "line", "arrow", "triangle"]:
+        page.locator(f'.tool-grid [data-kind="shape"][data-shape="{shape}"]').click()
+        widget = page.locator("#canvas .widget.shape").last
+        assert widget.locator(".shape-visual svg").count() == 1
+        assert widget.locator("img").count() == 0
+        assert page.locator("#properties [data-p='shapeType']").input_value() == shape
+    triangle = page.locator("#canvas .widget.shape").last
+    assert triangle.locator(".shape-point").count() == 3
+    points_input = page.locator("#properties [data-p='shapePoints']")
+    points_input.fill("3,10 96,36 10,93")
+    points_input.press("Tab")
+    triangle = page.locator("#canvas .widget.shape").last
+    assert "3,10 96,36 10,93" in triangle.locator("polygon").get_attribute("points")
+    handle = triangle.locator('.shape-point[data-point="0"]')
+    grip_box = handle.bounding_box()
+    assert grip_box is not None
+    px, py = grip_box["x"] + grip_box["width"]/2, grip_box["y"] + grip_box["height"]/2
+    page.mouse.move(px, py)
+    page.mouse.down()
+    page.mouse.move(px + 18, py + 15, steps=8)
+    page.mouse.up()
+    changed_points = page.locator("#properties [data-p='shapePoints']").input_value()
+    assert changed_points != "3,10 96,36 10,93"
+    page.locator("#previewBtn").click()
+    preview_shapes = page.frame_locator("#previewFrame").locator("#stage .o.shape .shape-visual svg")
+    assert preview_shapes.count() == 5
+    assert page.frame_locator("#previewFrame").locator("#stage .o.shape img").count() == 0
+    assert page.frame_locator("#previewFrame").locator("#stage .o.shape polygon").count() >= 2
+    page.locator("#closePreview").click()
+    assert page.locator("#diagnostics .diagnostic.error").count() == 0
+    checks.append("native_svg_shapes_and_editable_triangle_vertices_in_editor_and_runtime")
+
     assert not errors, "Browser JavaScript errors: " + repr(errors)
     report = {
         "status": "PASS",
