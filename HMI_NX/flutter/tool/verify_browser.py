@@ -124,6 +124,7 @@ with tempfile.TemporaryDirectory(prefix="webhmi-browser-") as temporary, sync_pl
         assert page.locator(".left").is_visible()
         assert page.locator(".tool-grid button").count() == 17
         assert page.locator('.tool-grid [data-kind="shape"]').count() == 1
+        page.locator("#sidebar-tab-elements").click()
         page.locator('.tool-grid [data-kind="shape"]').click()
         page.get_by_role("button", name="Propiedades", exact=True).click()
         assert page.locator('#properties [data-p="shapeType"] option').count() == 5
