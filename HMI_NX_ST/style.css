@@ -56,3 +56,9 @@
 #previewResizeHandle{position:absolute;right:0;bottom:0;width:26px;height:26px;z-index:10;cursor:nwse-resize;touch-action:none;user-select:none;border-radius:0 0 10px 0;background:linear-gradient(135deg,transparent 47%,#475569 49%,#475569 52%,transparent 54%) 13px 14px/8px 8px no-repeat,linear-gradient(135deg,transparent 47%,#475569 49%,#475569 52%,transparent 54%) 6px 7px/14px 14px no-repeat}
 #previewResizeHandle:hover,#previewResizeHandle:focus-visible{background-color:#e0e7ff;outline-offset:-2px}
 @media(max-width:620px){#previewDialog .dialog-title .hint{display:none}}
+
+/* Pure SVG shape widgets; geometric vertices can be dragged independently of the box. */
+.widget.shape .shape-visual{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.widget.shape .shape-visual svg{display:block;width:100%;height:100%}
+#canvas .widget.shape .shape-point{position:absolute;width:12px;height:12px;transform:translate(-50%,-50%);border:2px solid #fff;border-radius:50%;background:#0f766e;box-shadow:0 0 0 1px #0f766e;z-index:14;cursor:crosshair;touch-action:none;display:none}
+#canvas .widget.shape.selected:not(.inherited) .shape-point{display:block}
