@@ -223,6 +223,140 @@ ${recipeRuntimeJS()}
 function startComm(){loadCachedSnapshot();showScreen(0);fitStage();paint();schedule(0)}
 startComm();
 `;}
-function recipeRuntimeJS(){return String.raw`/*RECIPE_RUNTIME_CODE*/`;}
+function recipeRuntimeJS(){return String.raw`
+const recipeOpen=document.getElementById("recipeOpen"),recipeWindow=document.getElementById("recipeWindow"),recipeClose=document.getElementById("recipeClose");
+const recipeSelect=document.getElementById("recipeSelect"),recipeName=document.getElementById("recipeName"),recipeScope=document.getElementById("recipeScope"),recipeFieldList=document.getElementById("recipeFieldList"),recipeMessageEl=document.getElementById("recipeMessage");
+const recipeFields=P.recipeFields||[],recipeFieldsByName=Object.fromEntries(recipeFields.map(f=>[f.name,f]));
+const recipeBrowserKey="hminx:recipes:v1:"+String(P.recipeKey||P.name);
+const recipeSlots=new Map(),recipeBrowser=[];
+let recipeRemoteReady=false,recipeBusy=false,recipeSelected="",recipeDraft=null,recipeDirty=false,recipeApplyJob=null;
+function recipeClone(o){return JSON.parse(JSON.stringify(o))}
+function recipeUid(){return "r"+Date.now().toString(36)+Math.random().toString(36).slice(2,10)}
+function recipeAlert(t,error){recipeMessageEl.textContent=t;recipeMessageEl.style.color=error?"#b91c1c":"#0f4c81"}
+function recipeStorageSave(){
+ try{localStorage.setItem(recipeBrowserKey,JSON.stringify({version:1,recipes:recipeBrowser}));return true}
+ catch(e){recipeAlert("No se pudieron conservar las recetas en el navegador: "+e.message,true);return false}
+}
+function recipeSanitize(candidate,scope){
+ if(!candidate||typeof candidate!=="object"||Array.isArray(candidate))throw Error("Receta no válida");
+ const o={id:typeof candidate.id==="string"&&candidate.id.length<=100?candidate.id:recipeUid(),name:String(candidate.name||""),scope,values:Object.create(null)};
+ if(!candidate.values||typeof candidate.values!=="object"||Array.isArray(candidate.values))throw Error("La receta necesita un mapa de valores");
+ for(const [name,value] of Object.entries(candidate.values)){
+  if(!Object.prototype.hasOwnProperty.call(recipeFieldsByName,name))throw Error("Variable ajena a este proyecto: "+name);
+  o.values[name]=recipeTypedValue(recipeFieldsByName[name],value);
+ }
+ if(!o.name.trim()||o.name.length>48)throw Error("Nombre de receta obligatorio, máximo 48 caracteres");
+ return o
+}
+function recipeTypedValue(field,value){
+ const type=field.type,raw=String(value??"").trim();
+ if(type==="BOOL"){if(!/^(true|false|0|1)$/i.test(raw))throw Error(field.name+": usa TRUE o FALSE");return raw==="1"||raw.toLowerCase()==="true"}
+ if(type==="STRING"){const str=String(value??"");if(new TextEncoder().encode(str).length>Math.min(512,Number(field.stringLength)||255))throw Error(field.name+": cadena demasiado larga");return str}
+ if(["INT","SINT","USINT","UINT","DINT","UDINT","LINT","ULINT"].includes(type)){
+  if(!/^[+-]?\d+$/.test(raw))throw Error(field.name+": número entero obligatorio");
+  const n=BigInt(raw),bounds={SINT:[-128n,127n],USINT:[0n,255n],INT:[-32768n,32767n],UINT:[0n,65535n],DINT:[-2147483648n,2147483647n],UDINT:[0n,4294967295n],LINT:[-(1n<<63n),(1n<<63n)-1n],ULINT:[0n,(1n<<64n)-1n]};
+  const lim=bounds[type];if(n<lim[0]||n>lim[1])throw Error(field.name+": entero fuera de rango");return n.toString();
+ }
+ if(["REAL","LREAL"].includes(type)){
+  if(!raw||!/^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(raw))throw Error(field.name+": decimal no válido (usa punto)");
+  const n=Number(raw);if(!Number.isFinite(n))throw Error(field.name+": decimal no válido");return n;
+ }
+ if(["BYTE","WORD","DWORD","LWORD"].includes(type)){
+  const width={BYTE:2,WORD:4,DWORD:8,LWORD:16}[type],hex=raw.replace(/^(0x|16#)/i,"");
+  if(!new RegExp("^[0-9a-f]{1,"+width+"}$","i").test(hex))throw Error(field.name+": hexadecimal no válido");return hex.toUpperCase().padStart(width,"0");
+ }
+ if(type==="TIME"&&!/^[+-]?\d+$/.test(raw))throw Error(field.name+": TIME debe ser nanosegundos enteros");
+ if(type==="DATE"&&!/^\d{4}-\d{2}-\d{2}(?:-\d{2}:\d{2}:\d{2})?$/.test(raw))throw Error(field.name+": DATE no válida");
+ if(type==="TIME_OF_DAY"&&!/^\d\d:\d\d:\d\d$/.test(raw))throw Error(field.name+": hora no válida");
+ if(type==="DATE_AND_TIME"&&!/^\d{4}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}$/.test(raw))throw Error(field.name+": fecha y hora no válidas");
+ return raw
+}
+function recipeASCII(o){return JSON.stringify({id:o.id,name:o.name,values:o.values}).replace(/[^\x00-\x7F]/g,c=>"\\u"+c.charCodeAt(0).toString(16).padStart(4,"0"))}
+function recipeLoadBrowser(){
+ let saved=null;
+ try{const raw=localStorage.getItem(recipeBrowserKey);if(raw!==null){const o=JSON.parse(raw);if(o&&o.version===1&&Array.isArray(o.recipes))saved=o.recipes}}
+ catch(e){recipeAlert("Error leyendo recetas locales: "+e.message,true)}
+ const list=saved===null?P.recipes.filter(r=>r.scope==="local"):saved;
+ for(const r of list){try{if(recipeBrowser.length<24)recipeBrowser.push(recipeSanitize(r,"local"))}catch(e){recipeAlert("Receta local omitida: "+e.message,true)}}
+}
+function recipeSeedShared(){
+ let slot=1;
+ for(const r of P.recipes.filter(r=>r.scope==="shared").slice(0,12)){
+  try{recipeSlots.set(slot,{rev:0,data:recipeSanitize(r,"shared"),fallback:true})}catch{}
+  slot++;
+ }
+}
+function recipeListItems(){
+ const items=[];
+ for(const [slot,item] of [...recipeSlots].sort((a,b)=>a[0]-b[0]))if(item.data)items.push({key:"S:"+slot,data:item.data,slot,rev:item.rev});
+ for(const r of recipeBrowser)items.push({key:"L:"+r.id,data:r});
+ return items
+}
+function recipeSelectItem(key){
+ const item=recipeListItems().find(x=>x.key===key);
+ if(!item){recipeSelected="";recipeDraft=null;recipeDirty=false;renderRecipeManager();return}
+ recipeSelected=key;recipeDraft=recipeClone(item.data);recipeDirty=false;renderRecipeManager();
+}
+function recipeCurrentString(field){
+ if(field.source==="PLC"&&comm.state!=="ONLINE")return "— (NX desconectado)";
+ const value=currentValue(field.name);return value===undefined?"—":String(value)
+}
+function refreshRecipeActualValues(){
+ if(recipeWindow.hidden)return;
+ for(const el of recipeFieldList.querySelectorAll("[data-recipe-current]")){const f=recipeFieldsByName[el.getAttribute("data-recipe-current")];if(f)el.textContent=recipeCurrentString(f)}
+}
+function renderRecipeManager(){
+ const items=recipeListItems();
+ recipeSelect.replaceChildren();
+ for(const item of items){const option=E("option");option.value=item.key;option.textContent=(item.key.startsWith("S:")?"NX · ":"Local · ")+item.data.name;recipeSelect.append(option)}
+ if(recipeDraft&&recipeSelected.startsWith("N:")){const option=E("option");option.value=recipeSelected;option.textContent="Sin guardar · "+recipeDraft.name;recipeSelect.append(option)}
+ if(!recipeDraft&&items.length){recipeSelected=items[0].key;recipeDraft=recipeClone(items[0].data)}
+ if(recipeDraft){recipeSelect.value=recipeSelected;recipeName.value=recipeDraft.name;recipeScope.value=recipeDraft.scope||"local"}
+ else{recipeName.value="";recipeScope.value="local"}
+ const existing=!recipeSelected.startsWith("N:")&&Boolean(recipeDraft);
+ recipeName.disabled=!recipeDraft||recipeBusy;
+ recipeScope.disabled=!recipeDraft||existing||recipeBusy;
+ recipeFieldList.replaceChildren();
+ for(const f of recipeFields){
+  const row=E("div","recipe-field"),label=E("label","recipe-check"),check=E("input"),title=E("span"),fieldInput=f.type==="BOOL"?E("select","recipe-val"):E("input","recipe-val"),actual=E("span","recipe-live");
+  check.type="checkbox";check.checked=Boolean(recipeDraft&&Object.prototype.hasOwnProperty.call(recipeDraft.values,f.name));check.disabled=!recipeDraft||recipeBusy;
+  check.setAttribute("data-recipe-included",f.name);
+  title.textContent=f.name+" · "+f.type+" · "+f.source;
+  label.append(check,title);fieldInput.setAttribute("data-recipe-value",f.name);
+  if(f.type==="BOOL"){for(const b of ["false","true"]){const o=E("option");o.value=b;o.textContent=b.toUpperCase();fieldInput.append(o)}}
+  else fieldInput.type="text";
+  fieldInput.value=check.checked?String(recipeDraft.values[f.name]):"";
+  fieldInput.disabled=!check.checked||recipeBusy;
+  check.onchange=()=>{fieldInput.disabled=!check.checked||recipeBusy;if(check.checked&&!fieldInput.value)fieldInput.value=String(recipeCurrentString(f).startsWith("—")?(f.type==="BOOL"?"false":f.type==="STRING"?"":"0"):currentValue(f.name));recipeDirty=true};
+  fieldInput.oninput=()=>{recipeDirty=true};
+  actual.setAttribute("data-recipe-current",f.name);actual.textContent=recipeCurrentString(f);
+  row.append(label,fieldInput,actual);recipeFieldList.append(row);
+ }
+ const disable=!recipeDraft||recipeBusy;
+ for(const id of ["recipeSave","recipeApply","recipeCapture","recipeDelete","recipeDuplicate"])document.getElementById(id).disabled=disable;
+ document.getElementById("recipeDelete").disabled=disable||recipeSelected.startsWith("N:");
+ document.getElementById("recipeApply").disabled=disable||recipeSelected.startsWith("N:")||recipeDirty;
+ recipeSelect.disabled=recipeBusy;document.getElementById("recipeNew").disabled=recipeBusy;document.getElementById("recipeImport").disabled=recipeBusy;
+ document.getElementById("recipeRefresh").disabled=recipeBusy;
+ recipeName.oninput=()=>{recipeDirty=true;document.getElementById("recipeApply").disabled=true};
+ recipeScope.onchange=()=>{recipeDirty=true;document.getElementById("recipeApply").disabled=true};
+}
+function recipeReadForm(){
+ if(!recipeDraft)throw Error("Selecciona una receta");
+ const o={id:recipeDraft.id,name:recipeName.value.trim(),scope:recipeScope.value,values:Object.create(null)};
+ for(const check of recipeFieldList.querySelectorAll("[data-recipe-included]"))if(check.checked){
+  const name=check.getAttribute("data-recipe-included"),field=recipeFieldsByName[name],input=Array.from(recipeFieldList.querySelectorAll("[data-recipe-value]")).find(x=>x.getAttribute("data-recipe-value")===name);
+  o.values[name]=recipeTypedValue(field,input.value);
+ }
+ if(!o.name||o.name.length>48)throw Error("Nombre obligatorio, máximo 48 caracteres");
+ if(!Object.keys(o.values).length)throw Error("Selecciona al menos una variable para la receta");
+ if(Object.keys(o.values).length>20)throw Error("Máximo 20 parámetros");
+ if(o.scope==="shared"&&new TextEncoder().encode(recipeASCII(o)).length>500)throw Error("La receta supera los 500 bytes del banco NX");
+ if(recipeListItems().some(x=>x.key!==recipeSelected&&x.data.scope===o.scope&&x.data.name.toLowerCase()===o.name.toLowerCase()))throw Error("Ya hay otra receta con ese nombre");
+ return o
+}
+recipeLoadBrowser();recipeSeedShared();
+/*RECIPE_RUNTIME_HANDLERS*/
+`;}
 C.buildRuntimeHTML=buildRuntimeHTML;
 })(globalThis);
