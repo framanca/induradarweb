@@ -47,6 +47,11 @@ function buildST(input){
  const alarmAckCases=p.alarms.map((a,i)=>{const v=vm.get(a.binding);return v?`${i+1}:\n IF ${alarmExpr(v,a)} THEN Web_AlarmAck[${i+1}] := TRUE; END_IF;\n Web_Found := TRUE;`:''}).filter(Boolean).join('\n');
  const alarmAckAll=p.alarms.map((a,i)=>{const v=vm.get(a.binding);return v?`IF ${alarmExpr(v,a)} THEN Web_AlarmAck[${i+1}] := TRUE; END_IF;`:''}).filter(Boolean).join('\n');
  const recipeCases=p.recipes.map((r,i)=>{const assigns=[];for(const [name,value] of Object.entries(r.values||{})){const v=vm.get(name);if(v&&v.access==='RW'&&v.writeSupported)assigns.push(v.enumType?`NumToEnum(${stTyped(v,value)}, ${v.name});`:`${v.name} := ${stTyped(v,value)};`);}return `${i+1}:\n                ${assigns.join('\n                ')||';'}\n                Web_Found := TRUE;`;}).join('\n            ');
+ const recipeInit=p.recipes.filter(r=>r.scope==='shared').map((r,i)=>{
+  const blob=C.recipeWireJSON(r);
+  if(enc.encode(blob).length>C.RECIPE_BYTES_MAX)throw Error('Receta '+r.name+': exceso de capacidad NX');
+  return "Web_RecipeData["+(i+1)+"] := '"+stLiteral(blob)+"'; Web_RecipeRev["+(i+1)+"] := UDINT#1;";
+ }).join('\n    ');
  const chunkCases=parts.map((c,i)=>`${i}: Web_TxText := '${stLiteral(c)}';`).join('\n            ');
  return `(* HMI NX ST · servidor WebHMI generado
    Proyecto: ${p.name}
@@ -57,6 +62,11 @@ function buildST(input){
 *)
 
 ${alarmReset}
+(* Banco de recetas retenido. Validar los atributos Retain de las variables en Sysmac. *)
+IF NOT Web_RecipeInit THEN
+    ${recipeInit}
+    Web_RecipeInit := TRUE;
+END_IF;
 IF Web_State = Web_PrevState THEN
     IF (Web_State <> UINT#10) AND (Web_StateTicks < UDINT#4294967294) THEN
         Web_StateTicks := Web_StateTicks + UDINT#1;
@@ -104,6 +114,12 @@ CASE Web_State OF
             Web_Request := UINT#2;
         ELSIF FIND(Web_RxText, 'POST /api/write?') = 1 THEN
             Web_Request := UINT#3;
+        ELSIF FIND(Web_RxText, 'POST /api/recipe?slot=') = 1 THEN
+            Web_Request := UINT#8;
+        ELSIF FIND(Web_RxText, 'GET /api/recipe?slot=') = 1 THEN
+            Web_Request := UINT#7;
+        ELSIF FIND(Web_RxText, 'GET /api/recipes ') = 1 THEN
+            Web_Request := UINT#6;
         ELSIF FIND(Web_RxText, 'POST /api/recipe?') = 1 THEN
             Web_Request := UINT#4;
          ELSIF FIND(Web_RxText, 'POST /api/ack?') = 1 THEN
@@ -202,6 +218,69 @@ CASE Web_State OF
             Web_TxText := 'HTTP/1.0 400 Bad Request$r$nContent-Type: text/plain$r$nConnection: close$r$n$r$n';
         END_IF;
 
+
+    6: (* Consulta ligera: version de las 12 ranuras sin cargar sus valores. *)
+        Web_ApiBody := 'RCPV=1$n';
+        FOR Web_RecipeIdx := UINT#1 TO UINT#12 DO
+            Web_ApiBody := CONCAT(Web_ApiBody, UINT_TO_STRING(Web_RecipeIdx), '=', UDINT_TO_STRING(Web_RecipeRev[Web_RecipeIdx]), '$n');
+        END_FOR;
+        Web_TxText := 'HTTP/1.0 200 OK$r$nContent-Type: text/plain; charset=utf-8$r$nCache-Control: no-store$r$nConnection: close$r$n$r$n';
+
+    7: (* Obtener blob ASCII de una ranura, maximo 500 bytes. *)
+        Web_PosSlot := FIND(Web_RxText, '?slot=');
+        Web_PosEnd := FIND(Web_RxText, ' HTTP/');
+        Web_Found := FALSE;
+        IF (Web_PosSlot > 0) AND (Web_PosEnd > Web_PosSlot + UINT#6) THEN
+            Web_SlotText := MID(In:=Web_RxText, L:=Web_PosEnd-(Web_PosSlot+UINT#6), P:=Web_PosSlot+UINT#6);
+            Web_RecipeSlot := STRING_TO_UINT(Web_SlotText);
+            IF (Web_RecipeSlot >= UINT#1) AND (Web_RecipeSlot <= UINT#12) THEN
+                Web_ApiBody := Web_RecipeData[Web_RecipeSlot];
+                Web_Found := TRUE;
+            END_IF;
+        END_IF;
+        IF Web_Found THEN
+            Web_TxText := 'HTTP/1.0 200 OK$r$nContent-Type: application/json; charset=utf-8$r$nCache-Control: no-store$r$nConnection: close$r$n$r$n';
+        ELSE
+            Web_ApiBody := 'BAD SLOT';
+            Web_TxText := 'HTTP/1.0 400 Bad Request$r$nContent-Type: text/plain$r$nConnection: close$r$n$r$n';
+        END_IF;
+
+    8: (* Escritura de receta atomica por ranura con revision CAS. No se interpreta el JSON en ST. *)
+        Web_PosSlot := FIND(Web_RxText, '?slot=');
+        Web_PosRev := FIND(Web_RxText, '&rev=');
+        Web_PosEnd := FIND(Web_RxText, ' HTTP/');
+        Web_PosBody := FIND(Web_RxText, '$r$n$r$n');
+        Web_Found := FALSE;
+        IF (Web_PosSlot > 0) AND (Web_PosRev > Web_PosSlot) AND (Web_PosEnd > Web_PosRev) AND (Web_PosBody > 0) THEN
+            Web_SlotText := MID(In:=Web_RxText, L:=Web_PosRev-(Web_PosSlot+UINT#6), P:=Web_PosSlot+UINT#6);
+            Web_RevText := MID(In:=Web_RxText, L:=Web_PosEnd-(Web_PosRev+UINT#5), P:=Web_PosRev+UINT#5);
+            Web_RecipeSlot := STRING_TO_UINT(Web_SlotText);
+            Web_RecipeExpected := STRING_TO_UDINT(Web_RevText);
+            Web_BodyLen := LEN(Web_RxText)-(Web_PosBody+UINT#3);
+            IF (Web_RecipeSlot >= UINT#1) AND (Web_RecipeSlot <= UINT#12) AND (Web_BodyLen <= UINT#500) THEN
+                Web_Found := TRUE;
+                IF Web_RecipeRev[Web_RecipeSlot] = Web_RecipeExpected THEN
+                    IF Web_BodyLen = UINT#0 THEN
+                        Web_ValueText := '';
+                    ELSE
+                        Web_ValueText := MID(In:=Web_RxText, L:=Web_BodyLen, P:=Web_PosBody+UINT#4);
+                    END_IF;
+                    Web_RecipeData[Web_RecipeSlot] := Web_ValueText;
+                    Web_RecipeRev[Web_RecipeSlot] := Web_RecipeRev[Web_RecipeSlot] + UDINT#1;
+                    IF Web_RecipeRev[Web_RecipeSlot] = UDINT#0 THEN Web_RecipeRev[Web_RecipeSlot] := UDINT#1; END_IF;
+                    Web_ApiBody := CONCAT('REV=', UDINT_TO_STRING(Web_RecipeRev[Web_RecipeSlot]));
+                    Web_TxText := 'HTTP/1.0 200 OK$r$nContent-Type: text/plain$r$nCache-Control: no-store$r$nConnection: close$r$n$r$n';
+                ELSE
+                    Web_ApiBody := CONCAT('CONFLICT REV=', UDINT_TO_STRING(Web_RecipeRev[Web_RecipeSlot]));
+                    Web_TxText := 'HTTP/1.0 409 Conflict$r$nContent-Type: text/plain$r$nConnection: close$r$n$r$n';
+                END_IF;
+            END_IF;
+        END_IF;
+        IF NOT Web_Found THEN
+            Web_ApiBody := 'BAD RECIPE DATA';
+            Web_TxText := 'HTTP/1.0 400 Bad Request$r$nContent-Type: text/plain$r$nConnection: close$r$n$r$n';
+        END_IF;
+
     ELSE
         Web_ApiBody := 'NOT FOUND';
         Web_TxText := 'HTTP/1.0 404 Not Found$r$nContent-Type: text/plain$r$nConnection: close$r$n$r$n';
@@ -286,6 +365,17 @@ function localVariablesTSV(input){const p=C.normalize(input);const rows=[
 ['Web_ApiBody','STRING[1985]','','','','','Datos API'],
 ['Web_IdText','STRING[12]','','','','','ID parseado'],
 ['Web_ValueText','STRING[512]','','','','','Valor de escritura'],
+['Web_RecipeInit','BOOL','FALSE','','True','','Banco de recetas inicializado - Retain'],
+ ['Web_RecipeData','ARRAY[1..12] OF STRING[512]','','','True','','Contenido ASCII del banco de recetas - Retain'],
+ ['Web_RecipeRev','ARRAY[1..12] OF UDINT','','','True','','Version de recetas - Retain'],
+ ['Web_RecipeSlot','UINT','0','','','','Ranura receta'],
+ ['Web_RecipeIdx','UINT','0','','','','Indice de resumen'],
+ ['Web_RecipeExpected','UDINT','0','','','','Version cliente CAS'],
+ ['Web_PosSlot','UINT','0','','','','Posicion slot'],
+ ['Web_PosRev','UINT','0','','','','Posicion rev'],
+ ['Web_BodyLen','UINT','0','','','','Longitud cuerpo receta'],
+ ['Web_SlotText','STRING[8]','','','','','Ranura'],
+ ['Web_RevText','STRING[16]','','','','','Version cliente'],
 ['Web_Socket','_sSOCKET','','','','','Socket aceptado'],
 ['Web_Accept','SktTCPAccept','','','','','Accept TCP'],
 ['Web_Rcv','SktTCPRcv','','','','','Receive TCP'],
@@ -307,6 +397,10 @@ INSTALACIÓN
 - Pegar WebHMI_Server.st en un Program ST.
 - Pegar WebHMI_LocalVariables.tsv en Internals.
 - Pegar WebHMI_ExternalVariables.tsv en Externals.
+- Comprobar que Web_RecipeInit, Web_RecipeData y Web_RecipeRev tienen la casilla Retain activada. Sin Retain las recetas editadas se perderían al reiniciar.
+- Banco NX: 12 recetas compartidas de hasta 500 bytes ASCII, revisión por ranura para evitar colisiones entre navegadores.
+- Las recetas iniciales se siembran solo si Web_RecipeInit está a FALSE. Antes de borrar Retain o transferir otro proyecto, exportar una copia de las recetas.
+- Recetas locales: quedan almacenadas solo en el navegador.
 - Las variables referenciadas deben existir como Global Variables con el mismo nombre/tipo.
 - Si importaste una estructura, union, enumeracion o ARRAY, crea su tipo en Data Types de Sysmac y declara la raiz global. El TSV Externals contiene SOLO esa raiz, no miembros sueltos.
 - Asignar el Program a una tarea y transferir al NX.
@@ -332,7 +426,9 @@ LÍMITES ACTUALES
 - Petición <=1900 bytes en una recepción.
 - Web_WatchdogLimit es un límite en ciclos de tarea (5000 por defecto), no tiempo absoluto.
 - Alarmas: ACK en memoria PLC mientras sigan activas; no retentivas tras reinicio ni historial.
-- Recetas: valores compilados con la exportación; editar una receta exige regenerar/transferir ST.
+- Recetas: edición CRUD desde runtime; 12 ranuras compartidas Retain con revisión CAS y 24 locales por navegador. Las plantillas iniciales se cargan una vez al arrancar con Web_RecipeInit=FALSE.
+- El botón Aplicar envía escrituras PLC secuenciales; NO es una operación atómica ni sustituye enclavamientos de máquina. Comprobar lectura posterior.
+- El endpoint legado POST /api/recipe?id mantiene las antiguas recetas fijas únicamente para compatibilidad; la ventana nueva usa el banco Retain y /api/write.
 - Sin HTTPS ni gestión de usuarios todavía.
 - No usar la HMI para funciones de seguridad.
 `;}

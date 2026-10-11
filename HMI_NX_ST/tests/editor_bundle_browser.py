@@ -718,6 +718,164 @@ with sync_playwright() as pw:
     page.locator("#closePreview").click()
     checks.append("hmi_internal_alarms_bool_int_offline_ack_all_reset_and_retrigger")
 
+
+    # Recipes: editor whitelists local variables, runtime edits/captures/applies and
+    # persists browser-local recipes without touching PLC APIs.
+    page.locator("#newBtn").click()
+    select_sidebar("variables")
+    page.locator("#addInternalVar").click()
+    page.locator('#internalVarList [data-iv="0"][data-key="type"]').select_option("INT")
+    page.locator('#internalVarList [data-iv="0"][data-key="value"]').fill("0")
+    page.locator('#internalVarList [data-iv="0"][data-key="value"]').press("Tab")
+    select_sidebar("recipes")
+    page.locator('#recipeVariableEditor [data-recipe-var="Internal_1"]').check()
+    page.locator("#addRecipe").click()
+    page.locator('[data-recipe-name="0"]').fill("Nivel inicial")
+    page.locator('[data-recipe-name="0"]').press("Tab")
+    page.locator('[data-recipe-values="0"]').fill("Internal_1=7")
+    page.locator('[data-recipe-values="0"]').press("Tab")
+    assert page.locator('[data-recipe-scope="0"]').input_value() == "local"
+    assert page.locator("#diagnostics .diagnostic.error").count() == 0
+    select_sidebar("elements")
+    page.locator('.tool-grid [data-kind="value"]').click()
+    page.locator("#properties [data-p='binding']").select_option("Internal_1")
+    page.locator("#previewBtn").click()
+    recipe_frame = page.frame_locator("#previewFrame")
+    recipe_frame.locator("#recipeOpen").click()
+    assert recipe_frame.locator("#recipeWindow").is_visible()
+    assert "Nivel inicial" in recipe_frame.locator("#recipeSelect").inner_text()
+    assert recipe_frame.locator('[data-recipe-value="Internal_1"]').input_value() == "7"
+    assert recipe_frame.locator("#recipeApply").is_enabled()
+    recipe_frame.locator("#recipeApply").click()
+    assert recipe_frame.locator("#stage .o.value .in").inner_text() == "7"
+    recipe_frame.locator("#recipeName").fill("Nivel editado")
+    recipe_frame.locator('[data-recipe-value="Internal_1"]').fill("9")
+    recipe_frame.locator("#recipeSave").click()
+    assert "Nivel editado" in recipe_frame.locator("#recipeSelect").inner_text()
+    assert recipe_frame.locator("#recipeApply").is_enabled()
+    recipe_frame.locator("#recipeClose").click()
+    page.locator("#closePreview").click()
+    page.locator("#previewBtn").click()
+    recipe_frame.locator("#recipeOpen").click()
+    assert "Nivel editado" in recipe_frame.locator("#recipeSelect").inner_text()
+    assert recipe_frame.locator('[data-recipe-value="Internal_1"]').input_value() == "9"
+    recipe_frame.locator("#recipeDuplicate").click()
+    assert "(copia)" in recipe_frame.locator("#recipeName").input_value()
+    recipe_frame.locator("#recipeSave").click()
+    assert recipe_frame.locator("#recipeSelect option").count() == 2
+    recipe_frame.locator("#recipeDelete").click()
+    assert recipe_frame.locator("#recipeSelect option").count() == 1
+    recipe_frame.locator("#recipeNew").click()
+    recipe_frame.locator("#recipeName").fill("Receta creada runtime")
+    recipe_frame.locator('[data-recipe-included="Internal_1"]').check()
+    recipe_frame.locator('[data-recipe-value="Internal_1"]').fill("21")
+    recipe_frame.locator("#recipeSave").click()
+    assert recipe_frame.locator("#recipeSelect option").count() == 2
+    recipe_frame.locator("#recipeApply").click()
+    assert recipe_frame.locator("#stage .o.value .in").inner_text() == "21"
+    page.locator("#closePreview").click()
+    checks.append("runtime_recipe_manager_internal_variables_crud_persistence_and_apply_offline")
+
+
+    # Shared recipes: mock the NX's Retain bank and verify CAS save, stale
+    # revisions, refresh conflict recovery, and blocking stale application.
+    from urllib.parse import urlsplit, parse_qs
+    shared_bank = {
+        1: {"rev": 1, "data": json.dumps({
+            "id": "initial", "name": "Formato compartido",
+            "values": {"SpeedPLC": 60}
+        }, ensure_ascii=True)}
+    }
+    shared_calls = []
+    def mock_recipe_bank(route):
+        request = route.request
+        parsed = urlsplit(request.url)
+        shared_calls.append((request.method, parsed.path, parsed.query))
+        if parsed.path == "/api/recipes":
+            rows = ["RCPV=1"] + [f"{i}={shared_bank.get(i, {'rev': 0})['rev']}" for i in range(1, 13)]
+            route.fulfill(status=200, body="\n".join(rows)+"\n", content_type="text/plain")
+            return
+        if parsed.path == "/api/recipe":
+            params = parse_qs(parsed.query)
+            slot = int(params.get("slot", ["0"])[0])
+            if slot < 1 or slot > 12:
+                route.fulfill(status=400, body="BAD SLOT")
+                return
+            entry = shared_bank.get(slot, {"rev": 0, "data": ""})
+            if request.method == "GET":
+                route.fulfill(status=200, body=entry["data"], content_type="application/json")
+                return
+            expected = int(params.get("rev", ["-1"])[0])
+            if expected != entry["rev"]:
+                route.fulfill(status=409, body="CONFLICT REV="+str(entry["rev"]))
+                return
+            entry = {"rev": expected+1, "data": request.post_data or ""}
+            shared_bank[slot] = entry
+            route.fulfill(status=200, body="REV="+str(entry["rev"]))
+            return
+        route.continue_()
+    page.route("**/api/recipe*", mock_recipe_bank)
+    page.locator("#newBtn").click()
+    select_sidebar("variables")
+    page.locator("#pasteBtn").click()
+    page.locator("#pasteText").fill("Name,Data Type\nSpeedPLC,INT\n")
+    page.locator("#pasteImport").click()
+    page.locator('#varList [data-acc="0"]').select_option("RW")
+    select_sidebar("recipes")
+    page.locator('#recipeVariableEditor [data-recipe-var="SpeedPLC"]').check()
+    page.locator("#addRecipe").click()
+    page.locator('[data-recipe-name="0"]').fill("Formato compartido")
+    page.locator('[data-recipe-name="0"]').press("Tab")
+    page.locator('[data-recipe-values="0"]').fill("SpeedPLC=60")
+    page.locator('[data-recipe-values="0"]').press("Tab")
+    assert page.locator('[data-recipe-scope="0"]').input_value() == "shared"
+    assert page.locator("#diagnostics .diagnostic.error").count() == 0
+    page.locator("#previewBtn").click()
+    shared_frame = page.frame_locator("#previewFrame")
+    shared_frame.locator("#recipeOpen").click()
+    shared_frame.locator("#recipeSelect option").first.wait_for(state="attached")
+    page.wait_for_function("""() => {
+      const d = document.getElementById('previewFrame').contentDocument;
+      return d?.getElementById('recipeMessage')?.textContent.includes('actualizadas desde NX');
+    }""")
+    assert "Formato compartido" in shared_frame.locator("#recipeSelect").inner_text()
+    shared_frame.locator("#recipeName").fill("Formato actualizado")
+    shared_frame.locator("#recipeSave").click()
+    page.wait_for_function("""() => {
+      const d = document.getElementById('previewFrame').contentDocument;
+      return d?.getElementById('recipeMessage')?.textContent.includes('Receta guardada');
+    }""")
+    assert shared_bank[1]["rev"] == 2
+    assert json.loads(shared_bank[1]["data"])["name"] == "Formato actualizado"
+    # Another terminal saves a newer revision while this preview still has rev=2.
+    shared_bank[1]["rev"] = 3
+    shared_frame.locator("#recipeName").fill("No pisar edición")
+    shared_frame.locator("#recipeSave").click()
+    page.wait_for_function("""() => {
+      const d = document.getElementById('previewFrame').contentDocument;
+      return d?.getElementById('recipeMessage')?.textContent.includes('Conflicto');
+    }""")
+    assert json.loads(shared_bank[1]["data"])["name"] == "Formato actualizado"
+    assert shared_frame.locator("#recipeName").input_value() == "No pisar edición"
+    # Discard and reload, then change the remote revision again: apply must
+    # fail before writing even though PLC communication is notionally online.
+    shared_frame.locator("#recipeRefresh").click()
+    page.wait_for_function("""() => {
+      const d = document.getElementById('previewFrame').contentDocument;
+      return d?.getElementById('recipeMessage')?.textContent.includes('actualizadas desde NX');
+    }""")
+    assert shared_frame.locator("#recipeName").input_value() == "Formato actualizado"
+    shared_bank[1]["rev"] = 4
+    shared_frame.locator("#recipeApply").click()
+    page.wait_for_function("""() => {
+      const d = document.getElementById('previewFrame').contentDocument;
+      return d?.getElementById('recipeMessage')?.textContent.includes('bloqueada');
+    }""")
+    assert not any("/api/write" in call[1] for call in shared_calls)
+    page.locator("#closePreview").click()
+    page.unroute("**/api/recipe*", mock_recipe_bank)
+    checks.append("shared_recipe_bank_cas_conflict_preserved_draft_refresh_and_stale_apply_block")
+
     assert not errors, "Browser JavaScript errors: " + repr(errors)
     report = {
         "status": "PASS",
