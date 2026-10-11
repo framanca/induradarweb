@@ -73,7 +73,7 @@ test('editor lists both namespaces and runtime switches/stepper use local values
  assert.match(editor,/optgroup label="Variables internas"/);
  assert.match(editor,/opts\(o\.binding,BOOL\)/);
  assert.match(editor,/opts\(o\.feedbackBinding,BOOL\)/);
- assert.match(editor,/opts\(a\.binding,\(\)=>true,false\)/); // Alarm definitions remain PLC-only.
+ assert.match(editor,/opts\(a\.binding,\(\)=>true,true\)/); // Alarm definitions also offer HMI internal variables.
  assert.match(runtime,/function widgetWritable\(name\)/);
  assert.match(runtime,/localWritable\(name\)\|\|comm\.state==="ONLINE"/);
  assert.match(runtime,/boolValue\(currentValue\(o\.binding\)\)/);
