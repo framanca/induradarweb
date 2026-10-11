@@ -349,7 +349,10 @@ function recipeReadForm(){
 recipeLoadBrowser();recipeSeedShared();
 
 async function recipeRefreshShared(silent){
- if(recipeDirty&&!silent&&!confirm("Hay cambios sin guardar. \u00bfDescartarlos y actualizar las recetas NX?"))return;
+ if(recipeDirty&&!silent){
+  if(!confirm("Hay cambios sin guardar. \u00bfDescartarlos y actualizar las recetas NX?"))return;
+  recipeDirty=false;
+ }
  if(recipeBusy)return;
  recipeBusy=true;renderRecipeManager();
  try{
