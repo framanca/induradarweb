@@ -129,9 +129,9 @@ function paintAlarms(){
  const active=P.alarms.filter(a=>alarmVals[a.wireId]),unacked=active.filter(a=>!ackVals[a.wireId]);
  alarmCount.textContent=String(unacked.length);
  alarmOpen.classList.toggle("active",unacked.length>0);
- ackAll.disabled=comm.state!=="ONLINE"||pendingAck!==null||!unacked.length;
+ ackAll.disabled=!unacked.some(a=>a.local||comm.state==="ONLINE"&&pendingAck===null);
  if(!active.length){alarmbar.classList.remove("show");alarmbar.textContent=""}
- else{alarmbar.classList.add("show");alarmbar.textContent=unacked.length?unacked.map(a=>"["+String(a.severity).toUpperCase()+"] "+a.name).join(" | "):"Alarmas activas reconocidas ("+active.length+")";if(comm.state!=="ONLINE")alarmbar.textContent+=" | DATOS DESACTUALIZADOS"}
+ else{alarmbar.classList.add("show");alarmbar.textContent=unacked.length?unacked.map(a=>"["+String(a.severity).toUpperCase()+"]["+(a.local?"HMI":"PLC")+"] "+a.name).join(" | "):"Alarmas activas reconocidas ("+active.length+")";if(comm.state!=="ONLINE"&&active.some(a=>!a.local))alarmbar.textContent+=" | DATOS PLC DESACTUALIZADOS"}
  const order={high:3,warning:2,info:1};
  const list=[...P.alarms].sort((a,b)=>{const d=Number(Boolean(alarmVals[b.wireId]))-Number(Boolean(alarmVals[a.wireId]));return d||((order[b.severity]||0)-(order[a.severity]||0))});
  alarmList.replaceChildren();
@@ -139,11 +139,11 @@ function paintAlarms(){
   const isActive=Boolean(alarmVals[a.wireId]),isAck=Boolean(ackVals[a.wireId]);
   const row=E("div","alarm-row"+(isActive?" active":"")),state=E("span","alarm-state"+(isActive&&!isAck?" on":"")),name=E("strong"),cond=E("span","alarm-cond"),ack=E("button","ack-one");
   state.textContent=!isActive?"Normal":isAck?"ACTIVA RECONOCIDA":"ACTIVA PENDIENTE";
-  name.textContent="["+String(a.severity).toUpperCase()+"] "+a.name;
+  name.textContent="["+String(a.severity).toUpperCase()+"]["+(a.local?"HMI local":"PLC")+"] "+a.name;
   const ops={eq:"=",ne:"!=",gt:">",ge:">=",lt:"<",le:"<="};
   cond.textContent=a.binding+" "+(ops[a.operator]||a.operator)+" "+String(a.value);
   ack.textContent=isAck?"ACK OK":"Reconocer";
-  ack.disabled=!isActive||isAck||comm.state!=="ONLINE"||pendingAck!==null;
+  ack.disabled=!isActive||isAck||!a.local&&(comm.state!=="ONLINE"||pendingAck!==null);
   ack.onclick=()=>acknowledge(a.wireId);
   row.append(state,name,cond,ack);alarmList.append(row);
  }
@@ -193,7 +193,19 @@ else if(["DATE","DATE_AND_TIME","TIME_OF_DAY"].includes(tag.type))raw=calendarSe
 else if(tag.type!=="BOOL"&&tag.type!=="STRING"&&!/^-?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$/.test(raw))throw Error("Valor numerico no valido");
 if(tag.type==="STRING"&&new TextEncoder().encode(raw).length>Math.min(512,Number(tag.stringLength)||255))throw Error("STRING supera longitud permitida");if(tag.enumValues&&!Object.values(tag.enumValues).includes(Number(raw)))throw Error("Valor no definido en enumeracion "+tag.enumType);if(["SINT","USINT","INT","UINT","DINT","UDINT"].includes(tag.type)){const ranges={SINT:[-128n,127n],USINT:[0n,255n],INT:[-32768n,32767n],UINT:[0n,65535n],DINT:[-2147483648n,2147483647n],UDINT:[0n,4294967295n]};if(!/^[+-]?[0-9]+$/.test(raw))throw Error("Se requiere entero exacto");const n=BigInt(raw),limits=ranges[tag.type];if(n<limits[0]||n>limits[1])throw Error(tag.type+" fuera de rango");raw=n.toString()}
 if(!["BOOL","STRING","BYTE","WORD","DWORD","LWORD","LINT","ULINT","TIME","DATE","DATE_AND_TIME","TIME_OF_DAY"].includes(tag.type)){const num=Number(raw),min=opt&&opt.min!==null&&opt.min!==undefined?Number(opt.min):null,max=opt&&opt.max!==null&&opt.max!==undefined?Number(opt.max):null;if(min!==null&&num<min)throw Error("Valor menor que limite inferior ("+min+")");if(max!==null&&num>max)throw Error("Valor mayor que limite superior ("+max+")")}if(node)node.inputError="";pendingWrites.set(name,{name,raw,attempts:0,state:"queued",due:Date.now(),expires:Date.now()+WRITE_TTL,error:""});paint();schedule(0);return true}catch(e){if(node)node.inputError=e.message;paint();statusEl.textContent="ESCRITURA RECHAZADA | "+e.message;return false}}
-function acknowledge(id){if(comm.state!=="ONLINE"||pendingAck!==null)return;pendingAck=id;schedule(0)}
+function acknowledge(id){
+ updateLocalAlarms();
+ if(id===0){let localChanged=false;for(const a of P.alarms)if(a.local&&alarmVals[a.wireId]&&!ackVals[a.wireId]){ackVals[a.wireId]=true;localChanged=true}
+ const plcUnacked=P.alarms.some(a=>!a.local&&alarmVals[a.wireId]&&!ackVals[a.wireId]);
+ if(comm.state==="ONLINE"&&pendingAck===null&&plcUnacked){pendingAck=0;schedule(0)}
+ if(localChanged)paintAlarms();return;
+ }
+ const a=P.alarms.find(a=>a.wireId===id);
+ if(!a||!alarmVals[id]||ackVals[id])return;
+ if(a.local){ackVals[id]=true;paintAlarms();return}
+ if(comm.state!=="ONLINE"||pendingAck!==null)return;
+ pendingAck=id;schedule(0)
+}
 ackAll.onclick=()=>acknowledge(0);
 function applyRecipe(id){if(pendingRecipe){statusEl.textContent="RECETA PENDIENTE";return}pendingRecipe={id,at:Date.now()};schedule(0)}
 
