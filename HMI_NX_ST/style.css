@@ -74,3 +74,12 @@
 .layer-actions button{min-width:0;padding:9px 5px;font-size:12px;background:#f0f5ff;border-color:#94b7e8;color:#1e40af}
 .layer-actions button:disabled{opacity:.45;cursor:not-allowed}
 #layerSelect{width:100%}
+
+/* Recipe variables are explicitly whitelisted at design time. */
+#recipeVariableEditor{display:flex;flex-direction:column;gap:5px;margin:8px 0 14px}
+#recipeVariableEditor label{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:500;min-width:0;overflow-wrap:anywhere}
+#recipeVariableEditor label input{width:auto;flex:none}
+#recipeEditor .editor-card>label{display:block;margin:6px 0}
+#recipeEditor .editor-card>label select{width:100%}
+#recipeEditor .editor-card textarea{width:100%;min-height:82px}
+.sub-title{font-size:13px;margin:9px 0 5px}
