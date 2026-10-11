@@ -276,7 +276,7 @@ sidebarTabs.forEach((tab,index)=>{
   e.preventDefault();showSidebarTab(next.dataset.sidebarTab,true);
  };
 });
-document.querySelectorAll('.tool-grid [data-kind]').forEach(b=>b.onclick=()=>editAction(()=>{const o=C.newObject(b.dataset.kind);if(b.dataset.kind==='shape'){o.shapeType=b.dataset.shape||'rect';o.shapePoints=C.defaultShapePoints(o.shapeType);o.text=C.SHAPE_LABELS[o.shapeType]||'Figura';}activeScreen().objects.push(o);selected=o.id;render();}));
+document.querySelectorAll('.tool-grid [data-kind]').forEach(b=>b.onclick=()=>editAction(()=>{const o=C.newObject(b.dataset.kind);if(b.dataset.kind==='shape'){o.text='Figura';}activeScreen().objects.push(o);selected=o.id;render();}));
 ['projectName','port','pollMs','screenW','screenH','minDisplayWidth','maxDisplayWidth'].forEach(id=>{const input=$('#'+id);input.onchange=()=>editAction(()=>{syncProjectInputs();renderCanvas();renderDiag();},input);});
 function uniqueScreenName(base){const names=new Set([...p.screens,...(p.baseScreen?[p.baseScreen]:[])].map(s=>s.name));if(!names.has(base))return base;for(let i=2;;i++){const name=base+' '+i;if(!names.has(name))return name;}}
 function canAddScreen(){if(p.screens.length<20)return true;toast('Máximo 20 pantallas por proyecto');return false;}
