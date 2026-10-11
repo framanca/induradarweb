@@ -529,6 +529,61 @@ with sync_playwright() as pw:
     page.locator("#closePreview").click()
     checks.append("unused_selector_hidden_and_dropdown_still_changes_internal_variable")
 
+
+    # Names in Properties must NOT appear as automatic visual headers in the runtime.
+    # Standalone Text, command-button captions and the counter's target are still useful.
+    page.locator("#newBtn").click()
+    select_sidebar("variables")
+    page.locator("#addInternalVar").click()  # Internal_1 BOOL
+    page.locator("#addInternalVar").click()  # Internal_2 BOOL -> INT
+    page.locator('#internalVarList [data-iv="1"][data-key="type"]').select_option("INT")
+    page.locator('#internalVarList [data-iv="1"][data-key="value"]').fill("1")
+    page.locator('#internalVarList [data-iv="1"][data-key="value"]').press("Tab")
+    select_sidebar("elements")
+    without_header = [
+        ("status", "Internal_1", "Estado"),
+        ("tank", "Internal_2", "Depósito"),
+        ("value", "Internal_2", "Producción"),
+        ("input", "Internal_2", "Entrada"),
+        ("slider", "Internal_2", "Ajuste"),
+        ("switch", "Internal_1", "Interruptor"),
+        ("multistate", "Internal_2", "Estado de modo"),
+        ("gauge", "Internal_2", "Indicador"),
+        ("stepper", "Internal_2", "Ajuste +/-"),
+        ("counter", "Internal_2", "Contador"),
+        ("dropdown", "Internal_2", "Opciones"),
+        ("bar", "Internal_2", "Barra"),
+        ("text", None, "Texto visible"),
+        ("button", "Internal_1", "Accionar"),
+    ]
+    for kind, binding, label in without_header:
+        page.locator(f'.tool-grid [data-kind="{kind}"]').click()
+        if binding:
+            page.locator("#properties [data-p='binding']").select_option(binding)
+        field = page.locator("#properties [data-p='text']")
+        field.fill(label)
+        field.press("Tab")
+        assert page.locator("#properties [data-p='text']").input_value() == label
+    assert page.locator("#diagnostics .diagnostic.error").count() == 0
+    page.locator("#previewBtn").click()
+    stage = page.frame_locator("#previewFrame").locator("#stage")
+    assert stage.locator(".o").count() == len(without_header)
+    assert stage.locator(".o > .label").count() == 0
+    assert stage.locator(".o.status .caption").count() == 0
+    assert stage.locator(".o.tank .caption").count() == 0
+    assert stage.locator(".o:not(.counter) .control-panel > .caption").count() == 0
+    assert stage.locator(".o.status .status-visual svg").count() == 1
+    assert stage.locator(".o.tank .symbol .level").count() == 1
+    assert stage.locator(".o.value .in").inner_text() == "1"
+    assert stage.locator(".o.input input").count() == 1
+    assert stage.locator(".o.stepper .controls button").count() == 2
+    assert "Objetivo: 100" in stage.locator(".o.counter .caption").inner_text()
+    assert stage.locator(".o.text .in").inner_text() == "Texto visible"
+    assert stage.locator(".o.button .in").inner_text() == "Accionar"
+    assert stage.locator(".o.multistate .reading").inner_text() == "Manual"
+    page.locator("#closePreview").click()
+    checks.append("runtime_widget_headings_removed_but_data_and_command_text_preserved")
+
     assert not errors, "Browser JavaScript errors: " + repr(errors)
     report = {
         "status": "PASS",
