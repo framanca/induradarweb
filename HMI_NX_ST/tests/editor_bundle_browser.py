@@ -833,7 +833,7 @@ with sync_playwright() as pw:
     page.locator("#previewBtn").click()
     shared_frame = page.frame_locator("#previewFrame")
     shared_frame.locator("#recipeOpen").click()
-    shared_frame.locator("#recipeSelect option").first.wait_for()
+    shared_frame.locator("#recipeSelect option").first.wait_for(state="attached")
     page.wait_for_function("""() => {
       const d = document.getElementById('previewFrame').contentDocument;
       return d?.getElementById('recipeMessage')?.textContent.includes('actualizadas desde NX');
