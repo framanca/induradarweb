@@ -499,10 +499,25 @@ function checkRecipeApplyJob(){
   recipeAlert(ok?"Receta aplicada: valores PLC verificados y variables HMI actualizadas":"Consignas PLC verificadas, pero fall\u00f3 un valor local",!ok);
  }
 }
-function recipeApplySelected(){
+async function recipeApplySelected(){
+ if(recipeBusy)return;
  if(!recipeDraft||recipeSelected.startsWith("N:")||recipeDirty){recipeAlert("Guarda antes de aplicar la receta",true);return}
  let record;
  try{record=recipeReadForm()}catch(e){recipeAlert(e.message,true);return}
+ if(recipeSelected.startsWith("S:")){
+  if(!recipeRemoteReady){recipeAlert("No se puede aplicar una receta NX sin leer primero el banco de recetas",true);return}
+  recipeBusy=true;renderRecipeManager();
+  try{
+   const slot=Number(recipeSelected.slice(2)),res=await fetchTimed("/api/recipes",{},READ_TIMEOUT);
+   if(!res.ok)throw Error("HTTP "+res.status);
+   const txt=await res.text();
+   if(!txt.startsWith("RCPV=1"))throw Error("respuesta de banco incompatible");
+   const line=txt.split(/\\r?\\n/).find(x=>x.startsWith(slot+"="));
+   if(!line||Number(line.split("=")[1])!==recipeSlots.get(slot)?.rev)
+    throw Error("La receta ha cambiado en otro navegador. Actualiza NX antes de aplicarla");
+  }catch(e){recipeBusy=false;renderRecipeManager();recipeAlert("Aplicaci\\u00f3n bloqueada: "+e.message,true);return}
+  recipeBusy=false;renderRecipeManager();
+ }
  const plc=[],local=[];
  for(const [name,value] of Object.entries(record.values)){
   const field=recipeFieldsByName[name];
