@@ -642,6 +642,82 @@ with sync_playwright() as pw:
     page.locator("#closePreview").click()
     checks.append("lamp_custom_on_color_no_rays_and_layer_order_undo_redo_preview")
 
+
+    # A local BOOL and INT alarm can trigger and be acknowledged with no PLC snapshot.
+    # Acknowledge must reset after the condition clears and reappears.
+    page.locator("#newBtn").click()
+    select_sidebar("variables")
+    page.locator("#addInternalVar").click()  # Internal_1 BOOL starts FALSE
+    page.locator("#addInternalVar").click()  # Internal_2 INT starts at 12
+    page.locator('#internalVarList [data-iv="1"][data-key="type"]').select_option("INT")
+    page.locator('#internalVarList [data-iv="1"][data-key="value"]').fill("12")
+    page.locator('#internalVarList [data-iv="1"][data-key="value"]').press("Tab")
+    select_sidebar("alarms")
+    page.locator("#addAlarm").click()
+    assert page.locator('#alarmEditor [data-alarm="0"][data-k="binding"]').input_value() == "Internal_1"
+    opts = page.locator('#alarmEditor [data-alarm="0"][data-k="binding"] option')
+    assert opts.filter(has_text="Internal_1").count() == 1
+    assert opts.filter(has_text="Internal_2").count() == 1
+    page.locator('#alarmEditor [data-alarm="0"][data-k="name"]').fill("Aviso operador")
+    page.locator('#alarmEditor [data-alarm="0"][data-k="name"]').press("Tab")
+    page.locator("#addAlarm").click()
+    page.locator('#alarmEditor [data-alarm="1"][data-k="binding"]').select_option("Internal_2")
+    page.locator('#alarmEditor [data-alarm="1"][data-k="operator"]').select_option("ge")
+    page.locator('#alarmEditor [data-alarm="1"][data-k="value"]').fill("10")
+    page.locator('#alarmEditor [data-alarm="1"][data-k="value"]').press("Tab")
+    page.locator('#alarmEditor [data-alarm="1"][data-k="name"]').fill("Producción elevada")
+    page.locator('#alarmEditor [data-alarm="1"][data-k="name"]').press("Tab")
+    select_sidebar("elements")
+    page.locator('.tool-grid [data-kind="button"]').click()
+    page.locator("#properties [data-p='binding']").select_option("Internal_1")
+    page.locator("#properties [data-p='actionMode']").select_option("toggle")
+    page.locator("#properties [data-p='text']").fill("Conmutar aviso")
+    page.locator("#properties [data-p='text']").press("Tab")
+    page.locator('.tool-grid [data-kind="input"]').click()
+    page.locator("#properties [data-p='binding']").select_option("Internal_2")
+    page.locator("#properties [data-p='x']").fill("320")
+    page.locator("#properties [data-p='x']").press("Tab")
+    assert page.locator("#diagnostics .diagnostic.error").count() == 0
+    page.locator("#previewBtn").click()
+    alarm_button = page.frame_locator("#previewFrame").locator("#alarmOpen")
+    alarm_button.wait_for()
+    assert page.frame_locator("#previewFrame").locator("#alarmCount").inner_text() == "1"
+    alarm_button.click()
+    entries = page.frame_locator("#previewFrame").locator("#alarmList .alarm-row")
+    assert entries.count() == 2
+    assert all("[HMI local]" in row for row in entries.locator("strong").all_inner_texts())
+    ack_all = page.frame_locator("#previewFrame").locator("#ackAll")
+    assert ack_all.is_enabled()  # local alarm works even when PLC is offline
+    ack_all.click()
+    assert page.frame_locator("#previewFrame").locator("#alarmCount").inner_text() == "0"
+    page.frame_locator("#previewFrame").locator("#alarmClose").click()
+    local_button = page.frame_locator("#previewFrame").locator("#stage .o.button .in")
+    local_button.click()
+    assert page.frame_locator("#previewFrame").locator("#alarmCount").inner_text() == "1"
+    alarm_button.click()
+    entry = entries.filter(has_text="Aviso operador")
+    assert "ACTIVA PENDIENTE" in entry.inner_text()
+    entry.locator(".ack-one").click()
+    assert page.frame_locator("#previewFrame").locator("#alarmCount").inner_text() == "0"
+    page.frame_locator("#previewFrame").locator("#alarmClose").click()
+    local_button.click()  # clear condition: recognition resets
+    alarm_button.click()
+    assert "Normal" in entry.inner_text()
+    page.frame_locator("#previewFrame").locator("#alarmClose").click()
+    local_button.click()  # new occurrence: unacknowledged again
+    assert page.frame_locator("#previewFrame").locator("#alarmCount").inner_text() == "1"
+    value_input = page.frame_locator("#previewFrame").locator("#stage .o.input input")
+    value_input.fill("4")
+    page.frame_locator("#previewFrame").locator("#stage .o.input button").click()
+    alarm_button.click()
+    assert "Normal" in entries.filter(has_text="Producción elevada").inner_text()
+    page.frame_locator("#previewFrame").locator("#alarmClose").click()
+    value_input.fill("14")
+    page.frame_locator("#previewFrame").locator("#stage .o.input button").click()
+    assert page.frame_locator("#previewFrame").locator("#alarmCount").inner_text() == "2"
+    page.locator("#closePreview").click()
+    checks.append("hmi_internal_alarms_bool_int_offline_ack_all_reset_and_retrigger")
+
     assert not errors, "Browser JavaScript errors: " + repr(errors)
     report = {
         "status": "PASS",
