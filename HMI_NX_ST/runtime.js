@@ -356,7 +356,200 @@ function recipeReadForm(){
  return o
 }
 recipeLoadBrowser();recipeSeedShared();
-/*RECIPE_RUNTIME_HANDLERS*/
+
+async function recipeRefreshShared(silent){
+ if(recipeDirty&&!silent&&!confirm("Hay cambios sin guardar. ¿Descartarlos y actualizar las recetas NX?"))return;
+ if(recipeBusy)return;
+ recipeBusy=true;renderRecipeManager();
+ try{
+  const res=await fetchTimed("/api/recipes",{},READ_TIMEOUT);
+  if(!res.ok)throw Error("HTTP "+res.status);
+  const lines=(await res.text()).split(/\r?\n/);if(lines[0]!=="RCPV=1")throw Error("El NX no expone la versión de banco de recetas");
+  const versions=new Map();
+  for(const line of lines.slice(1)){const m=line.match(/^(\d{1,2})=(\d+)$/);if(m)versions.set(Number(m[1]),Number(m[2]))}
+  if(versions.size!==12)throw Error("Resumen NX incompleto");
+  const next=new Map();
+  for(let slot=1;slot<=12;slot++){
+   const rev=versions.get(slot),old=recipeSlots.get(slot);
+   if(rev===0){next.set(slot,{rev:0,data:null});continue}
+   if(old&&old.rev===rev&&!old.fallback){next.set(slot,old);continue}
+   const r=await fetchTimed("/api/recipe?slot="+slot,{},READ_TIMEOUT);
+   if(!r.ok)throw Error("Error leyendo receta NX "+slot+": HTTP "+r.status);
+   const body=await r.text();let data=null;
+   if(body.trim()){try{data=recipeSanitize(JSON.parse(body),"shared")}catch(e){throw Error("Ranura NX "+slot+" no compatible: "+e.message)}}
+   next.set(slot,{rev,data});
+  }
+  recipeSlots.clear();for(const [slot,item] of next)recipeSlots.set(slot,item);
+  recipeRemoteReady=true;
+  if(!recipeDirty||!recipeDraft){const current=recipeListItems().find(x=>x.key===recipeSelected);recipeDraft=current?recipeClone(current.data):null;recipeDirty=false}
+  recipeAlert("Recetas compartidas actualizadas desde NX");
+ }catch(e){recipeRemoteReady=false;recipeAlert("No se han podido consultar las recetas compartidas: "+e.message+". Los datos precargados son solo lectura.",true)}
+ finally{recipeBusy=false;renderRecipeManager()}
+}
+async function recipeStoreShared(rec,slot,expected){
+ if(!recipeRemoteReady)throw Error("Sin banco NX accesible; no se puede guardar");
+ const body=rec?recipeASCII(rec):"";
+ if(new TextEncoder().encode(body).length>500)throw Error("Supera el límite de 500 bytes por receta NX");
+ const res=await fetchTimed("/api/recipe?slot="+slot+"&rev="+expected,{
+  method:"POST",headers:{"Content-Type":"text/plain;charset=UTF-8"},body
+ },READ_TIMEOUT);
+ if(res.status===409)throw Error("Conflicto: otro navegador modificó esta receta. Exporta tu copia y pulsa Actualizar NX");
+ if(!res.ok)throw Error("El NX rechazó la escritura de la receta (HTTP "+res.status+")");
+ const txt=await res.text(),m=txt.match(/^REV=(\d+)/);
+ if(!m)throw Error("El NX no confirmó la nueva versión de la receta");
+ const rev=Number(m[1]);recipeSlots.set(slot,{rev,data:rec?recipeClone(rec):null});
+ return rev
+}
+function recipeFirstSlot(){
+ for(let slot=1;slot<=12;slot++){const item=recipeSlots.get(slot);if(!item||!item.data)return{slot,rev:item?.rev||0}}
+ return null
+}
+function recipeNewDraft(copy){
+ const o=copy?recipeClone(copy):{id:recipeUid(),name:"Nueva receta",scope:"local",values:{}};
+ o.id=recipeUid();o.name=copy?(copy.name.slice(0,39)+" (copia)"):"Nueva receta";recipeSelected="N:"+o.id;recipeDraft=o;recipeDirty=true;renderRecipeManager();recipeAlert("Receta sin guardar: modifica nombre, valores y destino, después pulsa Guardar")
+}
+async function recipeSaveDraft(){
+ if(recipeBusy)return;
+ let record;try{record=recipeReadForm()}catch(e){recipeAlert(e.message,true);return}
+ const originalKey=recipeSelected;
+ if(record.scope==="shared"&&!recipeRemoteReady){recipeAlert("Conecta con el NX antes de guardar una receta compartida",true);return}
+ recipeBusy=true;renderRecipeManager();
+ try{
+  if(record.scope==="local"){
+   const i=recipeBrowser.findIndex(x=>x.id===record.id);
+   if(i<0&&recipeBrowser.length>=24)throw Error("Límite de 24 recetas locales");
+   const previous=recipeBrowser.slice();if(i>=0)recipeBrowser[i]=record;else recipeBrowser.push(record);
+   if(!recipeStorageSave()){recipeBrowser.splice(0,recipeBrowser.length,...previous);throw Error("La receta no ha quedado guardada en el navegador")}
+   recipeSelected="L:"+record.id
+  }else{
+   const existing=originalKey.startsWith("S:")?Number(originalKey.slice(2)):0,free=existing?null:recipeFirstSlot();
+   if(!existing&&!free)throw Error("El banco NX está lleno (12 recetas). Elimina una o exporta y depura el banco");
+   const slot=existing||free.slot,rev=existing?recipeSlots.get(slot).rev:free.rev;
+   await recipeStoreShared(record,slot,rev);recipeSelected="S:"+slot;
+  }
+  recipeDraft=recipeClone(record);recipeDirty=false;recipeAlert("Receta guardada: "+record.name);
+ }catch(e){recipeAlert("No guardada: "+e.message,true)}
+ finally{recipeBusy=false;renderRecipeManager()}
+}
+async function recipeDeleteSelected(){
+ if(recipeBusy||!recipeDraft)return;
+ if(recipeSelected.startsWith("N:")){recipeSelected="";recipeDraft=null;recipeDirty=false;renderRecipeManager();return}
+ if(!confirm("¿Eliminar definitivamente la receta '"+recipeDraft.name+"' de "+(recipeSelected.startsWith("S:")?"la memoria del NX":"este navegador")+"?"))return;
+ recipeBusy=true;renderRecipeManager();
+ try{
+  if(recipeSelected.startsWith("S:")){const slot=Number(recipeSelected.slice(2)),item=recipeSlots.get(slot);await recipeStoreShared(null,slot,item.rev)}
+  else{
+   const i=recipeBrowser.findIndex(x=>x.id===recipeDraft.id),prev=recipeBrowser.slice();if(i>=0)recipeBrowser.splice(i,1);
+   if(!recipeStorageSave()){recipeBrowser.splice(0,recipeBrowser.length,...prev);throw Error("Fallo al eliminar en almacenamiento local")}
+  }
+  recipeDraft=null;recipeSelected="";recipeDirty=false;recipeAlert("Receta eliminada");
+ }catch(e){recipeAlert("No eliminada: "+e.message,true)}
+ finally{recipeBusy=false;renderRecipeManager()}
+}
+function recipeCaptureCurrent(){
+ if(!recipeDraft)return;let captured=0,skipped=0;
+ for(const field of recipeFields){
+  const v=currentValue(field.name);
+  if(v===undefined||field.source==="PLC"&&comm.state!=="ONLINE"){skipped++;continue}
+  const included=Array.from(recipeFieldList.querySelectorAll("[data-recipe-included]")).find(x=>x.getAttribute("data-recipe-included")===field.name);
+  const input=Array.from(recipeFieldList.querySelectorAll("[data-recipe-value]")).find(x=>x.getAttribute("data-recipe-value")===field.name);
+  included.checked=true;input.disabled=false;input.value=String(v);captured++;
+ }
+ recipeDirty=true;document.getElementById("recipeApply").disabled=true;
+ recipeAlert("Valores actuales capturados: "+captured+(skipped?"; omitidos sin lectura: "+skipped:"")+". Pulsa Guardar para conservarlos");
+}
+function recipeExportJSON(){
+ const all=recipeListItems().map(x=>recipeClone(x.data));
+ const data=JSON.stringify({format:"webhmi-recipes-v1",projectKey:P.recipeKey,exportedAt:new Date().toISOString(),recipes:all},null,2);
+ const blob=new Blob([data],{type:"application/json"}),url=URL.createObjectURL(blob),a=E("a");
+ a.href=url;a.download=(String(P.name||"WebHMI").replace(/[^a-z0-9_-]+/gi,"_"))+"_recetas.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ recipeAlert("Copia de "+all.length+" recetas exportada a JSON")
+}
+async function recipeImportFile(file){
+ if(!file||file.size>512000){recipeAlert("JSON de recetas demasiado grande",true);return}
+ let input;try{input=JSON.parse(await file.text())}catch{recipeAlert("Archivo JSON no válido",true);return}
+ if(input?.format!=="webhmi-recipes-v1"||!Array.isArray(input.recipes)){recipeAlert("Formato de archivo de recetas no reconocido",true);return}
+ if(input.projectKey!==P.recipeKey&&!confirm("Las recetas proceden de otro proyecto. ¿Importar únicamente los parámetros compatibles?"))return;
+ if(!confirm("¿Importar "+input.recipes.length+" recetas como NUEVAS, sin sobrescribir las actuales? Se grabarán las compartidas en el NX."))return;
+ recipeBusy=true;renderRecipeManager();let created=0,error="";
+ try{
+  for(const raw of input.recipes){
+   const scope=raw.scope==="shared"?"shared":"local";
+   const record=recipeSanitize(raw,scope);record.id=recipeUid();
+   if(recipeListItems().some(x=>x.data.scope===scope&&x.data.name.toLowerCase()===record.name.toLowerCase())){error="La receta "+record.name+" ya existe";break}
+   if(scope==="shared"){
+    if(!recipeRemoteReady){error="NX sin conexión";break}
+    const free=recipeFirstSlot();if(!free){error="Banco NX lleno";break}
+    await recipeStoreShared(record,free.slot,free.rev)
+   }else{
+    if(recipeBrowser.length>=24){error="Máximo de recetas locales";break}
+    recipeBrowser.push(record);
+    if(!recipeStorageSave()){recipeBrowser.pop();error="No se pudo persistir la receta local";break}
+   }
+   created++;
+  }
+ }catch(e){error=e.message}
+ finally{recipeBusy=false;recipeDirty=false;recipeDraft=null;recipeSelected="";renderRecipeManager();
+  recipeAlert("Importadas "+created+" recetas."+(error?" Interrumpida: "+error+". Las anteriores siguen guardadas.":""),Boolean(error))
+ }
+}
+function checkRecipeApplyJob(){
+ const job=recipeApplyJob;if(!job)return;
+ const failed=job.plc.find(x=>pendingWrites.get(x.name)?.state==="error");
+ if(failed||Date.now()-job.started>18000){
+  recipeApplyJob=null;recipeBusy=false;renderRecipeManager();
+  recipeAlert("Aplicación PARCIAL o sin confirmar"+(failed?" ("+failed.name+")":" (plazo agotado)")+". Revisa las consignas del PLC antes de reintentar.",true);return
+ }
+ if(job.plc.every(x=>!pendingWrites.has(x.name)&&sameValue(byName[x.name],vals[x.name],String(x.value)))){
+  recipeApplyJob=null;
+  let ok=true;for(const x of job.local)if(!write(x.name,x.value))ok=false;
+  recipeBusy=false;renderRecipeManager();
+  recipeAlert(ok?"Receta aplicada: valores PLC verificados y variables HMI actualizadas":"Consignas PLC verificadas, pero falló un valor local",!ok);
+ }
+}
+function recipeApplySelected(){
+ if(!recipeDraft||recipeSelected.startsWith("N:")||recipeDirty){recipeAlert("Guarda antes de aplicar la receta",true);return}
+ let record;
+ try{record=recipeReadForm()}catch(e){recipeAlert(e.message,true);return}
+ const plc=[],local=[];
+ for(const [name,value] of Object.entries(record.values)){
+  const field=recipeFieldsByName[name];
+  (field.source==="PLC"?plc:local).push({name,value})
+ }
+ if(!plc.length&&!local.length){recipeAlert("La receta no contiene valores",true);return}
+ if(plc.length&&comm.state!=="ONLINE"){recipeAlert("PLC sin comunicación: no se aplicarán consignas PLC",true);return}
+ if(plc.length&&pendingWrites.size){recipeAlert("Hay escrituras PLC pendientes. Resuélvelas antes de aplicar otra receta",true);return}
+ if(!confirm("¿Aplicar "+record.name+"? Se escribirán "+plc.length+" consignas PLC y "+local.length+" variables internas. Las consignas PLC se escriben secuencialmente (NO de forma atómica)."))return;
+ if(!plc.length){let ok=true;for(const x of local)if(!write(x.name,x.value))ok=false;
+  recipeAlert(ok?"Receta HMI local aplicada correctamente":"No se pudieron aplicar todos los valores locales",!ok);renderRecipeManager();return
+ }
+ recipeApplyJob={plc,local,started:Date.now()};recipeBusy=true;renderRecipeManager();recipeAlert("Aplicando al PLC y comprobando valores recibidos...");
+ for(const x of plc)if(!write(x.name,x.value)){
+  recipeApplyJob=null;recipeBusy=false;renderRecipeManager();recipeAlert("Escritura rechazada para "+x.name+"; puede haber otras escrituras pendientes",true);return
+ }
+ schedule(0)
+}
+recipeOpen.onclick=()=>{
+ recipeWindow.hidden=false;renderRecipeManager();
+ if(!recipeRemoteReady)recipeRefreshShared(true);
+};
+recipeClose.onclick=()=>{if(recipeDirty&&!confirm("Cambios sin guardar. ¿Cerrar el gestor?"))return;recipeWindow.hidden=true;recipeDirty=false};
+recipeWindow.onclick=e=>{if(e.target===recipeWindow)recipeClose.click()};
+recipeSelect.onchange=()=>{
+ if(recipeDirty&&!confirm("La receta actual tiene cambios sin guardar. ¿Descartarlos?")){recipeSelect.value=recipeSelected;return}
+ recipeSelectItem(recipeSelect.value)
+};
+document.getElementById("recipeRefresh").onclick=()=>recipeRefreshShared(false);
+document.getElementById("recipeNew").onclick=()=>{if(recipeDirty&&!confirm("Descartar los cambios sin guardar y crear otra receta?"))return;recipeNewDraft(null)};
+document.getElementById("recipeDuplicate").onclick=()=>{if(recipeDirty&&!confirm("Se duplicará la última versión guardada. ¿Continuar?"))return;recipeNewDraft(recipeDraft)};
+document.getElementById("recipeSave").onclick=()=>recipeSaveDraft();
+document.getElementById("recipeDelete").onclick=()=>recipeDeleteSelected();
+document.getElementById("recipeCapture").onclick=()=>recipeCaptureCurrent();
+document.getElementById("recipeApply").onclick=()=>recipeApplySelected();
+document.getElementById("recipeExport").onclick=()=>recipeExportJSON();
+document.getElementById("recipeImport").onclick=()=>document.getElementById("recipeImportFile").click();
+document.getElementById("recipeImportFile").onchange=async e=>{try{await recipeImportFile(e.target.files[0])}finally{e.target.value=""}};
+
 `;}
 C.buildRuntimeHTML=buildRuntimeHTML;
 })(globalThis);
