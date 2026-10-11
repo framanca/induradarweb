@@ -146,7 +146,8 @@ with sync_playwright() as pw:
     status = page.frame_locator("#previewFrame").locator("#stage .o.status .status-visual")
     status.wait_for()
     page.frame_locator("#previewFrame").locator("#stage .o.button .in").click()
-    assert "#15803d" in status.locator("svg").evaluate("(el) => el.innerHTML")
+    assert status.locator("circle").get_attribute("fill") == "#86efac"
+    assert status.locator("path").count() == 0
     # The preview must use only the area BELOW its HMI title, status, nav and recipes.
     # Resize the dialog in both directions, then via accessible keyboard controls.
     def assert_preview_fits():
