@@ -690,21 +690,28 @@ with sync_playwright() as pw:
     assert ack_all.is_enabled()  # local alarm works even when PLC is offline
     ack_all.click()
     assert page.frame_locator("#previewFrame").locator("#alarmCount").inner_text() == "0"
+    page.frame_locator("#previewFrame").locator("#alarmClose").click()
     local_button = page.frame_locator("#previewFrame").locator("#stage .o.button .in")
     local_button.click()
     assert page.frame_locator("#previewFrame").locator("#alarmCount").inner_text() == "1"
+    alarm_button.click()
     entry = entries.filter(has_text="Aviso operador")
     assert "ACTIVA PENDIENTE" in entry.inner_text()
     entry.locator(".ack-one").click()
     assert page.frame_locator("#previewFrame").locator("#alarmCount").inner_text() == "0"
+    page.frame_locator("#previewFrame").locator("#alarmClose").click()
     local_button.click()  # clear condition: recognition resets
+    alarm_button.click()
     assert "Normal" in entry.inner_text()
+    page.frame_locator("#previewFrame").locator("#alarmClose").click()
     local_button.click()  # new occurrence: unacknowledged again
     assert page.frame_locator("#previewFrame").locator("#alarmCount").inner_text() == "1"
     value_input = page.frame_locator("#previewFrame").locator("#stage .o.input input")
     value_input.fill("4")
     page.frame_locator("#previewFrame").locator("#stage .o.input button").click()
+    alarm_button.click()
     assert "Normal" in entries.filter(has_text="Producción elevada").inner_text()
+    page.frame_locator("#previewFrame").locator("#alarmClose").click()
     value_input.fill("14")
     page.frame_locator("#previewFrame").locator("#stage .o.input button").click()
     assert page.frame_locator("#previewFrame").locator("#alarmCount").inner_text() == "2"
