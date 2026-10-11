@@ -515,7 +515,7 @@ with sync_playwright() as pw:
     page.locator(".tool-grid [data-kind='dropdown']").click()
     page.locator("#properties [data-p='binding']").select_option("Internal_1")
     opts = page.locator("#properties [data-p='optionsText']")
-    opts.fill("0=Parado\\n1=Manual\\n2=Automático")
+    opts.fill("0=Parado\n1=Manual\n2=Automático")
     opts.press("Tab")
     assert page.locator("#diagnostics .diagnostic.error").count() == 0
     page.locator("#previewBtn").click()
