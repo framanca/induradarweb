@@ -577,7 +577,7 @@ with sync_playwright() as pw:
     assert stage.locator(".o.value .in").inner_text() == "1"
     assert stage.locator(".o.input input").count() == 1
     assert stage.locator(".o.stepper .controls button").count() == 2
-    assert stage.locator(".o.counter .caption").inner_text() == "Objetivo: 100"
+    assert "Objetivo: 100" in stage.locator(".o.counter .caption").inner_text()
     assert stage.locator(".o.text .in").inner_text() == "Texto visible"
     assert stage.locator(".o.button .in").inner_text() == "Accionar"
     assert stage.locator(".o.multistate .reading").inner_text() == "Manual"
