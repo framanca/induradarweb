@@ -64,7 +64,11 @@ test('editor lists shape tools and properties and pointer vertex handling',()=>{
  const index=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
  const app=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8');
  const css=fs.readFileSync(path.join(__dirname,'..','style.css'),'utf8');
- for(const kind of ['rect','ellipse','line','arrow','triangle'])assert.match(index,new RegExp('data-kind="shape" data-shape="'+kind+'"'));
+ assert.match(index,/<button data-kind="shape"[^>]*>Figuras<\/button>/);
+ assert.equal((index.match(/data-kind="shape"/g)||[]).length,1,'Un único botón Figuras en el editor');
+ assert.doesNotMatch(index,/data-shape="/);
+ assert.match(app,/if\(b\.dataset\.kind==='shape'\)\{o\.text='Figura';\}/);
+ for(const kind of ['rect','ellipse','line','arrow','triangle'])assert.ok(Object.hasOwn(C.SHAPE_LABELS,kind));
  for(const prop of ['shapeType','shapeFill','shapeStroke','shapeStrokeWidth','shapePoints','feedbackTextOff','feedbackTextOn'])assert.match(app,new RegExp('data-p="'+prop+'"'));
  assert.match(app,/pointIndex:point\?Number\(point\.dataset\.point\):-1/);
  assert.match(css,/#canvas \.widget\.shape \.shape-point/);
