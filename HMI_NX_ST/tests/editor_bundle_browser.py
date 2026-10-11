@@ -461,9 +461,16 @@ with sync_playwright() as pw:
     page.locator("#closePreview").click()
     checks.append("button_feedback_off_on_texts_update_from_internal_bool")
 
-    # All vector shapes are native SVG, with free deformation and no image assets.
+    # One "Figuras" tool; choose all five vector geometries in its properties.
+    assert page.locator('.tool-grid [data-kind="shape"]').count() == 1
+    assert page.locator('.tool-grid [data-kind="shape"]').inner_text() == "Figuras"
     for shape in ["rect", "ellipse", "line", "arrow", "triangle"]:
-        page.locator(f'.tool-grid [data-kind="shape"][data-shape="{shape}"]').click()
+        page.locator('.tool-grid [data-kind="shape"]').click()
+        widget = page.locator("#canvas .widget.shape").last
+        assert page.locator("#properties [data-p='shapeType']").input_value() == "rect"
+        options = page.locator("#properties [data-p='shapeType'] option")
+        assert options.count() == 5
+        page.locator("#properties [data-p='shapeType']").select_option(shape)
         widget = page.locator("#canvas .widget.shape").last
         assert widget.locator(".shape-visual svg").count() == 1
         assert widget.locator("img").count() == 0
@@ -492,7 +499,7 @@ with sync_playwright() as pw:
     assert page.frame_locator("#previewFrame").locator("#stage .o.shape polygon").count() >= 2
     page.locator("#closePreview").click()
     assert page.locator("#diagnostics .diagnostic.error").count() == 0
-    checks.append("native_svg_shapes_and_editable_triangle_vertices_in_editor_and_runtime")
+    checks.append("single_figuras_widget_selects_all_svg_shapes_and_edits_triangle_vertices")
 
     assert not errors, "Browser JavaScript errors: " + repr(errors)
     report = {
