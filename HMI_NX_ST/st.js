@@ -422,7 +422,9 @@ LÍMITES ACTUALES
 - Petición <=1900 bytes en una recepción.
 - Web_WatchdogLimit es un límite en ciclos de tarea (5000 por defecto), no tiempo absoluto.
 - Alarmas: ACK en memoria PLC mientras sigan activas; no retentivas tras reinicio ni historial.
-- Recetas: valores compilados con la exportación; editar una receta exige regenerar/transferir ST.
+- Recetas: edición CRUD desde runtime; 12 ranuras compartidas Retain con revisión CAS y 24 locales por navegador. Las plantillas iniciales se cargan una vez al arrancar con Web_RecipeInit=FALSE.
+- El botón Aplicar envía escrituras PLC secuenciales; NO es una operación atómica ni sustituye enclavamientos de máquina. Comprobar lectura posterior.
+- El endpoint legado POST /api/recipe?id mantiene las antiguas recetas fijas únicamente para compatibilidad; la ventana nueva usa el banco Retain y /api/write.
 - Sin HTTPS ni gestión de usuarios todavía.
 - No usar la HMI para funciones de seguridad.
 `;}
