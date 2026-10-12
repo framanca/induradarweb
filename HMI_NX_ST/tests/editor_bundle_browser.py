@@ -684,7 +684,11 @@ with sync_playwright() as pw:
     page.locator("#properties [data-p='x']").press("Tab")
     assert page.locator("#diagnostics .diagnostic.error").count() == 0
     page.locator("#previewBtn").click()
-    alarm_button = page.frame_locator("#previewFrame").locator("#alarmOpen")
+    preview_frame = page.frame_locator("#previewFrame")
+    assert preview_frame.locator("#nav").evaluate("""(el) => [
+        ...el.querySelectorAll('#recipeOpen,#alarmOpen,#alarmbar')
+    ].map(e=>e.id)""") == ["recipeOpen", "alarmOpen", "alarmbar"]
+    alarm_button = preview_frame.locator("#alarmOpen")
     alarm_button.wait_for()
     assert page.frame_locator("#previewFrame").locator("#alarmCount").inner_text() == "1"
     alarm_button.click()
@@ -712,13 +716,14 @@ with sync_playwright() as pw:
     local_button.click()  # new occurrence: unacknowledged again
     assert page.frame_locator("#previewFrame").locator("#alarmCount").inner_text() == "1"
     value_input = page.frame_locator("#previewFrame").locator("#stage .o.input input")
+    assert page.frame_locator("#previewFrame").locator("#stage .o.input button").count() == 0
     value_input.fill("4")
-    page.frame_locator("#previewFrame").locator("#stage .o.input button").click()
+    value_input.press("Enter")
     alarm_button.click()
     assert "Normal" in entries.filter(has_text="Producción elevada").inner_text()
     page.frame_locator("#previewFrame").locator("#alarmClose").click()
     value_input.fill("14")
-    page.frame_locator("#previewFrame").locator("#stage .o.input button").click()
+    value_input.press("Enter")
     assert page.frame_locator("#previewFrame").locator("#alarmCount").inner_text() == "2"
     page.locator("#closePreview").click()
     checks.append("hmi_internal_alarms_bool_int_offline_ack_all_reset_and_retrigger")

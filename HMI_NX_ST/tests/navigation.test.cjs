@@ -74,12 +74,13 @@ function prepare(options={}) {
 
 test('selector único y botón Alarmas comparten la barra de navegación', () => {
   const {html, get, project} = prepare();
-  assert.match(html, /<nav id="nav"[^>]*><label for="screenSelect">Pantalla<\/label><select id="screenSelect"[^>]*><\/select><button[^>]*id="alarmOpen"/);
+  assert.match(html, /<nav id="nav"[^>]*><label for="screenSelect">Pantalla<\/label><select id="screenSelect"[^>]*><\/select><button[^>]*id="recipeOpen"[^>]*>Recetas<\/button><button[^>]*id="alarmOpen"/);
   assert.equal(get('screenSelect').children.length, project.screens.length);
   assert.deepEqual(Array.from(get('screenSelect').children, el => el.textContent), project.screens.map(s => s.name));
   assert.equal(get('screenSelect').value, '0');
   assert.ok(html.indexOf('id="screenSelect"') < html.indexOf('id="alarmOpen"'));
   const nav = html.match(/<nav id="nav"[\s\S]*?<\/nav>/)?.[0] || '';
+  assert.ok(nav.indexOf('id="recipeOpen"') < nav.indexOf('id="alarmOpen"'));
   assert.ok(nav.indexOf('id="alarmOpen"') < nav.indexOf('id="alarmbar"'));
   assert.match(nav, /id="alarmbar"/);
   assert.doesNotMatch(html, /<\/nav><div id="alarmbar"/);
