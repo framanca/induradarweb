@@ -319,7 +319,7 @@ function renderRecipeManager(){
   fieldInput.value=check.checked?String(recipeDraft.values[f.name]):"";
   fieldInput.disabled=!check.checked||recipeBusy;
   check.onchange=()=>{fieldInput.disabled=!check.checked||recipeBusy;if(check.checked&&!fieldInput.value)fieldInput.value=String(recipeCurrentString(f).startsWith("\u2014")?(f.type==="BOOL"?"false":f.type==="STRING"?"":"0"):currentValue(f.name));recipeDirty=true};
-  fieldInput.oninput=()=>{recipeDirty=true};if(P.keyboardMode==="webhmi"&&f.type!=="BOOL"){fieldInput.readOnly=true;fieldInput.inputMode="none";fieldInput.setAttribute("aria-haspopup","dialog");fieldInput.onclick=()=>{if(fieldInput.disabled)return;openVirtualKeyboard({title:f.name+" \\u00b7 "+f.type,type:f.type,value:fieldInput.value,maxLength:f.type==="STRING"?Math.min(512,Number(f.stringLength)||255):64,onAccept:raw=>{recipeTypedValue(f,raw);fieldInput.value=raw;fieldInput.dispatchEvent(new Event("input",{bubbles:true}));}})}}
+  fieldInput.oninput=()=>{recipeDirty=true};if(P.keyboardMode==="webhmi"&&f.type!=="BOOL"){fieldInput.readOnly=true;fieldInput.inputMode="none";fieldInput.setAttribute("aria-haspopup","dialog");fieldInput.onclick=()=>{if(fieldInput.disabled)return;openVirtualKeyboard({title:f.name+" \u00b7 "+f.type,type:f.type,value:fieldInput.value,maxLength:f.type==="STRING"?Math.min(512,Number(f.stringLength)||255):64,onAccept:raw=>{recipeTypedValue(f,raw);fieldInput.value=raw;fieldInput.dispatchEvent(new Event("input",{bubbles:true}));}})}}
   actual.setAttribute("data-recipe-current",f.name);actual.textContent=recipeCurrentString(f);
   row.append(label,fieldInput,actual);recipeFieldList.append(row);
  }
