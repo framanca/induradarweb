@@ -84,11 +84,20 @@
       <p class="hint">Estado actual evaluado en PLC. Histórico/ACK persistente vendrá después.</p>
     </section>
     <section id="sidebar-panel-recipes" role="tabpanel" aria-labelledby="sidebar-tab-recipes" data-sidebar-panel="recipes" tabindex="0" hidden>
-      <div class="section-title"><h2>Recetas</h2><button id="addRecipe">+ Receta</button></div>
-      <h3 class="sub-title">Recetas iniciales</h3>
-      <div id="recipeCapacitySummary" class="hint" role="status" aria-live="polite"></div>
-      <div id="recipeEditor"></div>
-      <p class="hint">Marca las variables de cada receta y define sus valores. En el runtime también podrán seleccionarse las variables PLC RW expuestas en Variables y las HMI internas. Límite actual: 12 recetas NX Retain (hasta 500 bytes JSON cada una), 24 locales iniciales y 20 valores por receta. El editor avisa y bloquea la exportación si se supera algún límite. Las recetas guardadas en ejecución no modifican este proyecto; exporta JSON para conservar una copia.</p>
+      <div class="section-title"><h2>Recetas</h2><button id="addRecipe" type="button">+ Receta NX</button></div>
+      <label class="recipe-enable-option"><input type="checkbox" id="recipeEnabled"> Habilitar recetas (Retain del PLC)</label>
+      <div id="recipeSettings" hidden>
+        <div class="grid2">
+          <label>Número máximo de recetas (1–32)<input id="recipeSlots" type="number" min="1" max="32" step="1" value="12"></label>
+          <label>Bytes JSON por receta (64–500)<input id="recipeBytes" type="number" min="64" max="500" step="1" value="500"></label>
+        </div>
+        <p class="hint">Reserva Retain según el número y tamaño elegidos. Cada receta usa una cadena STRING del tamaño configurado más 12 caracteres de margen, una revisión UDINT y un indicador global de inicialización. La capacidad se comprueba al exportar y al guardar desde el navegador.</p>
+        <p class="hint"><strong>Antes de modificar la capacidad en un PLC instalado:</strong> exporta las recetas a JSON desde la HMI. Cambiar dimensiones de variables Retain o transferir otro programa puede reinicializar el banco. Las antiguas recetas guardadas solo en el navegador no se migran automáticamente: expórtalas desde el runtime anterior e impórtalas en el nuevo.</p>
+        <h3 class="sub-title">Recetas iniciales</h3>
+        <div id="recipeCapacitySummary" class="hint" role="status" aria-live="polite"></div>
+        <div id="recipeEditor"></div>
+        <p class="hint">Todas las recetas se guardan en la memoria Retain del NX. El runtime permite crear, editar, aplicar y exportar copias JSON. Guardar una receta no cambia las consignas de máquina; para ello hay que pulsar Aplicar. Al deshabilitar las recetas, el generador no incluye su código ni sus variables.</p>
+      </div>
     </section>
     </div>
   </aside>

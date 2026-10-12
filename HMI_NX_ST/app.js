@@ -252,20 +252,19 @@ function recipeValueOptions(r,i){
  }).join('')+'</div>';
 }
 function updateRecipeCapacity(){
- const shared=p.recipes.filter(r=>r.scope==='shared').length;
- const local=p.recipes.filter(r=>r.scope==='local').length;
+ const shared=p.recipes.length;
  const summary=$('#recipeCapacitySummary');
  if(summary){
-  summary.textContent='Banco NX: '+shared+' / '+C.RECIPE_SHARED_MAX+' recetas compartidas · Navegador: '+local+' / '+C.RECIPE_LOCAL_MAX+' recetas locales iniciales.';
-  summary.classList.toggle('recipe-capacity-warning',shared>C.RECIPE_SHARED_MAX||local>C.RECIPE_LOCAL_MAX);
+  summary.textContent='Banco NX Retain: '+shared+' / '+p.recipeSlots+' recetas · '+p.recipeBytes+' bytes JSON por receta · reserva aprox. '+Math.ceil((p.recipeSlots*(p.recipeBytes+13+4)+1)/1024*100)/100+' KB Retain.';
+  summary.classList.toggle('recipe-capacity-warning',shared>p.recipeSlots);
  }
  for(const [i,r] of p.recipes.entries()){
   const node=document.querySelector('[data-recipe-capacity="'+i+'"]');
   if(!node)continue;
   const used=Object.keys(r.values||{}).length;
-  const bytes=r.scope==='shared'?new TextEncoder().encode(C.recipeWireJSON(r)).length:null;
-  const over=used>20||bytes!==null&&bytes>C.RECIPE_BYTES_MAX;
-  node.textContent=used+' / 20 variables'+(bytes!==null?' · '+bytes+' / '+C.RECIPE_BYTES_MAX+' bytes JSON Retain NX':' · Receta local');
+  const bytes=new TextEncoder().encode(C.recipeWireJSON(r)).length;
+  const over=used>20||bytes>p.recipeBytes;
+  node.textContent=used+' / 20 variables · '+bytes+' / '+p.recipeBytes+' bytes JSON Retain NX';
   node.classList.toggle('recipe-capacity-warning',over);
   if(over)node.textContent+=' · LÍMITE SUPERADO: exportación bloqueada';
  }
@@ -273,41 +272,34 @@ function updateRecipeCapacity(){
 function duplicateEditorRecipe(index){
  const source=p.recipes[index];
  if(!source)return;
- const max=source.scope==='shared'?C.RECIPE_SHARED_MAX:C.RECIPE_LOCAL_MAX;
- const count=p.recipes.filter(r=>r.scope===source.scope).length;
- if(count>=max){toast('No se puede duplicar: máximo '+max+' recetas '+(source.scope==='shared'?'compartidas NX':'locales'));return}
+ const max=p.recipeSlots;
+ const count=p.recipes.length;
+ if(count>=max){toast('No se puede duplicar: máximo '+max+' recetas NX Retain');return}
  let clone;
  try{clone=C.duplicateRecipe(source,p.recipes)}catch(e){toast(e.message);return}
- if(clone.scope==='shared'&&new TextEncoder().encode(C.recipeWireJSON(clone)).length>C.RECIPE_BYTES_MAX){
-  toast('La copia supera los '+C.RECIPE_BYTES_MAX+' bytes del banco NX: reduce los valores de la receta original');
+ if(new TextEncoder().encode(C.recipeWireJSON(clone)).length>p.recipeBytes){
+  toast('La copia supera los '+p.recipeBytes+' bytes del banco NX: reduce los valores de la receta original');
   return;
  }
  editAction(()=>{p.recipes.splice(index+1,0,clone);render()});
  toast('Receta duplicada: '+clone.name);
 }
 function renderRecipes(){
+ $('#recipeEnabled').checked=p.recipeEnabled;
+ $('#recipeSettings').hidden=!p.recipeEnabled;
+ $('#addRecipe').disabled=!p.recipeEnabled;
+ $('#recipeSlots').value=p.recipeSlots;
+ $('#recipeBytes').value=p.recipeBytes;
  const host=$('#recipeEditor');
  host.innerHTML=p.recipes.map((r,i)=>'<div class="editor-card">'+
   '<label>Nombre<input data-recipe-name="'+i+'" maxlength="48" value="'+C.esc(r.name)+'"></label>'+
-  '<label>Almacenamiento<select data-recipe-scope="'+i+'">'+
-  '<option value="shared" '+(r.scope==='shared'?'selected':'')+'>Compartida · Retain NX</option>'+
-  '<option value="local" '+(r.scope==='local'?'selected':'')+'>Local · navegador</option></select></label>'+
+  '<p class="recipe-storage">Almacenamiento: <strong>Memoria Retain NX</strong></p>'+
   '<p class="recipe-check-title">Variables y valores de esta receta</p>'+
   recipeValueOptions(r,i)+
   '<p class="recipe-capacity-info" data-recipe-capacity="'+i+'"></p>'+
   '<div class="recipe-card-actions"><button type="button" data-duplicate-recipe="'+i+'">Duplicar</button><button type="button" data-del-recipe="'+i+'">Eliminar</button></div></div>').join('')||'<p class="hint">Sin recetas. Pulsa «+ Receta» y marca las variables que quieras incluir.</p>';
  updateRecipeCapacity();
  host.querySelectorAll('[data-recipe-name]').forEach(x=>x.onchange=()=>editAction(()=>{p.recipes[+x.dataset.recipeName].name=x.value;updateRecipeCapacity();renderDiag();},x));
- host.querySelectorAll('[data-recipe-scope]').forEach(x=>x.onchange=()=>{
-  const i=Number(x.dataset.recipeScope),previous=p.recipes[i].scope,next=x.value;
-  if(next!==previous){
-   const max=next==='shared'?C.RECIPE_SHARED_MAX:C.RECIPE_LOCAL_MAX;
-   if(p.recipes.filter((r,j)=>j!==i&&r.scope===next).length>=max){
-    toast('Máximo '+max+' recetas '+(next==='shared'?'compartidas NX':'locales iniciales'));x.value=previous;return;
-   }
-  }
-  editAction(()=>{p.recipes[i].scope=next;updateRecipeCapacity();renderDiag();},x);
- });
  host.querySelectorAll('[data-recipe-toggle]').forEach(x=>x.onchange=()=>{
   const i=Number(x.dataset.recipeToggle),name=x.dataset.name,enabled=x.checked;
   const r=p.recipes[i],v=recipeAvailableVariables().find(v=>v.name===name);
@@ -330,7 +322,7 @@ function renderRecipes(){
    editAction(()=>{
     r.values[name]=value;
     updateRecipeCapacity();renderDiag();
-    if(r.scope==='shared'&&new TextEncoder().encode(C.recipeWireJSON(r)).length>C.RECIPE_BYTES_MAX)toast('Receta '+r.name+': supera '+C.RECIPE_BYTES_MAX+' bytes NX. Reduce el contenido.');
+    if(new TextEncoder().encode(C.recipeWireJSON(r)).length>p.recipeBytes)toast('Receta '+r.name+': supera '+p.recipeBytes+' bytes NX. Reduce el contenido.');
    },x);
   }catch(e){toast(e.message);x.value=String(r.values[name])}
  });
@@ -518,15 +510,15 @@ $('#screenBinding').onchange=e=>editAction(()=>{p.screenBinding=e.target.value;c
 $('#addScreen').onclick=()=>{if(!canAddScreen())return;editAction(()=>{const s=C.newScreen(uniqueScreenName('Pantalla '+(p.screens.length+1)),C.nextScreenNumber(p.screens));p.screens.push(s);screenId=s.id;selected=null;render();});};$('#copyScreen').onclick=()=>{if(isBaseScreen()||!canAddScreen())return;editAction(()=>{const original=activeScreen(),s=C.duplicateScreen(original,uniqueScreenName(original.name+' (copia)'),C.nextScreenNumber(p.screens));p.screens.push(s);screenId=s.id;selected=null;render();});toast('Pantalla copiada: puedes editarla sin modificar la original');};$('#deleteScreen').onclick=()=>{if(isBaseScreen()){deleteSafely('la pantalla base','Se perderán sus '+p.baseScreen.objects.length+' objetos y se desactivará su uso en todas las pantallas.',()=>{p.baseScreen=null;p.screens.forEach(s=>{s.useBase=false});screenId=p.screens[0].id;selected=null;render();});return;}if(p.screens.length<=1)return;const s=activeScreen();deleteSafely('la pantalla «'+s.name+'»','Se eliminará la pantalla completa y sus '+s.objects.length+' objetos.',()=>{p.screens=p.screens.filter(x=>x.id!==s.id);screenId=p.screens[0].id;selected=null;render();});};
 $('#imageBtn').onclick=()=>{imageUploadTarget=null;$('#imageFile').click()};$('#imageFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;const uploadTarget=imageUploadTarget;try{const current=p.assets.reduce((n,a)=>n+C.dataUrlBytes(a.data),0),remaining=C.IMAGE_TOTAL_MAX_BYTES-current;if(remaining<=1024)throw new Error('No queda presupuesto de imágenes en el proyecto (256 KB total)');const proceed=confirm('La imagen se incrusta dentro del programa del NX. Límite: 64 KB por imagen y 256 KB total. Si es necesario se redimensionará y convertirá a WebP (máximo 1024 px) para reducir memoria y tiempo de carga. ¿Continuar?');if(!proceed)return;const target=Math.min(C.IMAGE_MAX_BYTES,remaining),result=await optimizeImage(file,target);if(result.bytes>C.IMAGE_MAX_BYTES||result.bytes>remaining)throw new Error('La imagen optimizada sigue superando el presupuesto permitido');const finalName=result.optimized?file.name.replace(/\.[^.]+$/,'')+'.webp':file.name;const asset={id:C.id(),name:finalName,data:result.data,optimized:result.optimized,sourceBytes:result.originalBytes,bytes:result.bytes,width:result.width,height:result.height};editAction(()=>{p.assets.push(asset);if(uploadTarget){const targetObj=[...p.screens,...(p.baseScreen?[p.baseScreen]:[])].flatMap(s=>s.objects).find(o=>o.id===uploadTarget.objectId);if(!targetObj||targetObj.kind!=='image')throw new Error('El objeto de imagen ya no existe');targetObj[uploadTarget.prop]=asset.id;selected=targetObj.id;}else{const o=C.newObject('image');o.assetId=asset.id;o.text=finalName;activeScreen().objects.push(o);selected=o.id;}render();});if(result.optimized)toast('Imagen optimizada: '+(result.originalBytes/1024).toFixed(1)+' → '+(result.bytes/1024).toFixed(1)+' KB'+(result.width?' · '+result.width+'×'+result.height+' WebP':''));else toast('Imagen añadida sin reducción: '+(result.bytes/1024).toFixed(1)+' KB');}catch(err){toast('Imagen rechazada: '+err.message)}finally{imageUploadTarget=null;e.target.value='';}};
 $('#addInternalVar').onclick=()=>editAction(()=>{const names=new Set([...p.variables,...p.internalVariables].map(v=>v.name));let i=1;while(names.has('Internal_'+i))i++;p.internalVariables.push({name:'Internal_'+i,type:'BOOL',value:false});render();});
-$('#addAlarm').onclick=()=>editAction(()=>{const v=p.variables.find(v=>v.live)||p.internalVariables.find(v=>v.name);p.alarms.push({id:C.id(),name:'Nueva alarma',binding:v?.name||'',operator:v?.type==='BOOL'?'eq':'gt',value:v?.type==='BOOL'?true:0,severity:'warning'});if(v&&p.variables.includes(v))v.expose=true;render();});$('#addRecipe').onclick=()=>{
- // Always propose the PLC Retain bank for newly created recipes, regardless of tag selection.
- // Local browser storage remains an explicit choice in each recipe's properties.
- const scope='shared';
- if(p.recipes.filter(r=>r.scope===scope).length>=C.RECIPE_SHARED_MAX){
-  toast('Banco NX Retain lleno: máximo '+C.RECIPE_SHARED_MAX+' recetas compartidas. Elimina una o cambia otra a Local.');
-  return;
- }
- editAction(()=>{let i=1;while(p.recipes.some(r=>r.name==='Receta '+i))i++;p.recipes.push({id:C.id(),name:'Receta '+i,scope,values:{}});render();});
+$('#addAlarm').onclick=()=>editAction(()=>{const v=p.variables.find(v=>v.live)||p.internalVariables.find(v=>v.name);p.alarms.push({id:C.id(),name:'Nueva alarma',binding:v?.name||'',operator:v?.type==='BOOL'?'eq':'gt',value:v?.type==='BOOL'?true:0,severity:'warning'});if(v&&p.variables.includes(v))v.expose=true;render();});
+$('#recipeEnabled').onchange=e=>editAction(()=>{p.recipeEnabled=e.target.checked;render();},e.target);
+for(const key of ['recipeSlots','recipeBytes'])$('#'+key).onchange=e=>editAction(()=>{
+ p[key]=Number(e.target.value);renderRecipes();renderDiag();
+},e.target);
+$('#addRecipe').onclick=()=>{
+ if(!p.recipeEnabled){toast('Habilita recetas para configurar el banco Retain NX');return}
+ if(p.recipes.length>=p.recipeSlots){toast('Banco NX Retain lleno: máximo '+p.recipeSlots+' recetas. Aumenta la capacidad o elimina una.');return}
+ editAction(()=>{let i=1;while(p.recipes.some(r=>r.name==='Receta '+i))i++;p.recipes.push({id:C.id(),name:'Receta '+i,scope:'shared',values:{}});render();});
 };
 $('#demoBtn').onclick=()=>p0ProtectReplace('cargar demo',()=>{p=C.demoProject();screenId=p.screens[0].id;selected=null;render()});$('#newBtn').onclick=()=>p0ProtectReplace('crear proyecto nuevo',()=>{p=C.newProject();screenId=p.screens[0].id;selected=null;render()});
 $('#importFileBtn').onclick=()=>$('#varsFile').click();$('#varsFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{importText(await file.text())}catch(err){toast(err.message)}e.target.value='';};$('#pasteBtn').onclick=()=>{$('#pasteText').value='';$('#pasteError').textContent='';$('#pasteDialog').showModal()};$('#pasteImport').onclick=()=>{try{importText($('#pasteText').value);$('#pasteDialog').close()}catch(e){$('#pasteError').textContent=e.message}};

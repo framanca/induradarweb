@@ -46,18 +46,18 @@ function buildST(input){
  const alarmReset=p.alarms.map((a,i)=>{const v=vm.get(a.binding);return v?`IF NOT ${alarmExpr(v,a)} THEN Web_AlarmAck[${i+1}] := FALSE; END_IF;`:''}).filter(Boolean).join('\n');
  const alarmAckCases=p.alarms.map((a,i)=>{const v=vm.get(a.binding);return v?`${i+1}:\n IF ${alarmExpr(v,a)} THEN Web_AlarmAck[${i+1}] := TRUE; END_IF;\n Web_Found := TRUE;`:''}).filter(Boolean).join('\n');
  const alarmAckAll=p.alarms.map((a,i)=>{const v=vm.get(a.binding);return v?`IF ${alarmExpr(v,a)} THEN Web_AlarmAck[${i+1}] := TRUE; END_IF;`:''}).filter(Boolean).join('\n');
- const recipeCases=p.recipes.map((r,i)=>{const assigns=[];for(const [name,value] of Object.entries(r.values||{})){const v=vm.get(name);if(v&&v.access==='RW'&&v.writeSupported)assigns.push(v.enumType?`NumToEnum(${stTyped(v,value)}, ${v.name});`:`${v.name} := ${stTyped(v,value)};`);}return `${i+1}:\n                ${assigns.join('\n                ')||';'}\n                Web_Found := TRUE;`;}).join('\n            ');
- const recipeInit=p.recipes.filter(r=>r.scope==='shared').map((r,i)=>{
+ const recipeCases=(p.recipeEnabled?p.recipes:[]).map((r,i)=>{const assigns=[];for(const [name,value] of Object.entries(r.values||{})){const v=vm.get(name);if(v&&v.access==='RW'&&v.writeSupported)assigns.push(v.enumType?`NumToEnum(${stTyped(v,value)}, ${v.name});`:`${v.name} := ${stTyped(v,value)};`);}return `${i+1}:\n                ${assigns.join('\n                ')||';'}\n                Web_Found := TRUE;`;}).join('\n            ');
+ const recipeInit=(p.recipeEnabled?p.recipes:[]).map((r,i)=>{
   const blob=C.recipeWireJSON(r);
-  if(enc.encode(blob).length>C.RECIPE_BYTES_MAX)throw Error('Receta '+r.name+': exceso de capacidad NX');
+  if(enc.encode(blob).length>p.recipeBytes)throw Error('Receta '+r.name+': exceso de capacidad NX');
   return "Web_RecipeData["+(i+1)+"] := '"+stLiteral(blob)+"'; Web_RecipeRev["+(i+1)+"] := UDINT#1;";
  }).join('\n    ');
  const chunkCases=parts.map((c,i)=>`${i}: Web_TxText := '${stLiteral(c)}';`).join('\n            ');
- return `(* HMI NX ST · servidor WebHMI generado
+ let program=`(* HMI NX ST · servidor WebHMI generado
    Proyecto: ${p.name}
    Puerto: ${p.port}
    HTML embebido: ${enc.encode(html).length} bytes / ${parts.length} fragmentos
-   Funciones: RW, pantallas, imágenes, widgets industriales, alarmas actuales y recetas.
+   Funciones: RW, pantallas, imágenes, widgets industriales, alarmas actuales${p.recipeEnabled?' y recetas':''}.
    Seguridad funcional e interlocks permanecen en el programa de máquina.
 *)
 
@@ -331,6 +331,20 @@ CASE Web_State OF
     END_IF;
 END_CASE;
 `;
+ // The server must never reference a non-existent recipe variable when disabled.
+ if(!p.recipeEnabled){
+  program=program.replace(/\n\(\* Banco de recetas retenido\.[\s\S]*?\nEND_IF;\n/,'\n');
+  program=program.replace(/\n        ELSIF FIND\(Web_RxText, 'POST \/api\/recipe\?slot='\)[\s\S]*?(?=\n         ELSIF FIND\(Web_RxText, 'POST \/api\/ack\?')/,'');
+  program=program.replace(/\n    4:[\s\S]*?(?=\n    5:)/,'');
+  program=program.replace(/\n    6:[\s\S]*?(?=\n    ELSE\n        Web_ApiBody := 'NOT FOUND';)/,'');
+  if(/Web_Recipe|Web_RecipeSlot|\/api\/recipes|\/api\/recipe/.test(program))throw Error('ST contiene referencias a recetas deshabilitadas');
+ }else{
+  program=program.replace('FOR Web_RecipeIdx := UINT#1 TO UINT#12 DO','FOR Web_RecipeIdx := UINT#1 TO UINT#'+p.recipeSlots+' DO');
+  program=program.replace(/Web_RecipeSlot <= UINT#12/g,'Web_RecipeSlot <= UINT#'+p.recipeSlots);
+  program=program.replace('Web_BodyLen <= UINT#500','Web_BodyLen <= UINT#'+p.recipeBytes);
+  program=program.replace('de las 12 ranuras','de las '+p.recipeSlots+' ranuras').replace('maximo 500 bytes','maximo '+p.recipeBytes+' bytes');
+ }
+ return program;
 }
 function referencedVariables(p){const n=C.normalize(p),set=new Set(n.variables.filter(v=>v.expose&&v.live).map(v=>v.name));if(n.screenBinding)set.add(n.screenBinding);for(const s of n.screens)for(const o of C.screenObjects(n,s)){if(o.binding)set.add(o.binding);if(o.feedbackBinding)set.add(o.feedbackBinding);}for(const a of n.alarms)if(a.binding)set.add(a.binding);for(const r of n.recipes)for(const k of Object.keys(r.values||{}))set.add(k);return n.variables.filter(v=>set.has(v.name));}
 function externalVariablesTSV(p){
@@ -381,7 +395,13 @@ function localVariablesTSV(input){const p=C.normalize(input);const rows=[
 ['Web_Rcv','SktTCPRcv','','','','','Receive TCP'],
 ['Web_Send','SktTCPSend','','','','','Send TCP'],
 ['Web_Close','SktClose','','','','','Close TCP']
-];return rows.map(r=>r.join('\t')).join('\r\n');}
+];
+ const selected=rows.filter(r=>p.recipeEnabled||!String(r[0]).startsWith('Web_Recipe')&&!['Web_PosSlot','Web_PosRev','Web_BodyLen','Web_SlotText','Web_RevText'].includes(r[0]));
+ return selected.map(r=>{
+  if(r[0]==='Web_RecipeData')r[1]='ARRAY[1..'+p.recipeSlots+'] OF STRING['+(p.recipeBytes+12)+']';
+  if(r[0]==='Web_RecipeRev')r[1]='ARRAY[1..'+p.recipeSlots+'] OF UDINT';
+  return r.join('\t');
+ }).join('\r\n');}
 function readme(input,html,st){const p=C.normalize(input);return `HMI NX ST · paquete generado
 
 Proyecto: ${p.name}
@@ -397,10 +417,7 @@ INSTALACIÓN
 - Pegar WebHMI_Server.st en un Program ST.
 - Pegar WebHMI_LocalVariables.tsv en Internals.
 - Pegar WebHMI_ExternalVariables.tsv en Externals.
-- Comprobar que Web_RecipeInit, Web_RecipeData y Web_RecipeRev tienen la casilla Retain activada. Sin Retain las recetas editadas se perderían al reiniciar.
-- Banco NX: 12 recetas compartidas de hasta 500 bytes ASCII, revisión por ranura para evitar colisiones entre navegadores.
-- Las recetas iniciales se siembran solo si Web_RecipeInit está a FALSE. Antes de borrar Retain o transferir otro proyecto, exportar una copia de las recetas.
-- Recetas locales: quedan almacenadas solo en el navegador.
+${p.recipeEnabled?'- Recetas habilitadas: importar Web_RecipeInit, Web_RecipeData y Web_RecipeRev con Retain activado.\n- Banco NX: '+p.recipeSlots+' recetas de hasta '+p.recipeBytes+' bytes JSON; STRING['+(p.recipeBytes+12)+'].\n- Las recetas iniciales se cargan una sola vez, cuando Web_RecipeInit está a FALSE. No borrar Retain sin exportar primero las recetas.':'- Recetas deshabilitadas: no importar ni crear variables Web_Recipe*. No se reserva memoria Retain para recetas.'}
 - Las variables referenciadas deben existir como Global Variables con el mismo nombre/tipo.
 - Si importaste una estructura, union, enumeracion o ARRAY, crea su tipo en Data Types de Sysmac y declara la raiz global. El TSV Externals contiene SOLO esa raiz, no miembros sueltos.
 - Asignar el Program a una tarea y transferir al NX.
@@ -426,9 +443,9 @@ LÍMITES ACTUALES
 - Petición <=1900 bytes en una recepción.
 - Web_WatchdogLimit es un límite en ciclos de tarea (5000 por defecto), no tiempo absoluto.
 - Alarmas: ACK en memoria PLC mientras sigan activas; no retentivas tras reinicio ni historial.
-- Recetas: edición CRUD desde runtime; 12 ranuras compartidas Retain con revisión CAS y 24 locales por navegador. Las plantillas iniciales se cargan una vez al arrancar con Web_RecipeInit=FALSE.
+- Recetas: ${p.recipeEnabled?'banco NX Retain de '+p.recipeSlots+' ranuras y '+p.recipeBytes+' bytes por receta; CRUD desde runtime':'deshabilitadas; sin banco NX ni gestor de recetas en runtime'}.
 - El botón Aplicar envía escrituras PLC secuenciales; NO es una operación atómica ni sustituye enclavamientos de máquina. Comprobar lectura posterior.
-- El endpoint legado POST /api/recipe?id mantiene las antiguas recetas fijas únicamente para compatibilidad; la ventana nueva usa el banco Retain y /api/write.
+- Las recetas habilitadas usan /api/recipes, /api/recipe y /api/write; no existe almacenamiento local de recetas.
 - Sin HTTPS ni gestión de usuarios todavía.
 - No usar la HMI para funciones de seguridad.
 `;}

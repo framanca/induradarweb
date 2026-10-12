@@ -10,6 +10,7 @@ const C = globalThis.NXST;
 
 function prepare(options={}) {
   const project = C.newProject();
+  project.recipeEnabled=true; // This fixture explicitly tests navigation with the recipes button.
   project.name = 'Pantallas de prueba';
   project.screens = [
     C.newScreen('Principal'),
