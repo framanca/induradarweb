@@ -89,10 +89,12 @@ test('JSON store format is ASCII and size limited; local-only recipes do not cre
  const many=project();many.recipes=Array.from({length:13},(_,i)=>({id:'r'+i,scope:'shared',name:'R'+i,values:{SpeedPLC:i}}));
  assert.ok(C.validate(many).some(msg=>msg.includes('Máximo 12 recetas')));
 });
-test('editor includes shared/local defaults and explicitly whitelists internal variables',()=>{
+test('editor uses per-recipe checkboxes without a global recipe variable whitelist',()=>{
  const editor=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8'),markup=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
- assert.match(editor,/function renderRecipeVariables\(\)/);
- assert.match(editor,/recipeVariables\.includes\(name\)/);
+ assert.doesNotMatch(editor,/function renderRecipeVariables\(\)/);
+ assert.doesNotMatch(markup,/recipeVariableEditor|Variables autorizadas para recetas/);
+ assert.match(markup,/id="recipeCapacitySummary"/);
+ assert.match(editor,/function updateRecipeCapacity\(\)/);
  assert.match(editor,/function recipeAvailableVariables\(\)/);
  assert.match(editor,/data-recipe-scope/);
  assert.match(editor,/recipeDefaultValue/);
@@ -100,14 +102,14 @@ test('editor includes shared/local defaults and explicitly whitelists internal v
  assert.match(editor,/data-recipe-value/);
  assert.match(editor,/recipeTypedEditor/);
  assert.doesNotMatch(editor,/data-recipe-values=/);
- assert.match(markup,/id="recipeVariableEditor"/);
+ assert.match(editor,/data-recipe-capacity/);
 });
 
 
 test('recipe checkboxes list all writable PLC/internal variables and pre-check only recipe assignments',()=>{
  const editor=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8');
  const start=editor.indexOf('function recipeAvailableVariables()');
- const end=editor.indexOf('function renderRecipeVariables()',start);
+ const end=editor.indexOf('function updateRecipeCapacity()',start);
  assert.ok(start>=0&&end>start);
  const sandbox={p:project(),C};
  vm.createContext(sandbox);
@@ -153,4 +155,31 @@ test('duplicating editor recipes keeps storage, deep-copies values and assigns u
  assert.match(editor,/p\.recipes\.splice\(index\+1,0,clone\)/);
  assert.match(editor,/C\.RECIPE_SHARED_MAX/);
  assert.match(editor,/C\.RECIPE_LOCAL_MAX/);
+});
+
+test('runtime recipe picker offers all exposed writable PLC tags and internal HMI variables, even without seed recipes',()=>{
+ const p=project();
+ const external=C.importSysmac('Name\tData Type\nSpareRW\tINT')[0];
+ external.access='RW';external.expose=true;
+ const hidden=C.importSysmac('Name\tData Type\nHiddenRW\tINT')[0];
+ hidden.access='RW';hidden.expose=false;
+ p.variables.push(external,hidden);
+ p.internalVariables.push({name:'NewHMI',type:'BOOL',value:false});
+ assert.equal(C.validate(p).length,0);
+ const html=C.buildRuntimeHTML(p);
+ const payload=html.match(/<script>const P=(\{.*?\});/)?.[1];
+ assert.ok(payload,'runtime includes recipe metadata');
+ const names=JSON.parse(payload).recipeFields.map(f=>f.name);
+ assert.ok(names.includes('SpareRW'), 'new runtime recipe can use exposed RW without any seed recipe');
+ assert.ok(names.includes('NewHMI'), 'new runtime recipe can use unused internal tag');
+ assert.ok(!names.includes('HiddenRW'), 'unexposed RW tags remain hidden');
+});
+test('more than 20 available variables is allowed while each individual recipe remains capped at 20',()=>{
+ const p=project();
+ for(let i=0;i<22;i++)p.internalVariables.push({name:'RecipeExtra'+i,type:'INT',value:0});
+ p.recipeVariables.push(...p.internalVariables.map(v=>v.name));
+ assert.equal(C.validate(p).length,0,'a removed global 20-variable whitelist must not limit runtime');
+ const huge={id:'many',name:'Demasiados campos',scope:'local',values:Object.fromEntries(p.internalVariables.slice(0,21).map(v=>[v.name,1]))};
+ p.recipes.push(huge);
+ assert.ok(C.validate(p).some(e=>e.includes('máximo 20 valores')));
 });
