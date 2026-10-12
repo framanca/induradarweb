@@ -26,6 +26,18 @@ with sync_playwright() as pw:
     page.wait_for_function("document.querySelector('#saveStatus').textContent.includes('Guardado local')")
     checks.append("startup_scripts_loaded_and_autosave_ready")
 
+    # First opening without a saved project must not load the recipe-enabled demo.
+    assert page.locator("#projectName").input_value() == "WebHMI ST"
+    assert page.locator("#canvas .widget").count() == 0
+    assert not page.locator("#recipeEnabled").is_checked()
+    assert page.locator("#recipeSettings").is_hidden()
+    assert page.locator("#addRecipe").is_disabled()
+    # The demo still includes recipes, but only when selected explicitly.
+    page.locator("#demoBtn").click()
+    assert page.locator("#recipeEnabled").is_checked()
+    assert page.locator("#addRecipe").is_enabled()
+    checks.append("first_open_recipes_disabled_demo_explicitly_enables_recipes")
+
     def select_sidebar(tab):
         button = page.locator(f"#sidebar-tab-{tab}")
         button.click()

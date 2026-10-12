@@ -27,7 +27,9 @@ def bundle():
             text = once(text, '<link rel="stylesheet" href="style.css">', '<link rel="stylesheet" href="style.css"><link rel="stylesheet" href="offline.css">')
             text = once(text, '<script defer src="app.js"></script>', '<script defer src="offline.js"></script><script defer src="app.js"></script>')
         if name == "app.js":
-            text = once(text, "let p=C.demoProject()", "let p=C.newProject()")
+            # The ST editor now starts with newProject() itself.
+            if text.count("let p=C.newProject()") != 1:
+                raise RuntimeError("The editor must start with recipes disabled")
             if text.count("localStorage.") < 5:
                 raise RuntimeError("Storage hooks changed")
             text = text.replace("localStorage.", "NXOffline.storage.")

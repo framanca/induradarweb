@@ -1,5 +1,7 @@
 (function(){
-'use strict';const C=NXST,$=s=>document.querySelector(s);let p=C.demoProject(),selected=null,drag=null,screenId=p.screens[0].id,imageUploadTarget=null;
+'use strict';const C=NXST,$=s=>document.querySelector(s);// Start clean on first use; p0Boot restores a real saved project when available.
+// The recipe-enabled demo remains accessible only through the explicit Demo button.
+let p=C.newProject(),selected=null,drag=null,screenId=p.screens[0].id,imageUploadTarget=null;
 const NUM=v=>C.NUMERIC_TYPES.has(v.type),BOOL=v=>v.type==='BOOL';
 function toast(t){const x=$('#toast');x.textContent=t;x.classList.add('show');setTimeout(()=>x.classList.remove('show'),3200)}
 function readAsDataURL(blob){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error||new Error('No se pudo leer la imagen'));r.readAsDataURL(blob);})}
