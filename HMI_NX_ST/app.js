@@ -246,6 +246,21 @@ function renderRecipeVariables(){
   });
  });
 }
+function duplicateEditorRecipe(index){
+ const source=p.recipes[index];
+ if(!source)return;
+ const max=source.scope==='shared'?C.RECIPE_SHARED_MAX:C.RECIPE_LOCAL_MAX;
+ const count=p.recipes.filter(r=>r.scope===source.scope).length;
+ if(count>=max){toast('No se puede duplicar: máximo '+max+' recetas '+(source.scope==='shared'?'compartidas NX':'locales'));return}
+ let clone;
+ try{clone=C.duplicateRecipe(source,p.recipes)}catch(e){toast(e.message);return}
+ if(clone.scope==='shared'&&new TextEncoder().encode(C.recipeWireJSON(clone)).length>C.RECIPE_BYTES_MAX){
+  toast('La copia supera los '+C.RECIPE_BYTES_MAX+' bytes del banco NX: reduce los valores de la receta original');
+  return;
+ }
+ editAction(()=>{p.recipes.splice(index+1,0,clone);render()});
+ toast('Receta duplicada: '+clone.name);
+}
 function renderRecipes(){
  renderRecipeVariables();
  const host=$('#recipeEditor');
@@ -256,7 +271,7 @@ function renderRecipes(){
   '<option value="local" '+(r.scope==='local'?'selected':'')+'>Local · navegador</option></select></label>'+
   '<p class="recipe-check-title">Variables y valores de esta receta</p>'+
   recipeValueOptions(r,i)+
-  '<button data-del-recipe="'+i+'">Eliminar</button></div>').join('')||'<p class="hint">Sin recetas. Pulsa «+ Receta» y marca las variables que quieras incluir.</p>';
+  '<div class="recipe-card-actions"><button type="button" data-duplicate-recipe="'+i+'">Duplicar</button><button type="button" data-del-recipe="'+i+'">Eliminar</button></div></div>').join('')||'<p class="hint">Sin recetas. Pulsa «+ Receta» y marca las variables que quieras incluir.</p>';
  host.querySelectorAll('[data-recipe-name]').forEach(x=>x.onchange=()=>editAction(()=>{p.recipes[+x.dataset.recipeName].name=x.value;renderDiag();},x));
  host.querySelectorAll('[data-recipe-scope]').forEach(x=>x.onchange=()=>editAction(()=>{p.recipes[+x.dataset.recipeScope].scope=x.value;renderDiag();},x));
  host.querySelectorAll('[data-recipe-toggle]').forEach(x=>x.onchange=()=>{
@@ -283,6 +298,7 @@ function renderRecipes(){
    editAction(()=>{r.values[name]=value;renderDiag();},x);
   }catch(e){toast(e.message);x.value=String(r.values[name])}
  });
+ host.querySelectorAll('[data-duplicate-recipe]').forEach(x=>x.onclick=()=>duplicateEditorRecipe(Number(x.dataset.duplicateRecipe)));
  host.querySelectorAll('[data-del-recipe]').forEach(x=>x.onclick=()=>{const i=+x.dataset.delRecipe,r=p.recipes[i];if(r)deleteSafely('la receta «'+r.name+'»','Se eliminarán también sus consignas guardadas.',()=>{p.recipes.splice(i,1);render();});});
 }
 function renderDiag(){syncProjectInputs();const errors=C.validate(p),html=C.buildRuntimeHTML(p),bytes=new TextEncoder().encode(html).length;let list=[`<div class="diagnostic ${errors.length?'error':'ok'}">${errors.length?'Bloqueos: '+errors.length:'Proyecto exportable'}</div>`];for(const e of errors.slice(0,7))list.push(`<div class="diagnostic error">${C.esc(e)}</div>`);const assetBytes=p.assets.reduce((n,a)=>n+C.dataUrlBytes(a.data),0);list.push(`<div class="diagnostic">HTML: ${(bytes/1024).toFixed(1)} / 512 KB · imágenes: ${(assetBytes/1024).toFixed(1)} / 256 KB · ${p.screens.length} pantallas · ${p.alarms.length} alarmas · ${p.recipes.length} recetas.</div>`);list.push('<div class="diagnostic ok">Base servidor/lectura validada en NX102 real.</div>');if(bytes>C.HTML_MAX_BYTES)list.push('<div class="diagnostic error">HTML supera 512 KB: exportación bloqueada.</div>');$('#diagnostics').innerHTML=list.join('');}
