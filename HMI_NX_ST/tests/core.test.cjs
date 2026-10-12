@@ -3,6 +3,21 @@ test('imports Sysmac TSV headers and string size',()=>{const v=C.importSysmac('N
 test('imports simple ST declarations',()=>{const v=C.importSysmac('Run : BOOL;\nSpeed : REAL;');assert.equal(Array.from(v,x=>x.name).join(','),'Run,Speed');});
 test('unsupported variables remain imported but disabled',()=>{const v=C.importSysmac('Name;Data Type\nA;ARRAY[0..2] OF BOOL');assert.equal(v[0].expose,false);});
 test('demo validates and HTML is self contained',()=>{const p=C.demoProject();assert.equal(C.validate(p).length,0);const h=C.buildRuntimeHTML(p);assert.match(h,/<!doctype html>/);assert.match(h,/\/api\/read/);assert.ok(!h.includes('<script src='));assert.ok([...h].every(ch=>ch.charCodeAt(0)<128));const script=h.match(/<script>([\s\S]*)<\/script>/)[1];assert.doesNotThrow(()=>new Function(script));});
+test('WebHMI keyboard export remains ASCII and is omitted when not selected',()=>{
+ const p=C.demoProject(),base=C.buildRuntimeHTML(p);
+ assert.doesNotMatch(base,/id="virtualKeyboard"/);
+ assert.equal(p.keyboardMode,'auto');
+ p.keyboardMode='webhmi';
+ const html=C.buildRuntimeHTML(p);
+ assert.match(html,/id="virtualKeyboard"/);
+ assert.match(html,/id="vkCancel"/);
+ assert.match(html,/id="vkAccept"/);
+ assert.match(html,/function openVirtualKeyboard/);
+ assert.ok([...html].every(ch=>ch.charCodeAt(0)<128),'embedded PLC HTML must stay ASCII');
+ assert.ok(html.length-base.length<14000,'keyboard should remain small');
+ assert.doesNotThrow(()=>new Function(html.match(/<script>([\s\S]*)<\/script>/)[1]));
+ assert.equal(C.normalize({ ...p, keyboardMode:'other' }).keyboardMode,'auto');
+});
 test('ST contains standard Omron socket blocks and embedded chunks',()=>{const s=C.buildST(C.demoProject());for(const x of ['StringToAry','AryToString'])assert.match(s,new RegExp(x));const locals=C.localVariablesTSV();for(const x of ['SktTCPAccept','SktTCPRcv','SktTCPSend','SktClose'])assert.match(locals,new RegExp(x));assert.match(s,/GET \/api\/read/);assert.match(s,/POST \/api\/write/);});
 test('package zip starts with local header and contains project',()=>{const o=C.exportPackage(C.demoProject());assert.equal(o.zip[0],0x50);assert.ok(o.files['WebHMI_Server.st']);assert.ok(o.files['project.nxst']);});
 
