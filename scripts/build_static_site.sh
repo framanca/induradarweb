@@ -40,6 +40,32 @@ for source in index.html style.css "${hmi_st_scripts[@]}"; do
 done
 # Separate online alternative. Copy only the public client, never server sources.
 python3 HMI_NX/online/tool/build.py "$output_dir/HMI_NX_Online"
+
+# Fingerprint editor scripts/styles so browsers cannot keep the pre-NX-Retain
+# recipe editor in their cache after a Pages deployment.
+python3 - "$output_dir/HMI_NX_ST" "$output_dir/HMI_NX_Online" <<'PY_VERSIONED_ASSETS'
+import hashlib
+import re
+import sys
+from pathlib import Path
+
+asset_re = re.compile(r'(\b(?:src|href)=")([A-Za-z0-9_.-]+\.(?:js|css))(")')
+for target in map(Path, sys.argv[1:]):
+    page = target / "index.html"
+    html = page.read_text(encoding="utf-8")
+    def fingerprint(match):
+        asset = target / match.group(2)
+        if not asset.is_file():
+            raise SystemExit(f"Missing WebHMI asset: {asset}")
+        token = hashlib.sha256(asset.read_bytes()).hexdigest()[:12]
+        return f"{match.group(1)}{match.group(2)}?v={token}{match.group(3)}"
+    html, total = asset_re.subn(fingerprint, html)
+    if total < 5:
+        raise SystemExit(f"Expected editor assets for {target}, found {total}")
+    page.write_text(html, encoding="utf-8")
+    print(f"{target}: fingerprinted {total} editor assets")
+PY_VERSIONED_ASSETS
+
 node --test HMI_NX/online/test/*.test.cjs
 # Catch missing JS dependencies in both published editors before Pages deployment.
 node scripts/verify_webhmi_bundle.cjs "$output_dir"
