@@ -179,7 +179,7 @@ function renderCanvas(){
    const finish=e=>{
     if(!drag||drag.id!==o.id||drag.pointerId!==e.pointerId)return;
     const before=drag.before,mode=drag.mode;
-    if(o.kind==='text'&&(mode.includes('e')||mode.includes('w')))o.autoWidth=false;
+    if(o.kind==='text'&&(mode!=='move'&&(mode.includes('e')||mode.includes('w'))))o.autoWidth=false;
     drag=null;
     editCommit(before);
     renderProps();
@@ -337,7 +337,30 @@ function renderRecipes(){
  host.querySelectorAll('[data-duplicate-recipe]').forEach(x=>x.onclick=()=>duplicateEditorRecipe(Number(x.dataset.duplicateRecipe)));
  host.querySelectorAll('[data-del-recipe]').forEach(x=>x.onclick=()=>{const i=+x.dataset.delRecipe,r=p.recipes[i];if(r)deleteSafely('la receta «'+r.name+'»','Se eliminarán también sus consignas guardadas.',()=>{p.recipes.splice(i,1);render();});});
 }
-function renderDiag(){syncProjectInputs();const errors=C.validate(p),html=C.buildRuntimeHTML(p),bytes=new TextEncoder().encode(html).length;let list=[`<div class="diagnostic ${errors.length?'error':'ok'}">${errors.length?'Bloqueos: '+errors.length:'Proyecto exportable'}</div>`];for(const e of errors.slice(0,7))list.push(`<div class="diagnostic error">${C.esc(e)}</div>`);const assetBytes=p.assets.reduce((n,a)=>n+C.dataUrlBytes(a.data),0);list.push(`<div class="diagnostic">HTML: ${(bytes/1024).toFixed(1)} / 512 KB · imágenes: ${(assetBytes/1024).toFixed(1)} / 256 KB · ${p.screens.length} pantallas · ${p.alarms.length} alarmas · ${p.recipes.length} recetas.</div>`);list.push('<div class="diagnostic ok">Base servidor/lectura validada en NX102 real.</div>');if(bytes>C.HTML_MAX_BYTES)list.push('<div class="diagnostic error">HTML supera 512 KB: exportación bloqueada.</div>');$('#diagnostics').innerHTML=list.join('');}
+function renderDiag(){
+ syncProjectInputs();
+ const errors=C.validate(p),html=C.buildRuntimeHTML(p),bytes=new TextEncoder().encode(html).length;
+ const assetBytes=p.assets.reduce((n,a)=>n+C.dataUrlBytes(a.data),0);
+ if(bytes>C.HTML_MAX_BYTES)errors.push('HTML supera 512 KB: exportación bloqueada.');
+ const uniqueErrors=[...new Set(errors)],ok=uniqueErrors.length===0;
+ const exportButton=$('#exportBtn');
+ exportButton.dataset.exportable=String(ok);
+ exportButton.title=ok?'Proyecto correcto: exportar paquete Sysmac':uniqueErrors.length+' problema(s). Pulsa para ver el diagnóstico.';
+ $('#exportWarningIcon').hidden=ok;
+ const list=[`<div class="diagnostic ${ok?'ok':'error'}">${ok?'Proyecto exportable':'Bloqueos: '+uniqueErrors.length}</div>`];
+ for(const message of uniqueErrors)list.push(`<div class="diagnostic error">${C.esc(message)}</div>`);
+ list.push(`<div class="diagnostic">HTML: ${(bytes/1024).toFixed(1)} / 512 KB · imágenes: ${(assetBytes/1024).toFixed(1)} / 256 KB · ${p.screens.length} pantallas · ${p.alarms.length} alarmas · ${p.recipes.length} recetas.</div>`);
+ list.push('<div class="diagnostic ok">Base servidor/lectura validada en NX102 real.</div>');
+ $('#diagnostics').innerHTML=list.join('');
+ return ok;
+}
+function openExportDiagnostics(message){
+ renderDiag();
+ if(message){const el=document.createElement('div');el.className='diagnostic error';el.textContent=message;$('#diagnostics').prepend(el)}
+ const dialog=$('#diagnosticsDialog');
+ if(!dialog.open)dialog.showModal();
+ $('#exportBtn').setAttribute('aria-expanded','true');
+}
 function importText(text){const old=new Map(p.variables.map(v=>[v.name,v]));const vars=C.importSysmac(text);for(const v of vars){const prev=old.get(v.name);if(prev){v.access=prev.access;v.expose=prev.expose;}}editAction(()=>{p.variables=vars;render();toast(vars.length+' variables importadas');});}
 function download(name,data,type='application/octet-stream'){const a=document.createElement('a'),blob=new Blob([data],{type});a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);}
 
@@ -503,7 +526,15 @@ $('#addAlarm').onclick=()=>editAction(()=>{const v=p.variables.find(v=>v.live)||
 };
 $('#demoBtn').onclick=()=>p0ProtectReplace('cargar demo',()=>{p=C.demoProject();screenId=p.screens[0].id;selected=null;render()});$('#newBtn').onclick=()=>p0ProtectReplace('crear proyecto nuevo',()=>{p=C.newProject();screenId=p.screens[0].id;selected=null;render()});
 $('#importFileBtn').onclick=()=>$('#varsFile').click();$('#varsFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{importText(await file.text())}catch(err){toast(err.message)}e.target.value='';};$('#pasteBtn').onclick=()=>{$('#pasteText').value='';$('#pasteError').textContent='';$('#pasteDialog').showModal()};$('#pasteImport').onclick=()=>{try{importText($('#pasteText').value);$('#pasteDialog').close()}catch(e){$('#pasteError').textContent=e.message}};
-$('#previewBtn').onclick=preview;$('#closePreview').onclick=()=>$('#previewDialog').close();$('#recoveryBtn').onclick=()=>{p0RenderRecovery();$('#recoveryDialog').showModal()};$('#closeRecovery').onclick=$('#closeRecovery2').onclick=()=>$('#recoveryDialog').close();$('#discardDrafts').onclick=()=>{if(confirm('¿Borrar todas las copias automáticas locales de HMI NX ST?')){localStorage.removeItem(P0_LATEST);localStorage.removeItem(P0_HISTORY);p0LastSavedJSON='';p0LastHistoryJSON='';p0RenderRecovery();p0Status('Copias locales borradas','dirty')}};$('#saveBtn').onclick=()=>{syncProjectInputs();const data=JSON.stringify(C.normalize(p),null,2);download((p.name||'project').replace(/[^A-Za-z0-9_-]+/g,'_')+'.nxst',data,'application/json');p0Checkpoint();p0Snapshot('guardado-manual',true);toast('Proyecto guardado y copia local actualizada')};$('#loadBtn').onclick=()=>$('#projectFile').click();$('#projectFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{const q=C.normalize(JSON.parse(await file.text()));p0Snapshot('antes-abrir-archivo',true);if(p0Dirty()&&!confirm('Hay cambios no descargados. Se ha creado una copia automática. ¿Abrir el archivo y sustituir el proyecto actual?')){e.target.value='';return}p=q;screenId=p.screens[0].id;selected=null;editReset();render();p0Checkpoint();p0Snapshot('archivo-abierto',true);toast('Proyecto abierto')}catch(err){toast('Proyecto no válido: '+err.message)}e.target.value='';};$('#exportBtn').onclick=()=>{syncProjectInputs();try{const out=C.exportPackage(p),name=(p.name||'WebHMI_ST').replace(/[^A-Za-z0-9_-]+/g,'_')+'_Sysmac.zip';download(name,out.zip,'application/zip');p0Checkpoint();p0Snapshot('exportado-sysmac',true);toast('Paquete Sysmac generado')}catch(e){toast(e.message)}};
+$('#previewBtn').onclick=preview;$('#closePreview').onclick=()=>$('#previewDialog').close();$('#recoveryBtn').onclick=()=>{p0RenderRecovery();$('#recoveryDialog').showModal()};$('#closeRecovery').onclick=$('#closeRecovery2').onclick=()=>$('#recoveryDialog').close();$('#discardDrafts').onclick=()=>{if(confirm('¿Borrar todas las copias automáticas locales de HMI NX ST?')){localStorage.removeItem(P0_LATEST);localStorage.removeItem(P0_HISTORY);p0LastSavedJSON='';p0LastHistoryJSON='';p0RenderRecovery();p0Status('Copias locales borradas','dirty')}};$('#saveBtn').onclick=()=>{syncProjectInputs();const data=JSON.stringify(C.normalize(p),null,2);download((p.name||'project').replace(/[^A-Za-z0-9_-]+/g,'_')+'.nxst',data,'application/json');p0Checkpoint();p0Snapshot('guardado-manual',true);toast('Proyecto guardado y copia local actualizada')};$('#loadBtn').onclick=()=>$('#projectFile').click();$('#projectFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{const q=C.normalize(JSON.parse(await file.text()));p0Snapshot('antes-abrir-archivo',true);if(p0Dirty()&&!confirm('Hay cambios no descargados. Se ha creado una copia automática. ¿Abrir el archivo y sustituir el proyecto actual?')){e.target.value='';return}p=q;screenId=p.screens[0].id;selected=null;editReset();render();p0Checkpoint();p0Snapshot('archivo-abierto',true);toast('Proyecto abierto')}catch(err){toast('Proyecto no válido: '+err.message)}e.target.value='';};$('#exportBtn').onclick=()=>{
+ if(!renderDiag()){openExportDiagnostics();return}
+ try{
+  const out=C.exportPackage(p),name=(p.name||'WebHMI_ST').replace(/[^A-Za-z0-9_-]+/g,'_')+'_Sysmac.zip';
+  download(name,out.zip,'application/zip');p0Checkpoint();p0Snapshot('exportado-sysmac',true);toast('Paquete Sysmac generado');
+ }catch(e){openExportDiagnostics('No se pudo exportar: '+e.message)}
+};
+$('#closeDiagnostics').onclick=$('#closeDiagnosticsBottom').onclick=()=>$('#diagnosticsDialog').close();
+$('#diagnosticsDialog').addEventListener('close',()=>$('#exportBtn').setAttribute('aria-expanded','false'));
 $('#undoBtn').onclick=editUndo;$('#redoBtn').onclick=editRedo;
 $('#widgetMenu').addEventListener('click',e=>{const action=e.target.closest('[data-widget-action]')?.dataset.widgetAction;hideWidgetMenu();if(action==='copy')copyWidget();if(action==='paste')pasteWidget();if(action==='front')changeWidgetLayer('front');if(action==='back')changeWidgetLayer('back');});
 document.addEventListener('pointerdown',e=>{if(!e.target.closest?.('#widgetMenu'))hideWidgetMenu()});document.addEventListener('scroll',hideWidgetMenu,true);
