@@ -83,6 +83,22 @@ with sync_playwright() as pw:
     assert page.locator("#canvas .widget").count() == 0
     checks.append("new_button_creates_empty_project")
 
+    # Export becomes a diagnostic trigger when the project is invalid.
+    assert page.locator("#exportWarningIcon").is_hidden()
+    select_sidebar("elements")
+    page.locator(".tool-grid [data-kind='input']").click()  # No binding: invalid.
+    assert page.locator("#exportWarningIcon").is_visible()
+    page.locator("#exportBtn").click()
+    assert page.locator("#diagnosticsDialog").is_visible()
+    assert "selecciona variable" in page.locator("#diagnostics").inner_text()
+    assert page.locator("#exportBtn").get_attribute("aria-expanded") == "true"
+    page.locator("#closeDiagnostics").click()
+    assert page.locator("#exportBtn").get_attribute("aria-expanded") == "false"
+    page.locator("#undoBtn").click()
+    assert page.locator("#exportWarningIcon").is_hidden()
+    select_sidebar("project")
+    checks.append("export_sysmac_shows_diagnostics_only_when_invalid")
+
     # Screen configuration is edited in a modal, not an inline name field.
     first_id = page.locator("#screenSelect option").first.get_attribute("value")
     page.locator("#editScreen").click()
@@ -128,8 +144,17 @@ with sync_playwright() as pw:
     page.locator("#addInternalVar").click()  # Internal_1 BOOL
     page.locator("#addInternalVar").click()  # Internal_2 INT
     page.locator('#internalVarList [data-iv="1"][data-key="type"]').select_option("INT")
+    assert page.locator('#internalVarList [data-iv="1"][data-key="value"]').input_value() == "0"
+    page.locator('#internalVarList [data-iv="1"][data-key="type"]').select_option("REAL")
+    assert page.locator('#internalVarList [data-iv="1"][data-key="value"]').input_value() == "0"
+    page.locator('#internalVarList [data-iv="1"][data-key="type"]').select_option("STRING")
+    assert page.locator('#internalVarList [data-iv="1"][data-key="value"]').input_value() == ""
+    page.locator('#internalVarList [data-iv="1"][data-key="type"]').select_option("BOOL")
+    assert page.locator('#internalVarList [data-iv="1"][data-key="value"]').input_value() == "false"
+    page.locator('#internalVarList [data-iv="1"][data-key="type"]').select_option("INT")
     page.locator('#internalVarList [data-iv="1"][data-key="value"]').fill("1")
     page.locator('#internalVarList [data-iv="1"][data-key="value"]').press("Tab")
+    checks.append("internal_variable_type_change_resets_typed_default")
     select_sidebar("elements")
     page.locator("#canvas .widget.button").click()
     page.locator("#properties [data-p='binding']").select_option("Internal_1")
@@ -272,11 +297,20 @@ with sync_playwright() as pw:
     assert page.locator("#properties [data-p='binding']").count() == 1
     assert page.locator("#properties [data-p='optionsText']").count() == 1
     assert page.locator("#properties [data-p='expressionText']").count() == 1
+    assert page.locator("#properties [data-p='autoWidth']").is_checked()
+    initial_text_width = text_widget.evaluate("(el) => parseFloat(el.style.width)")
+    assert initial_text_width < 220
+    page.locator("#properties [data-p='text']").fill("Texto más largo con ajuste automático")
+    page.locator("#properties [data-p='text']").press("Tab")
+    assert text_widget.evaluate("(el) => parseFloat(el.style.width)") > initial_text_width
+    page.locator("#undoBtn").click()  # Restore original text while keeping auto sizing
+    assert page.locator("#properties [data-p='autoWidth']").is_checked()
     page.locator("#properties [data-p='w']").fill("318")
     page.locator("#properties [data-p='w']").press("Tab")
     page.locator("#properties [data-p='h']").fill("82")
     page.locator("#properties [data-p='h']").press("Tab")
     assert text_widget.evaluate("(el) => parseFloat(el.style.width)") == 318
+    assert not page.locator("#properties [data-p='autoWidth']").is_checked()
     assert text_widget.evaluate("(el) => parseFloat(el.style.height)") == 82
     # A clear field retains the original font, setting px affects the real preview.
     font_size = page.locator("#properties [data-p='fontSize']")
@@ -292,6 +326,7 @@ with sync_playwright() as pw:
     page.locator("#undoBtn").click()  # insertion
     assert text_widget.count() == 0
     checks.append("unified_text_and_numeric_width_height_properties")
+    checks.append("text_widget_autofits_and_manual_width_override_is_preserved")
 
     # Numbers and editable numeric inputs have independent font sizes.
     page.locator(".tool-grid [data-kind='value']").click()
