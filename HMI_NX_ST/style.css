@@ -118,3 +118,10 @@
 #closeDiagnostics{border:0;font-size:17px;line-height:1.3}
 .text-auto-width-option{display:flex;gap:8px;align-items:center}
 .text-auto-width-option input{width:auto}
+
+/* Optional NX recipe bank: explicit enable, compact capacity controls. */
+.recipe-enable-option{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:600;color:#344054;margin:10px 0}
+.recipe-enable-option input[type=checkbox]{width:auto;margin:0}
+#recipeSettings[hidden]{display:none!important}
+#recipeSettings .grid2{align-items:start}
+#recipeSettings .recipe-storage{margin:6px 0 11px;font-size:12px;color:#475467}
