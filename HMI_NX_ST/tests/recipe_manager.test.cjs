@@ -90,8 +90,36 @@ test('editor includes shared/local defaults and explicitly whitelists internal v
  const editor=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8'),markup=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
  assert.match(editor,/function renderRecipeVariables\(\)/);
  assert.match(editor,/recipeVariables\.includes\(name\)/);
- assert.match(editor,/p\.internalVariables\.find\(v=>v\.name===name\)/);
+ assert.match(editor,/function recipeAvailableVariables\(\)/);
  assert.match(editor,/data-recipe-scope/);
  assert.match(editor,/recipeDefaultValue/);
+ assert.match(editor,/data-recipe-toggle/);
+ assert.match(editor,/data-recipe-value/);
+ assert.match(editor,/recipeTypedEditor/);
+ assert.doesNotMatch(editor,/data-recipe-values=/);
  assert.match(markup,/id="recipeVariableEditor"/);
+});
+
+
+test('recipe checkboxes list all writable PLC/internal variables and pre-check only recipe assignments',()=>{
+ const editor=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8');
+ const start=editor.indexOf('function recipeAvailableVariables()');
+ const end=editor.indexOf('function renderRecipeVariables()',start);
+ assert.ok(start>=0&&end>start);
+ const sandbox={p:project(),C};
+ vm.createContext(sandbox);
+ vm.runInContext(editor.slice(start,end),sandbox);
+ const html=sandbox.recipeValueOptions(sandbox.p.recipes[0],0);
+ assert.match(html,/data-recipe-toggle="0"/);
+ assert.match(html,/SpeedPLC/);
+ assert.match(html,/HMIFlag/);
+ assert.match(html,/HMIName/);
+ assert.match(html,/value="60"/);
+ assert.match(html,/value="true" selected/);
+ assert.match(html,/data-name="HMIName"[^>]*disabled/);
+ assert.match(html,/data-name="SpeedPLC" checked/);
+ assert.equal(sandbox.recipeTypedEditor(sandbox.p.variables[0],'50'),50);
+ assert.throws(()=>sandbox.recipeTypedEditor(sandbox.p.variables[0],'1.5'),/entero/);
+ assert.throws(()=>sandbox.recipeTypedEditor(sandbox.p.variables[0],''),/número/);
+ assert.equal(sandbox.recipeTypedEditor(sandbox.p.internalVariables[0],'true'),true);
 });
