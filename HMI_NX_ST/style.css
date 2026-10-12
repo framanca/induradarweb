@@ -101,3 +101,8 @@
 #recipeEditor .recipe-card-actions{display:flex;gap:8px;justify-content:flex-end;margin:10px 0 3px}
 #recipeEditor .recipe-card-actions button{min-width:80px}
 #recipeEditor .recipe-card-actions [data-del-recipe]{color:#b42318}
+
+/* Recipe Retain bank capacity feedback without the former global whitelist. */
+#recipeCapacitySummary{margin:7px 0 11px;font-size:12px}
+#recipeEditor .recipe-capacity-info{font-size:11px;color:#475569;margin:7px 0 3px}
+#recipeCapacitySummary.recipe-capacity-warning,#recipeEditor .recipe-capacity-warning{color:#b91c1c;font-weight:700}
