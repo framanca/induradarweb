@@ -25,7 +25,10 @@ def build(dest):
             text=replace(text,'<iframe id="previewFrame" title="Previsualización de la HMI">','<iframe id="previewFrame" sandbox="allow-scripts" title="Previsualización de la HMI">')
             text=text.replace('HMI NX ST','HMI NX Online')
         if name == 'app.js':
-            text=replace(text,"let p=C.demoProject()", "let p=C.newProject()")
+            # Source editor already starts with an empty project (recipes disabled).
+            # Keep an explicit assertion rather than replacing the old demo default.
+            if text.count("let p=C.newProject()") != 1:
+                raise RuntimeError('Editor must default to a new project')
             text=text.replace("'hmi-nx-st:p0:","'hmi-nx-online:p0:")
             start=text.index('function renderDiag()'); end=text.index('\nfunction ',start+10)
             text=text[:start]+'''function renderDiag(){
