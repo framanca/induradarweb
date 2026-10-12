@@ -922,12 +922,13 @@ with sync_playwright() as pw:
     kb_frame.locator("#vkAccept").click()
     assert kb_frame.locator("#virtualKeyboard").is_hidden()
     assert entries.nth(0).input_value() == "25"
+    original_string = entries.nth(1).input_value()
     entries.nth(1).click()
     assert "numeric" not in kb_frame.locator("#vkKeys").get_attribute("class")
     kb_frame.locator("#vkKeys button").get_by_text("A", exact=True).click()
     kb_frame.locator("#vkKeys button").get_by_text("B", exact=True).click()
     assert kb_frame.locator("#vkValue").input_value() == "AB"
-    assert entries.nth(1).input_value() == ""
+    assert entries.nth(1).input_value() == original_string
     kb_frame.locator("#vkAccept").click()
     assert entries.nth(1).input_value() == "AB"
     kb_frame.locator("#recipeOpen").click()
