@@ -777,6 +777,8 @@ with sync_playwright() as pw:
     assert page.locator("#recipeVariableEditor").count() == 0
     assert page.locator("#recipeCapacitySummary").is_visible()
     page.locator("#addRecipe").click()
+    assert page.locator('[data-recipe-scope="0"]').input_value() == "shared"
+    page.locator('[data-recipe-scope="0"]').select_option("local")  # Explicitly opt into browser storage for this offline test.
     page.locator('[data-recipe-name="0"]').fill("Nivel inicial")
     page.locator('[data-recipe-name="0"]').press("Tab")
     page.locator('[data-recipe-toggle="0"][data-name="Internal_1"]').check()
@@ -818,6 +820,8 @@ with sync_playwright() as pw:
     recipe_frame.locator("#recipeDelete").click()
     assert recipe_frame.locator("#recipeSelect option").count() == 1
     recipe_frame.locator("#recipeNew").click()
+    assert recipe_frame.locator("#recipeScope").input_value() == "shared"
+    recipe_frame.locator("#recipeScope").select_option("local")  # Opt in before saving without a connected NX.
     recipe_frame.locator("#recipeName").fill("Receta creada runtime")
     recipe_frame.locator('[data-recipe-included="Internal_1"]').check()
     recipe_frame.locator('[data-recipe-value="Internal_1"]').fill("21")
@@ -875,6 +879,7 @@ with sync_playwright() as pw:
     page.locator('#varList [data-acc="0"]').select_option("RW")
     select_sidebar("recipes")
     page.locator("#addRecipe").click()
+    assert page.locator('[data-recipe-scope="0"]').input_value() == "shared"
     page.locator('[data-recipe-name="0"]').fill("Formato compartido")
     page.locator('[data-recipe-name="0"]').press("Tab")
     page.locator('[data-recipe-toggle="0"][data-name="SpeedPLC"]').check()
@@ -987,6 +992,7 @@ with sync_playwright() as pw:
     assert entries.nth(1).input_value() == "AB"
     kb_frame.locator("#recipeOpen").click()
     kb_frame.locator("#recipeNew").click()
+    assert kb_frame.locator("#recipeScope").input_value() == "shared"
     kb_frame.locator("#recipeName").click()
     assert kb_frame.locator("#virtualKeyboard").is_visible()
     kb_frame.locator("#vkValue").fill("Lote 1")
