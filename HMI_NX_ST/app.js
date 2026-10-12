@@ -537,7 +537,8 @@ $('#closeDiagnostics').onclick=$('#closeDiagnosticsBottom').onclick=()=>{$('#dia
 $('#diagnosticsDialog').addEventListener('close',()=>$('#exportBtn').setAttribute('aria-expanded','false'));
 $('#undoBtn').onclick=editUndo;$('#redoBtn').onclick=editRedo;
 $('#widgetMenu').addEventListener('click',e=>{const action=e.target.closest('[data-widget-action]')?.dataset.widgetAction;hideWidgetMenu();if(action==='copy')copyWidget();if(action==='paste')pasteWidget();if(action==='front')changeWidgetLayer('front');if(action==='back')changeWidgetLayer('back');});
-document.addEventListener('pointerdown',e=>{if(!e.target.closest?.('#widgetMenu'))hideWidgetMenu()});document.addEventListener('scroll',hideWidgetMenu,true);
+document.addEventListener('pointerdown',e=>{if(!e.target.closest?.('#widgetMenu'))hideWidgetMenu()});// The menu is position:fixed. Do not close it on programmatic scroll-to-click,
+// which otherwise makes its own buttons disappear before they can be activated.
 document.addEventListener('focusin',e=>{const el=e.target;if(el.matches?.('#projectName,#port,#pollMs,#screenW,#screenH,#minDisplayWidth,#maxDisplayWidth,[data-p],[data-alarm],[data-recipe-name],[data-recipe-value],[data-exp],[data-acc]'))editFocus={element:el,state:editState()};});
 document.addEventListener('keydown',e=>{if(!(e.ctrlKey||e.metaKey)||e.altKey||e.target.closest?.('input,textarea,select,[contenteditable]'))return;const key=e.key.toLowerCase();if(key==='c'&&!e.shiftKey){if(selected&&activeScreen().objects.some(o=>o.id===selected)){e.preventDefault();copyWidget()}}else if(key==='v'&&!e.shiftKey){if(widgetClipboard){e.preventDefault();pasteWidget()}}else if(key==='z'||key==='y'){e.preventDefault();if(key==='y'||e.shiftKey)editRedo();else editUndo();}});
 p0Boot();
