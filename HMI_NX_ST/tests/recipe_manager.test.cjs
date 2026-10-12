@@ -95,7 +95,7 @@ test('NX-only JSON seed is ASCII and project capacity is validated',()=>{
  const huge=project();huge.recipes[0].values.HMIName='X'.repeat(510);
  assert.ok(C.validate(huge).some(msg=>msg.includes('500 bytes')));
  const many=project();many.recipes=Array.from({length:13},(_,i)=>({id:'r'+i,scope:'shared',name:'R'+i,values:{SpeedPLC:i}}));
- assert.ok(C.validate(many).some(msg=>msg.includes('Máximo 12 recetas')));
+ assert.ok(C.validate(many).some(msg=>msg.includes('máximo 12 recetas')));
 });
 test('editor uses per-recipe checkboxes without a global recipe variable whitelist',()=>{
  const editor=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8'),markup=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
