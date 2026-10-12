@@ -308,8 +308,8 @@ function renderRecipeManager(){
  for(const item of items){const option=E("option");option.value=item.key;option.textContent=(item.key.startsWith("S:")?"NX \u00b7 ":"Local \u00b7 ")+item.data.name;recipeSelect.append(option)}
  if(recipeDraft&&recipeSelected.startsWith("N:")){const option=E("option");option.value=recipeSelected;option.textContent="Sin guardar \u00b7 "+recipeDraft.name;recipeSelect.append(option)}
  if(!recipeDraft&&items.length){recipeSelected=items[0].key;recipeDraft=recipeClone(items[0].data)}
- if(recipeDraft){recipeSelect.value=recipeSelected;recipeName.value=recipeDraft.name;recipeScope.value=recipeDraft.scope||"local"}
- else{recipeName.value="";recipeScope.value="local"}
+ if(recipeDraft){recipeSelect.value=recipeSelected;recipeName.value=recipeDraft.name;recipeScope.value=recipeDraft.scope||"shared"}
+ else{recipeName.value="";recipeScope.value="shared"}
  const existing=!recipeSelected.startsWith("N:")&&Boolean(recipeDraft);
  recipeName.disabled=!recipeDraft||recipeBusy;
  recipeScope.disabled=!recipeDraft||existing||recipeBusy;
@@ -414,7 +414,7 @@ function recipeDuplicateName(copy){
  throw Error("No queda un nombre disponible para la copia")
 }
 function recipeNewDraft(copy){
- const o=copy?recipeClone(copy):{id:recipeUid(),name:"Nueva receta",scope:"local",values:{}};
+ const o=copy?recipeClone(copy):{id:recipeUid(),name:"Nueva receta",scope:"shared",values:{}};
  o.id=recipeUid();o.name=copy?recipeDuplicateName(o):"Nueva receta";recipeSelected="N:"+o.id;recipeDraft=o;recipeDirty=true;renderRecipeManager();recipeAlert("Receta sin guardar: modifica nombre, valores y destino, despu\u00e9s pulsa Guardar")
 }
 async function recipeSaveDraft(){

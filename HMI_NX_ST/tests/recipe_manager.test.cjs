@@ -68,6 +68,11 @@ test('generated runtime supports recipe CRUD, comparative values, local persiste
  assert.ok(html.indexOf('id="recipeDuplicate"')<html.indexOf('id="recipeDelete"'),'runtime Duplicar before Eliminar');
  assert.match(html,/function recipeDuplicateName\(copy\)/);
  assert.match(html,/recipeNewDraft\(source\)/);
+ assert.match(html,/name:\\?"Nueva receta\\?",scope:\\?"shared\\?"/);
+ assert.match(html,/recipeScope\.value=\\?"shared\\?"/);
+ const editor=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8');
+ assert.match(editor,/const scope='shared';/);
+ assert.match(editor,/p\.recipes\.push\(\{id:C\.id\(\),name:'Receta '\+i,scope,values:\{\}\}\)/);
  for(const marker of ['recipeStorageSave','recipeStoreShared','recipeRefreshShared','recipeImportFile','recipeExportJSON','recipeCaptureCurrent','checkRecipeApplyJob','recipeTypedValue','recipeApplySelected'])assert.ok(html.includes(marker),marker);
  assert.match(html,/recipeAlert\("Aplicando al PLC y comprobando valores recibidos/);
  assert.match(html,/recipeApplyJob=\{plc,local,started:Date\.now\(\)\}/);
