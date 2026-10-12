@@ -92,6 +92,7 @@
           <label>Bytes JSON por receta (64–500)<input id="recipeBytes" type="number" min="64" max="500" step="1" value="500"></label>
         </div>
         <p class="hint">Reserva Retain según el número y tamaño elegidos. Cada receta usa una cadena STRING del tamaño configurado más 12 caracteres de margen, una revisión UDINT y un indicador global de inicialización. La capacidad se comprueba al exportar y al guardar desde el navegador.</p>
+        <p class="hint"><strong>Antes de modificar la capacidad en un PLC instalado:</strong> exporta las recetas a JSON desde la HMI. Cambiar dimensiones de variables Retain o transferir otro programa puede reinicializar el banco. Las antiguas recetas guardadas solo en el navegador no se migran automáticamente: expórtalas desde el runtime anterior e impórtalas en el nuevo.</p>
         <h3 class="sub-title">Recetas iniciales</h3>
         <div id="recipeCapacitySummary" class="hint" role="status" aria-live="polite"></div>
         <div id="recipeEditor"></div>
