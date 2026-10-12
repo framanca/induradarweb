@@ -324,7 +324,12 @@ with sync_playwright() as pw:
     recipe_count = page.locator("#recipeEditor .editor-card").count()
     page.locator("#addRecipe").click()
     assert page.locator("#recipeEditor .editor-card").count() == recipe_count + 1
-    page.locator("#undoBtn").click()
+    page.locator(f'[data-duplicate-recipe="{recipe_count}"]').click()
+    assert page.locator("#recipeEditor .editor-card").count() == recipe_count + 2
+    assert page.locator(f'[data-recipe-name="{recipe_count + 1}"]').input_value().endswith(" (copia)")
+    page.locator("#undoBtn").click()  # recipe duplication
+    assert page.locator("#recipeEditor .editor-card").count() == recipe_count + 1
+    page.locator("#undoBtn").click()  # recipe creation
     assert page.locator("#recipeEditor .editor-card").count() == recipe_count
     assert page.locator("#canvas .widget").count() == 1
     select_sidebar("project")
@@ -760,8 +765,10 @@ with sync_playwright() as pw:
     recipe_frame.locator("#recipeOpen").click()
     assert "Nivel editado" in recipe_frame.locator("#recipeSelect").inner_text()
     assert recipe_frame.locator('[data-recipe-value="Internal_1"]').input_value() == "9"
+    assert recipe_frame.locator("#recipeDuplicate").evaluate("(el) => el.nextElementSibling?.id === 'recipeDelete'")
     recipe_frame.locator("#recipeDuplicate").click()
     assert "(copia)" in recipe_frame.locator("#recipeName").input_value()
+    assert recipe_frame.locator('[data-recipe-value="Internal_1"]').input_value() == "9"
     recipe_frame.locator("#recipeSave").click()
     assert recipe_frame.locator("#recipeSelect option").count() == 2
     recipe_frame.locator("#recipeDelete").click()

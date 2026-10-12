@@ -96,3 +96,8 @@
 #recipeEditor .recipe-value-label small{font-size:10px;color:#64748b;font-weight:400}
 #recipeEditor .recipe-value-row>input,#recipeEditor .recipe-value-row>select{width:100%;min-width:0;margin:0;padding:5px;font-size:12px}
 #recipeEditor .recipe-value-row>input:disabled,#recipeEditor .recipe-value-row>select:disabled{opacity:.55}
+
+/* Keep recipe copy and delete adjacent in the editor. */
+#recipeEditor .recipe-card-actions{display:flex;gap:8px;justify-content:flex-end;margin:10px 0 3px}
+#recipeEditor .recipe-card-actions button{min-width:80px}
+#recipeEditor .recipe-card-actions [data-del-recipe]{color:#b42318}
