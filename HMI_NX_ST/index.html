@@ -47,6 +47,7 @@
       <div class="grid2"><label>Puerto<input id="port" type="number" min="1024" max="65535" value="8080"></label><label>Polling ms<input id="pollMs" type="number" min="100" max="5000" value="500"></label></div>
       <div class="grid2"><label>Ancho diseño<input id="screenW" type="number" min="320" max="3840" value="1024"></label><label>Alto diseño<input id="screenH" type="number" min="240" max="2160" value="600"></label></div>
       <div class="grid2"><label>Ancho mín.<input id="minDisplayWidth" type="number" value="480"></label><label>Ancho máx.<input id="maxDisplayWidth" type="number" value="1920"></label></div>
+      <label>Teclado virtual<select id="keyboardMode"><option value="auto">Automático del dispositivo</option><option value="webhmi">Teclado WebHMI (táctil)</option><option value="off">Desactivado (teclado físico)</option></select></label>
       <label>Control de pantalla desde PLC<select id="screenBinding"><option value="">— Navegación manual —</option></select></label>
       <p class="hint">Opcional: variable entera del PLC en lectura. Su valor selecciona el número de pantalla; si no existe, se muestra la primera (principal). Con esta opción, la navegación queda bajo control del PLC.</p>
     </section>

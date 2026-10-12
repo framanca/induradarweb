@@ -876,6 +876,73 @@ with sync_playwright() as pw:
     page.unroute("**/api/recipe*", mock_recipe_bank)
     checks.append("shared_recipe_bank_cas_conflict_preserved_draft_refresh_and_stale_apply_block")
 
+    # WebHMI virtual keyboards: touchscreen use without physical keyboard,
+    # no write on typing/cancel, numeric validation, and STRING alpha keyboard.
+    page.locator("#newBtn").click()
+    select_sidebar("project")
+    assert page.locator("#keyboardMode").input_value() == "auto"
+    page.locator("#keyboardMode").select_option("webhmi")
+    select_sidebar("variables")
+    page.locator("#addInternalVar").click()
+    page.locator("#addInternalVar").click()
+    page.locator('#internalVarList [data-iv="0"][data-key="type"]').select_option("INT")
+    page.locator('#internalVarList [data-iv="1"][data-key="type"]').select_option("STRING")
+    select_sidebar("elements")
+    page.locator('.tool-grid [data-kind="input"]').click()
+    page.locator("#properties [data-p='binding']").select_option("Internal_1")
+    page.locator("#properties [data-p='x']").fill("60")
+    page.locator("#properties [data-p='x']").press("Tab")
+    page.locator('.tool-grid [data-kind="input"]').click()
+    page.locator("#properties [data-p='binding']").select_option("Internal_2")
+    page.locator("#properties [data-p='x']").fill("370")
+    page.locator("#properties [data-p='x']").press("Tab")
+    assert page.locator("#diagnostics .diagnostic.error").count() == 0
+    page.locator("#previewBtn").click()
+    kb_frame = page.frame_locator("#previewFrame")
+    entries = kb_frame.locator("#stage .o.input input")
+    assert entries.count() == 2
+    assert entries.nth(0).get_attribute("readonly") is not None
+    assert entries.nth(1).get_attribute("readonly") is not None
+    assert kb_frame.locator("#virtualKeyboard").is_hidden()
+    entries.nth(0).click()
+    assert kb_frame.locator("#virtualKeyboard").is_visible()
+    assert "numeric" in kb_frame.locator("#vkKeys").get_attribute("class")
+    kb_frame.locator("#vkKeys button").get_by_text("7", exact=True).click()
+    assert kb_frame.locator("#vkValue").input_value() == "7"
+    assert entries.nth(0).input_value() == "0"  # Not committed during typing
+    kb_frame.locator("#vkCancel").click()
+    assert kb_frame.locator("#virtualKeyboard").is_hidden()
+    assert entries.nth(0).input_value() == "0"  # Cancel discards everything
+    entries.nth(0).click()
+    kb_frame.locator("#vkValue").fill("not-a-number")
+    kb_frame.locator("#vkAccept").click()
+    assert kb_frame.locator("#virtualKeyboard").is_visible()
+    assert "Formato numérico" in kb_frame.locator("#vkError").inner_text()
+    kb_frame.locator("#vkValue").fill("25")
+    kb_frame.locator("#vkAccept").click()
+    assert kb_frame.locator("#virtualKeyboard").is_hidden()
+    assert entries.nth(0).input_value() == "25"
+    original_string = entries.nth(1).input_value()
+    entries.nth(1).click()
+    assert "numeric" not in kb_frame.locator("#vkKeys").get_attribute("class")
+    kb_frame.locator("#vkKeys button").get_by_text("A", exact=True).click()
+    kb_frame.locator("#vkKeys button").get_by_text("B", exact=True).click()
+    assert kb_frame.locator("#vkValue").input_value() == "AB"
+    assert entries.nth(1).input_value() == original_string
+    kb_frame.locator("#vkAccept").click()
+    assert entries.nth(1).input_value() == "AB"
+    kb_frame.locator("#recipeOpen").click()
+    kb_frame.locator("#recipeNew").click()
+    kb_frame.locator("#recipeName").click()
+    assert kb_frame.locator("#virtualKeyboard").is_visible()
+    kb_frame.locator("#vkValue").fill("Lote 1")
+    kb_frame.locator("#vkAccept").click()
+    assert kb_frame.locator("#recipeName").input_value() == "Lote 1"
+    page.locator("#closePreview").click()
+    select_sidebar("project")
+    assert page.locator("#keyboardMode").input_value() == "webhmi"
+    checks.append("virtual_keyboards_numeric_alpha_cancel_accept_validation_recipe_and_project_config")
+
     assert not errors, "Browser JavaScript errors: " + repr(errors)
     report = {
         "status": "PASS",
