@@ -356,6 +356,8 @@ with sync_playwright() as pw:
     page.locator("#undoBtn").click()
     assert page.locator("#alarmEditor .editor-card").count() == alarm_count
     select_sidebar("recipes")
+    assert page.locator("#addRecipe").is_disabled()
+    page.locator("#recipeEnabled").check()
     recipe_count = page.locator("#recipeEditor .editor-card").count()
     page.locator("#addRecipe").click()
     assert page.locator("#recipeEditor .editor-card").count() == recipe_count + 1
@@ -764,74 +766,57 @@ with sync_playwright() as pw:
     checks.append("hmi_internal_alarms_bool_int_offline_ack_all_reset_and_retrigger")
 
 
-    # Recipes: no global whitelist; runtime edits/captures/applies and
-    # persists browser-local recipes without touching PLC APIs.
+    # Recipes are optional. Without them the generated runtime has no recipe UI.
     page.locator("#newBtn").click()
+    select_sidebar("recipes")
+    assert not page.locator("#recipeEnabled").is_checked()
+    assert page.locator("#recipeSettings").is_hidden()
+    assert page.locator("#addRecipe").is_disabled()
+    page.locator("#previewBtn").click()
+    recipe_frame = page.frame_locator("#previewFrame")
+    assert recipe_frame.locator("#recipeOpen").count() == 0
+    assert recipe_frame.locator("#recipeWindow").count() == 0
+    page.locator("#closePreview").click()
+
+    # Enabling recipes creates only NX Retain recipes, even for internal HMI fields.
+    page.locator("#recipeEnabled").check()
+    assert page.locator("#recipeSettings").is_visible()
+    page.locator("#recipeSlots").fill("3")
+    page.locator("#recipeSlots").press("Tab")
+    page.locator("#recipeBytes").fill("180")
+    page.locator("#recipeBytes").press("Tab")
     select_sidebar("variables")
     page.locator("#addInternalVar").click()
     page.locator('#internalVarList [data-iv="0"][data-key="type"]').select_option("INT")
-    page.locator('#internalVarList [data-iv="0"][data-key="value"]').fill("0")
-    page.locator('#internalVarList [data-iv="0"][data-key="value"]').press("Tab")
-    page.locator("#addInternalVar").click()  # Not used in any initial recipe, still offered at runtime
+    page.locator("#addInternalVar").click()
     select_sidebar("recipes")
     assert page.locator("#recipeVariableEditor").count() == 0
     assert page.locator("#recipeCapacitySummary").is_visible()
     page.locator("#addRecipe").click()
-    assert page.locator('[data-recipe-scope="0"]').input_value() == "shared"
-    page.locator('[data-recipe-scope="0"]').select_option("local")  # Explicitly opt into browser storage for this offline test.
+    assert page.locator('[data-recipe-scope="0"]').count() == 0
+    assert "Memoria Retain NX" in page.locator("#recipeEditor").inner_text()
     page.locator('[data-recipe-name="0"]').fill("Nivel inicial")
     page.locator('[data-recipe-name="0"]').press("Tab")
     page.locator('[data-recipe-toggle="0"][data-name="Internal_1"]').check()
     page.locator('[data-recipe-value="0"][data-name="Internal_1"]').fill("7")
     page.locator('[data-recipe-value="0"][data-name="Internal_1"]').press("Tab")
     assert "1 / 20 variables" in page.locator('[data-recipe-capacity="0"]').inner_text()
-    assert page.locator('[data-recipe-scope="0"]').input_value() == "local"
+    assert "1 / 3" in page.locator("#recipeCapacitySummary").inner_text()
+    assert "180 bytes" in page.locator("#recipeCapacitySummary").inner_text()
     assert page.locator("#diagnostics .diagnostic.error").count() == 0
-    select_sidebar("elements")
-    page.locator('.tool-grid [data-kind="value"]').click()
-    page.locator("#properties [data-p='binding']").select_option("Internal_1")
     page.locator("#previewBtn").click()
-    recipe_frame = page.frame_locator("#previewFrame")
     recipe_frame.locator("#recipeOpen").click()
     assert recipe_frame.locator("#recipeWindow").is_visible()
+    assert recipe_frame.locator("#recipeScope").count() == 0
     assert "Nivel inicial" in recipe_frame.locator("#recipeSelect").inner_text()
-    assert recipe_frame.locator('[data-recipe-value="Internal_1"]').input_value() == "7"
     assert recipe_frame.locator('[data-recipe-included="Internal_2"]').count() == 1
-    assert recipe_frame.locator("#recipeApply").is_enabled()
-    recipe_frame.locator("#recipeApply").click()
-    assert recipe_frame.locator("#stage .o.value .in").inner_text() == "7"
-    recipe_frame.locator("#recipeName").fill("Nivel editado")
-    recipe_frame.locator('[data-recipe-value="Internal_1"]').fill("9")
-    recipe_frame.locator("#recipeSave").click()
-    assert "Nivel editado" in recipe_frame.locator("#recipeSelect").inner_text()
-    assert recipe_frame.locator("#recipeApply").is_enabled()
-    recipe_frame.locator("#recipeClose").click()
-    page.locator("#closePreview").click()
-    page.locator("#previewBtn").click()
-    recipe_frame.locator("#recipeOpen").click()
-    assert "Nivel editado" in recipe_frame.locator("#recipeSelect").inner_text()
-    assert recipe_frame.locator('[data-recipe-value="Internal_1"]').input_value() == "9"
-    assert recipe_frame.locator("#recipeDuplicate").evaluate("(el) => el.nextElementSibling?.id === 'recipeDelete'")
-    recipe_frame.locator("#recipeDuplicate").click()
-    assert "(copia)" in recipe_frame.locator("#recipeName").input_value()
-    assert recipe_frame.locator('[data-recipe-value="Internal_1"]').input_value() == "9"
-    recipe_frame.locator("#recipeSave").click()
-    assert recipe_frame.locator("#recipeSelect option").count() == 2
-    recipe_frame.locator("#recipeDelete").click()
-    assert recipe_frame.locator("#recipeSelect option").count() == 1
     recipe_frame.locator("#recipeNew").click()
-    assert recipe_frame.locator("#recipeScope").input_value() == "shared"
-    recipe_frame.locator("#recipeScope").select_option("local")  # Opt in before saving without a connected NX.
-    recipe_frame.locator("#recipeName").fill("Receta creada runtime")
+    assert "Nueva receta" in recipe_frame.locator("#recipeName").input_value()
     recipe_frame.locator('[data-recipe-included="Internal_1"]').check()
-    recipe_frame.locator('[data-recipe-value="Internal_1"]').fill("21")
     recipe_frame.locator("#recipeSave").click()
-    assert recipe_frame.locator("#recipeSelect option").count() == 2
-    recipe_frame.locator("#recipeApply").click()
-    assert recipe_frame.locator("#stage .o.value .in").inner_text() == "21"
+    assert "Conecta con el NX" in recipe_frame.locator("#recipeMessage").inner_text() or "NX sin" in recipe_frame.locator("#recipeMessage").inner_text()
     page.locator("#closePreview").click()
-    checks.append("runtime_recipe_manager_internal_variables_crud_persistence_and_apply_offline")
-
+    checks.append("optional_nx_only_recipe_bank_capacity_and_disabled_runtime")
 
     # Shared recipes: mock the NX's Retain bank and verify CAS save, stale
     # revisions, refresh conflict recovery, and blocking stale application.
@@ -848,13 +833,13 @@ with sync_playwright() as pw:
         parsed = urlsplit(request.url)
         shared_calls.append((request.method, parsed.path, parsed.query))
         if parsed.path == "/api/recipes":
-            rows = ["RCPV=1"] + [f"{i}={shared_bank.get(i, {'rev': 0})['rev']}" for i in range(1, 13)]
+            rows = ["RCPV=1"] + [f"{i}={shared_bank.get(i, {'rev': 0})['rev']}" for i in range(1, 4)]
             route.fulfill(status=200, body="\n".join(rows)+"\n", content_type="text/plain")
             return
         if parsed.path == "/api/recipe":
             params = parse_qs(parsed.query)
             slot = int(params.get("slot", ["0"])[0])
-            if slot < 1 or slot > 12:
+            if slot < 1 or slot > 3:
                 route.fulfill(status=400, body="BAD SLOT")
                 return
             entry = shared_bank.get(slot, {"rev": 0, "data": ""})
@@ -878,16 +863,19 @@ with sync_playwright() as pw:
     page.locator("#pasteImport").click()
     page.locator('#varList [data-acc="0"]').select_option("RW")
     select_sidebar("recipes")
+    page.locator("#recipeEnabled").check()
+    page.locator("#recipeSlots").fill("3")
+    page.locator("#recipeSlots").press("Tab")
+    page.locator("#recipeBytes").fill("180")
+    page.locator("#recipeBytes").press("Tab")
     page.locator("#addRecipe").click()
-    assert page.locator('[data-recipe-scope="0"]').input_value() == "shared"
+    assert page.locator('[data-recipe-scope="0"]').count() == 0
     page.locator('[data-recipe-name="0"]').fill("Formato compartido")
     page.locator('[data-recipe-name="0"]').press("Tab")
     page.locator('[data-recipe-toggle="0"][data-name="SpeedPLC"]').check()
     page.locator('[data-recipe-value="0"][data-name="SpeedPLC"]').fill("60")
     page.locator('[data-recipe-value="0"][data-name="SpeedPLC"]').press("Tab")
     assert "1 / 20 variables" in page.locator('[data-recipe-capacity="0"]').inner_text()
-    page.locator('[data-recipe-scope="0"]').select_option("shared")
-    assert page.locator('[data-recipe-scope="0"]').input_value() == "shared"
     assert page.locator("#diagnostics .diagnostic.error").count() == 0
     page.locator("#previewBtn").click()
     shared_frame = page.frame_locator("#previewFrame")
@@ -990,9 +978,13 @@ with sync_playwright() as pw:
     assert entries.nth(1).input_value() == original_string
     kb_frame.locator("#vkAccept").click()
     assert entries.nth(1).input_value() == "AB"
+    assert kb_frame.locator("#recipeOpen").count() == 0
+    page.locator("#closePreview").click()
+    select_sidebar("recipes")
+    page.locator("#recipeEnabled").check()
+    page.locator("#previewBtn").click()
     kb_frame.locator("#recipeOpen").click()
     kb_frame.locator("#recipeNew").click()
-    assert kb_frame.locator("#recipeScope").input_value() == "shared"
     kb_frame.locator("#recipeName").click()
     assert kb_frame.locator("#virtualKeyboard").is_visible()
     kb_frame.locator("#vkValue").fill("Lote 1")
