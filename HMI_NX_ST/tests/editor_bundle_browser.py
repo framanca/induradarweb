@@ -830,6 +830,7 @@ with sync_playwright() as pw:
     page.locator('[data-recipe-value="0"][data-name="SpeedPLC"]').fill("60")
     page.locator('[data-recipe-value="0"][data-name="SpeedPLC"]').press("Tab")
     assert page.locator('#recipeVariableEditor [data-recipe-var="SpeedPLC"]').is_checked()
+    page.locator('[data-recipe-scope="0"]').select_option("shared")
     assert page.locator('[data-recipe-scope="0"]').input_value() == "shared"
     assert page.locator("#diagnostics .diagnostic.error").count() == 0
     page.locator("#previewBtn").click()
