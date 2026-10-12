@@ -46,8 +46,8 @@ function buildST(input){
  const alarmReset=p.alarms.map((a,i)=>{const v=vm.get(a.binding);return v?`IF NOT ${alarmExpr(v,a)} THEN Web_AlarmAck[${i+1}] := FALSE; END_IF;`:''}).filter(Boolean).join('\n');
  const alarmAckCases=p.alarms.map((a,i)=>{const v=vm.get(a.binding);return v?`${i+1}:\n IF ${alarmExpr(v,a)} THEN Web_AlarmAck[${i+1}] := TRUE; END_IF;\n Web_Found := TRUE;`:''}).filter(Boolean).join('\n');
  const alarmAckAll=p.alarms.map((a,i)=>{const v=vm.get(a.binding);return v?`IF ${alarmExpr(v,a)} THEN Web_AlarmAck[${i+1}] := TRUE; END_IF;`:''}).filter(Boolean).join('\n');
- const recipeCases=p.recipes.map((r,i)=>{const assigns=[];for(const [name,value] of Object.entries(r.values||{})){const v=vm.get(name);if(v&&v.access==='RW'&&v.writeSupported)assigns.push(v.enumType?`NumToEnum(${stTyped(v,value)}, ${v.name});`:`${v.name} := ${stTyped(v,value)};`);}return `${i+1}:\n                ${assigns.join('\n                ')||';'}\n                Web_Found := TRUE;`;}).join('\n            ');
- const recipeInit=p.recipes.filter(r=>r.scope==='shared').map((r,i)=>{
+ const recipeCases=(p.recipeEnabled?p.recipes:[]).map((r,i)=>{const assigns=[];for(const [name,value] of Object.entries(r.values||{})){const v=vm.get(name);if(v&&v.access==='RW'&&v.writeSupported)assigns.push(v.enumType?`NumToEnum(${stTyped(v,value)}, ${v.name});`:`${v.name} := ${stTyped(v,value)};`);}return `${i+1}:\n                ${assigns.join('\n                ')||';'}\n                Web_Found := TRUE;`;}).join('\n            ');
+ const recipeInit=(p.recipeEnabled?p.recipes:[]).map((r,i)=>{
   const blob=C.recipeWireJSON(r);
   if(enc.encode(blob).length>p.recipeBytes)throw Error('Receta '+r.name+': exceso de capacidad NX');
   return "Web_RecipeData["+(i+1)+"] := '"+stLiteral(blob)+"'; Web_RecipeRev["+(i+1)+"] := UDINT#1;";
@@ -57,7 +57,7 @@ function buildST(input){
    Proyecto: ${p.name}
    Puerto: ${p.port}
    HTML embebido: ${enc.encode(html).length} bytes / ${parts.length} fragmentos
-   Funciones: RW, pantallas, imágenes, widgets industriales, alarmas actuales y recetas.
+   Funciones: RW, pantallas, imágenes, widgets industriales, alarmas actuales${p.recipeEnabled?' y recetas':''}.
    Seguridad funcional e interlocks permanecen en el programa de máquina.
 *)
 
