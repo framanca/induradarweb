@@ -724,7 +724,7 @@ with sync_playwright() as pw:
     preview_frame = page.frame_locator("#previewFrame")
     assert preview_frame.locator("#nav").evaluate("""(el) => [
         ...el.querySelectorAll('#recipeOpen,#alarmOpen,#alarmbar')
-    ].map(e=>e.id)""") == ["recipeOpen", "alarmOpen", "alarmbar"]
+    ].map(e=>e.id)""") == ["alarmOpen", "alarmbar"]
     alarm_button = preview_frame.locator("#alarmOpen")
     alarm_button.wait_for()
     assert page.frame_locator("#previewFrame").locator("#alarmCount").inner_text() == "1"
