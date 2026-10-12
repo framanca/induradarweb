@@ -85,12 +85,12 @@
     </section>
     <section id="sidebar-panel-recipes" role="tabpanel" aria-labelledby="sidebar-tab-recipes" data-sidebar-panel="recipes" tabindex="0" hidden>
       <div class="section-title"><h2>Recetas</h2><button id="addRecipe">+ Receta</button></div>
-      <h3 class="sub-title">Variables disponibles en recetas</h3>
-      <p class="hint">Marca las consignas PLC RW y/o variables internas permitidas en recetas. Los cambios en runtime no modifican el proyecto original.</p>
+      <h3 class="sub-title">Variables autorizadas para recetas</h3>
+      <p class="hint">Marca aquí las variables permitidas globalmente, o selecciónalas directamente dentro de cada receta: se autorizarán automáticamente. Los cambios en runtime no modifican el proyecto original.</p>
       <div id="recipeVariableEditor"></div>
       <h3 class="sub-title">Recetas iniciales</h3>
       <div id="recipeEditor"></div>
-      <p class="hint">Formato: Variable=Valor, una por línea. Compartida NX: almacenada como Retain en el PLC (hasta 12); local: solo en este navegador. El HTML no es un respaldo de recetas modificadas en ejecución.</p>
+      <p class="hint">En cada receta, marca las variables que necesites y define sus valores al lado. Compartida NX: almacenada como Retain en el PLC (hasta 12); local: solo en este navegador. El HTML no es un respaldo de recetas modificadas en ejecución.</p>
     </section>
     </div>
   </aside>
