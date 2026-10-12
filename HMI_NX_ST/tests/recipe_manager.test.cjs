@@ -65,6 +65,9 @@ test('generated runtime supports recipe CRUD, comparative values, local persiste
  assert.ok(script);
  assert.doesNotThrow(()=>new Function(script));
  for(const text of ['id="recipeWindow"','id="recipeSelect"','id="recipeName"','id="recipeSave"','id="recipeDelete"','id="recipeApply"','id="recipeNew"','id="recipeDuplicate"','id="recipeCapture"','id="recipeImport"','id="recipeExport"'])assert.ok(html.includes(text),text);
+ assert.ok(html.indexOf('id="recipeDuplicate"')<html.indexOf('id="recipeDelete"'),'runtime Duplicar before Eliminar');
+ assert.match(html,/function recipeDuplicateName\(copy\)/);
+ assert.match(html,/recipeNewDraft\(source\)/);
  for(const marker of ['recipeStorageSave','recipeStoreShared','recipeRefreshShared','recipeImportFile','recipeExportJSON','recipeCaptureCurrent','checkRecipeApplyJob','recipeTypedValue','recipeApplySelected'])assert.ok(html.includes(marker),marker);
  assert.match(html,/recipeAlert\("Aplicando al PLC y comprobando valores recibidos/);
  assert.match(html,/recipeApplyJob=\{plc,local,started:Date\.now\(\)\}/);
@@ -122,4 +125,32 @@ test('recipe checkboxes list all writable PLC/internal variables and pre-check o
  assert.throws(()=>sandbox.recipeTypedEditor(sandbox.p.variables[0],'1.5'),/entero/);
  assert.throws(()=>sandbox.recipeTypedEditor(sandbox.p.variables[0],''),/número/);
  assert.equal(sandbox.recipeTypedEditor(sandbox.p.internalVariables[0],'true'),true);
+});
+
+test('duplicating editor recipes keeps storage, deep-copies values and assigns unique names and IDs',()=>{
+ const p=project();
+ const original=p.recipes[0];
+ const copy1=C.duplicateRecipe(original,p.recipes);
+ assert.equal(copy1.scope,original.scope);
+ assert.equal(copy1.name,'Formato estándar (copia)');
+ assert.notEqual(copy1.id,original.id);
+ assert.deepEqual(JSON.parse(JSON.stringify(copy1.values)),JSON.parse(JSON.stringify(original.values)));
+ copy1.values.SpeedPLC=100;
+ assert.equal(original.values.SpeedPLC,60,'copy must not mutate original values');
+ p.recipes.push(copy1);
+ const copy2=C.duplicateRecipe(original,p.recipes);
+ assert.equal(copy2.name,'Formato estándar (copia 2)');
+ assert.ok(C.validate({...p,recipes:[...p.recipes,copy2]}).length===0);
+ const long={id:'long',scope:'local',name:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKL',values:{HMIFlag:true}};
+ const longCopy=C.duplicateRecipe(long,[long]);
+ assert.ok(longCopy.name.length<=48);
+ assert.ok(longCopy.name.endsWith(' (copia)'));
+ const localCopy=C.duplicateRecipe({...original,scope:'local'},p.recipes);
+ assert.equal(localCopy.name,'Formato estándar (copia)');
+ const editor=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8');
+ assert.match(editor,/function duplicateEditorRecipe\(index\)/);
+ assert.match(editor,/data-duplicate-recipe/);
+ assert.match(editor,/p\.recipes\.splice\(index\+1,0,clone\)/);
+ assert.match(editor,/C\.RECIPE_SHARED_MAX/);
+ assert.match(editor,/C\.RECIPE_LOCAL_MAX/);
 });
