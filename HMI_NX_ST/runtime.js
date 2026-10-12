@@ -221,21 +221,16 @@ startComm();
 `;}
 function recipeRuntimeJS(){return String.raw`
 const recipeOpen=document.getElementById("recipeOpen"),recipeWindow=document.getElementById("recipeWindow"),recipeClose=document.getElementById("recipeClose");
-const recipeSelect=document.getElementById("recipeSelect"),recipeName=document.getElementById("recipeName"),recipeScope=document.getElementById("recipeScope"),recipeFieldList=document.getElementById("recipeFieldList"),recipeMessageEl=document.getElementById("recipeMessage");
+const recipeSelect=document.getElementById("recipeSelect"),recipeName=document.getElementById("recipeName"),recipeFieldList=document.getElementById("recipeFieldList"),recipeMessageEl=document.getElementById("recipeMessage");
 const recipeFields=P.recipeFields||[],recipeFieldsByName=Object.fromEntries(recipeFields.map(f=>[f.name,f]));
-const recipeBrowserKey="hminx:recipes:v1:"+String(P.recipeKey||P.name);
-const recipeSlots=new Map(),recipeBrowser=[];
+const recipeSlots=new Map();
 let recipeRemoteReady=false,recipeBusy=false,recipeSelected="",recipeDraft=null,recipeDirty=false,recipeApplyJob=null;
 function recipeClone(o){return JSON.parse(JSON.stringify(o))}
 function recipeUid(){return "r"+Date.now().toString(36)+Math.random().toString(36).slice(2,10)}
 function recipeAlert(t,error){recipeMessageEl.textContent=t;recipeMessageEl.style.color=error?"#b91c1c":"#0f4c81"}
-function recipeStorageSave(){
- try{localStorage.setItem(recipeBrowserKey,JSON.stringify({version:1,recipes:recipeBrowser}));return true}
- catch(e){recipeAlert("No se pudieron conservar las recetas en el navegador: "+e.message,true);return false}
-}
 function recipeSanitize(candidate,scope){
  if(!candidate||typeof candidate!=="object"||Array.isArray(candidate))throw Error("Receta no v\u00e1lida");
- const o={id:typeof candidate.id==="string"&&candidate.id.length<=100?candidate.id:recipeUid(),name:String(candidate.name||""),scope,values:Object.create(null)};
+ const o={id:typeof candidate.id==="string"&&candidate.id.length<=100?candidate.id:recipeUid(),name:String(candidate.name||""),scope:"shared",values:Object.create(null)};
  if(!candidate.values||typeof candidate.values!=="object"||Array.isArray(candidate.values))throw Error("La receta necesita un mapa de valores");
  for(const [name,value] of Object.entries(candidate.values)){
   if(!Object.prototype.hasOwnProperty.call(recipeFieldsByName,name))throw Error("Variable ajena a este proyecto: "+name);
@@ -269,16 +264,9 @@ function recipeTypedValue(field,value){
  return raw
 }
 function recipeASCII(o){return JSON.stringify({id:o.id,name:o.name,values:o.values}).replace(/[^\x00-\x7F]/g,c=>"\\u"+c.charCodeAt(0).toString(16).padStart(4,"0"))}
-function recipeLoadBrowser(){
- let saved=null;
- try{const raw=localStorage.getItem(recipeBrowserKey);if(raw!==null){const o=JSON.parse(raw);if(o&&o.version===1&&Array.isArray(o.recipes))saved=o.recipes}}
- catch(e){recipeAlert("Error leyendo recetas locales: "+e.message,true)}
- const list=saved===null?P.recipes.filter(r=>r.scope==="local"):saved;
- for(const r of list){try{if(recipeBrowser.length<24)recipeBrowser.push(recipeSanitize(r,"local"))}catch(e){recipeAlert("Receta local omitida: "+e.message,true)}}
-}
 function recipeSeedShared(){
  let slot=1;
- for(const r of P.recipes.filter(r=>r.scope==="shared").slice(0,12)){
+ for(const r of P.recipes.slice(0,P.recipeSlots)){
   try{recipeSlots.set(slot,{rev:0,data:recipeSanitize(r,"shared"),fallback:true})}catch{}
   slot++;
  }
@@ -286,7 +274,6 @@ function recipeSeedShared(){
 function recipeListItems(){
  const items=[];
  for(const [slot,item] of [...recipeSlots].sort((a,b)=>a[0]-b[0]))if(item.data)items.push({key:"S:"+slot,data:item.data,slot,rev:item.rev});
- for(const r of recipeBrowser)items.push({key:"L:"+r.id,data:r});
  return items
 }
 function recipeSelectItem(key){
@@ -305,14 +292,13 @@ function refreshRecipeActualValues(){
 function renderRecipeManager(){
  const items=recipeListItems();
  recipeSelect.replaceChildren();
- for(const item of items){const option=E("option");option.value=item.key;option.textContent=(item.key.startsWith("S:")?"NX \u00b7 ":"Local \u00b7 ")+item.data.name;recipeSelect.append(option)}
+ for(const item of items){const option=E("option");option.value=item.key;option.textContent="NX \u00b7 "+item.data.name;recipeSelect.append(option)}
  if(recipeDraft&&recipeSelected.startsWith("N:")){const option=E("option");option.value=recipeSelected;option.textContent="Sin guardar \u00b7 "+recipeDraft.name;recipeSelect.append(option)}
  if(!recipeDraft&&items.length){recipeSelected=items[0].key;recipeDraft=recipeClone(items[0].data)}
- if(recipeDraft){recipeSelect.value=recipeSelected;recipeName.value=recipeDraft.name;recipeScope.value=recipeDraft.scope||"shared"}
- else{recipeName.value="";recipeScope.value="shared"}
+ if(recipeDraft){recipeSelect.value=recipeSelected;recipeName.value=recipeDraft.name}
+ else{recipeName.value=""}
  const existing=!recipeSelected.startsWith("N:")&&Boolean(recipeDraft);
  recipeName.disabled=!recipeDraft||recipeBusy;
- recipeScope.disabled=!recipeDraft||existing||recipeBusy;
  recipeFieldList.replaceChildren();
  for(const f of recipeFields){
   const row=E("div","recipe-field"),label=E("label","recipe-check"),check=E("input"),title=E("span"),fieldInput=f.type==="BOOL"?E("select","recipe-val"):E("input","recipe-val"),actual=E("span","recipe-live");
@@ -336,11 +322,10 @@ function renderRecipeManager(){
  recipeSelect.disabled=recipeBusy;document.getElementById("recipeNew").disabled=recipeBusy;document.getElementById("recipeImport").disabled=recipeBusy;
  document.getElementById("recipeRefresh").disabled=recipeBusy;
  recipeName.oninput=()=>{recipeDirty=true;document.getElementById("recipeApply").disabled=true};
- recipeScope.onchange=()=>{recipeDirty=true;document.getElementById("recipeApply").disabled=true};
 }
 function recipeReadForm(){
  if(!recipeDraft)throw Error("Selecciona una receta");
- const o={id:recipeDraft.id,name:recipeName.value.trim(),scope:recipeScope.value,values:Object.create(null)};
+ const o={id:recipeDraft.id,name:recipeName.value.trim(),scope:"shared",values:Object.create(null)};
  for(const check of recipeFieldList.querySelectorAll("[data-recipe-included]"))if(check.checked){
   const name=check.getAttribute("data-recipe-included"),field=recipeFieldsByName[name],input=Array.from(recipeFieldList.querySelectorAll("[data-recipe-value]")).find(x=>x.getAttribute("data-recipe-value")===name);
   o.values[name]=recipeTypedValue(field,input.value);
@@ -348,11 +333,11 @@ function recipeReadForm(){
  if(!o.name||o.name.length>48)throw Error("Nombre obligatorio, m\u00e1ximo 48 caracteres");
  if(!Object.keys(o.values).length)throw Error("Selecciona al menos una variable para la receta");
  if(Object.keys(o.values).length>20)throw Error("M\u00e1ximo 20 par\u00e1metros");
- if(o.scope==="shared"&&new TextEncoder().encode(recipeASCII(o)).length>500)throw Error("La receta supera los 500 bytes del banco NX");
+ if(new TextEncoder().encode(recipeASCII(o)).length>P.recipeBytes)throw Error("La receta supera los "+P.recipeBytes+" bytes del banco NX");
  if(recipeListItems().some(x=>x.key!==recipeSelected&&x.data.scope===o.scope&&x.data.name.toLowerCase()===o.name.toLowerCase()))throw Error("Ya hay otra receta con ese nombre");
  return o
 }
-recipeLoadBrowser();recipeSeedShared();
+recipeSeedShared();
 
 async function recipeRefreshShared(silent){
  if(recipeDirty&&!silent){
@@ -367,9 +352,9 @@ async function recipeRefreshShared(silent){
   const lines=(await res.text()).split(/\r?\n/);if(lines[0]!=="RCPV=1")throw Error("El NX no expone la versi\u00f3n de banco de recetas");
   const versions=new Map();
   for(const line of lines.slice(1)){const m=line.match(/^(\d{1,2})=(\d+)$/);if(m)versions.set(Number(m[1]),Number(m[2]))}
-  if(versions.size!==12)throw Error("Resumen NX incompleto");
+  if(versions.size!==P.recipeSlots)throw Error("Resumen NX incompleto");
   const next=new Map();
-  for(let slot=1;slot<=12;slot++){
+  for(let slot=1;slot<=P.recipeSlots;slot++){
    const rev=versions.get(slot),old=recipeSlots.get(slot);
    if(rev===0){next.set(slot,{rev:0,data:null});continue}
    if(old&&old.rev===rev&&!old.fallback){next.set(slot,old);continue}
@@ -389,7 +374,7 @@ async function recipeRefreshShared(silent){
 async function recipeStoreShared(rec,slot,expected){
  if(!recipeRemoteReady)throw Error("Sin banco NX accesible; no se puede guardar");
  const body=rec?recipeASCII(rec):"";
- if(new TextEncoder().encode(body).length>500)throw Error("Supera el l\u00edmite de 500 bytes por receta NX");
+ if(new TextEncoder().encode(body).length>P.recipeBytes)throw Error("Supera el l\u00edmite de "+P.recipeBytes+" bytes por receta NX");
  const res=await fetchTimed("/api/recipe?slot="+slot+"&rev="+expected,{
   method:"POST",headers:{"Content-Type":"text/plain;charset=UTF-8"},body
  },READ_TIMEOUT);
@@ -401,7 +386,7 @@ async function recipeStoreShared(rec,slot,expected){
  return rev
 }
 function recipeFirstSlot(){
- for(let slot=1;slot<=12;slot++){const item=recipeSlots.get(slot);if(!item||!item.data)return{slot,rev:item?.rev||0}}
+ for(let slot=1;slot<=P.recipeSlots;slot++){const item=recipeSlots.get(slot);if(!item||!item.data)return{slot,rev:item?.rev||0}}
  return null
 }
 function recipeDuplicateName(copy){
@@ -415,28 +400,20 @@ function recipeDuplicateName(copy){
 }
 function recipeNewDraft(copy){
  const o=copy?recipeClone(copy):{id:recipeUid(),name:"Nueva receta",scope:"shared",values:{}};
- o.id=recipeUid();o.name=copy?recipeDuplicateName(o):"Nueva receta";recipeSelected="N:"+o.id;recipeDraft=o;recipeDirty=true;renderRecipeManager();recipeAlert("Receta sin guardar: modifica nombre, valores y destino, despu\u00e9s pulsa Guardar")
+ o.id=recipeUid();o.scope="shared";o.name=copy?recipeDuplicateName(o):"Nueva receta";recipeSelected="N:"+o.id;recipeDraft=o;recipeDirty=true;renderRecipeManager();recipeAlert("Receta sin guardar: modifica nombre y valores y pulsa Guardar en NX")
 }
 async function recipeSaveDraft(){
  if(recipeBusy)return;
  let record;try{record=recipeReadForm()}catch(e){recipeAlert(e.message,true);return}
  const originalKey=recipeSelected;
  recipeDraft=recipeClone(record); // Keep unsaved edits intact even if NX save fails or returns 409.
- if(record.scope==="shared"&&!recipeRemoteReady){recipeAlert("Conecta con el NX antes de guardar una receta compartida",true);return}
+ if(!recipeRemoteReady){recipeAlert("Conecta con el NX antes de guardar una receta compartida",true);return}
  recipeBusy=true;renderRecipeManager();
  try{
-  if(record.scope==="local"){
-   const i=recipeBrowser.findIndex(x=>x.id===record.id);
-   if(i<0&&recipeBrowser.length>=24)throw Error("L\u00edmite de 24 recetas locales");
-   const previous=recipeBrowser.slice();if(i>=0)recipeBrowser[i]=record;else recipeBrowser.push(record);
-   if(!recipeStorageSave()){recipeBrowser.splice(0,recipeBrowser.length,...previous);throw Error("La receta no ha quedado guardada en el navegador")}
-   recipeSelected="L:"+record.id
-  }else{
-   const existing=originalKey.startsWith("S:")?Number(originalKey.slice(2)):0,free=existing?null:recipeFirstSlot();
-   if(!existing&&!free)throw Error("El banco NX est\u00e1 lleno (12 recetas). Elimina una o exporta y depura el banco");
-   const slot=existing||free.slot,rev=existing?recipeSlots.get(slot).rev:free.rev;
-   await recipeStoreShared(record,slot,rev);recipeSelected="S:"+slot;
-  }
+  const existing=originalKey.startsWith("S:")?Number(originalKey.slice(2)):0,free=existing?null:recipeFirstSlot();
+  if(!existing&&!free)throw Error("El banco NX est\u00e1 lleno ("+P.recipeSlots+" recetas). Elimina una o aumenta su capacidad en el editor");
+  const slot=existing||free.slot,rev=existing?recipeSlots.get(slot).rev:free.rev;
+  await recipeStoreShared(record,slot,rev);recipeSelected="S:"+slot;
   recipeDraft=recipeClone(record);recipeDirty=false;recipeAlert("Receta guardada: "+record.name);
  }catch(e){recipeAlert("No guardada: "+e.message,true)}
  finally{recipeBusy=false;renderRecipeManager()}
@@ -444,14 +421,11 @@ async function recipeSaveDraft(){
 async function recipeDeleteSelected(){
  if(recipeBusy||!recipeDraft)return;
  if(recipeSelected.startsWith("N:")){recipeSelected="";recipeDraft=null;recipeDirty=false;renderRecipeManager();return}
- if(!confirm("\u00bfEliminar definitivamente la receta '"+recipeDraft.name+"' de "+(recipeSelected.startsWith("S:")?"la memoria del NX":"este navegador")+"?"))return;
+ if(!confirm("\u00bfEliminar definitivamente la receta '"+recipeDraft.name+"' de la memoria Retain NX?"))return;
  recipeBusy=true;renderRecipeManager();
  try{
-  if(recipeSelected.startsWith("S:")){const slot=Number(recipeSelected.slice(2)),item=recipeSlots.get(slot);await recipeStoreShared(null,slot,item.rev)}
-  else{
-   const i=recipeBrowser.findIndex(x=>x.id===recipeDraft.id),prev=recipeBrowser.slice();if(i>=0)recipeBrowser.splice(i,1);
-   if(!recipeStorageSave()){recipeBrowser.splice(0,recipeBrowser.length,...prev);throw Error("Fallo al eliminar en almacenamiento local")}
-  }
+  const slot=Number(recipeSelected.slice(2)),item=recipeSlots.get(slot);
+  await recipeStoreShared(null,slot,item.rev);
   recipeDraft=null;recipeSelected="";recipeDirty=false;recipeAlert("Receta eliminada");
  }catch(e){recipeAlert("No eliminada: "+e.message,true)}
  finally{recipeBusy=false;renderRecipeManager()}
@@ -484,18 +458,11 @@ async function recipeImportFile(file){
  recipeBusy=true;renderRecipeManager();let created=0,error="";
  try{
   for(const raw of input.recipes){
-   const scope=raw.scope==="shared"?"shared":"local";
-   const record=recipeSanitize(raw,scope);record.id=recipeUid();
-   if(recipeListItems().some(x=>x.data.scope===scope&&x.data.name.toLowerCase()===record.name.toLowerCase())){error="La receta "+record.name+" ya existe";break}
-   if(scope==="shared"){
-    if(!recipeRemoteReady){error="NX sin conexi\u00f3n";break}
-    const free=recipeFirstSlot();if(!free){error="Banco NX lleno";break}
-    await recipeStoreShared(record,free.slot,free.rev)
-   }else{
-    if(recipeBrowser.length>=24){error="M\u00e1ximo de recetas locales";break}
-    recipeBrowser.push(record);
-    if(!recipeStorageSave()){recipeBrowser.pop();error="No se pudo persistir la receta local";break}
-   }
+   const record=recipeSanitize(raw,"shared");record.id=recipeUid();
+   if(recipeListItems().some(x=>x.data.name.toLowerCase()===record.name.toLowerCase())){error="La receta "+record.name+" ya existe";break}
+   if(!recipeRemoteReady){error="NX sin conexi\u00f3n";break}
+   const free=recipeFirstSlot();if(!free){error="Banco NX lleno";break}
+   await recipeStoreShared(record,free.slot,free.rev);
    created++;
   }
  }catch(e){error=e.message}
