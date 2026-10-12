@@ -729,7 +729,7 @@ with sync_playwright() as pw:
     checks.append("hmi_internal_alarms_bool_int_offline_ack_all_reset_and_retrigger")
 
 
-    # Recipes: editor whitelists local variables, runtime edits/captures/applies and
+    # Recipes: no global whitelist; runtime edits/captures/applies and
     # persists browser-local recipes without touching PLC APIs.
     page.locator("#newBtn").click()
     select_sidebar("variables")
@@ -737,14 +737,17 @@ with sync_playwright() as pw:
     page.locator('#internalVarList [data-iv="0"][data-key="type"]').select_option("INT")
     page.locator('#internalVarList [data-iv="0"][data-key="value"]').fill("0")
     page.locator('#internalVarList [data-iv="0"][data-key="value"]').press("Tab")
+    page.locator("#addInternalVar").click()  # Not used in any initial recipe, still offered at runtime
     select_sidebar("recipes")
+    assert page.locator("#recipeVariableEditor").count() == 0
+    assert page.locator("#recipeCapacitySummary").is_visible()
     page.locator("#addRecipe").click()
     page.locator('[data-recipe-name="0"]').fill("Nivel inicial")
     page.locator('[data-recipe-name="0"]').press("Tab")
     page.locator('[data-recipe-toggle="0"][data-name="Internal_1"]').check()
     page.locator('[data-recipe-value="0"][data-name="Internal_1"]').fill("7")
     page.locator('[data-recipe-value="0"][data-name="Internal_1"]').press("Tab")
-    assert page.locator('#recipeVariableEditor [data-recipe-var="Internal_1"]').is_checked()
+    assert "1 / 20 variables" in page.locator('[data-recipe-capacity="0"]').inner_text()
     assert page.locator('[data-recipe-scope="0"]').input_value() == "local"
     assert page.locator("#diagnostics .diagnostic.error").count() == 0
     select_sidebar("elements")
@@ -756,6 +759,7 @@ with sync_playwright() as pw:
     assert recipe_frame.locator("#recipeWindow").is_visible()
     assert "Nivel inicial" in recipe_frame.locator("#recipeSelect").inner_text()
     assert recipe_frame.locator('[data-recipe-value="Internal_1"]').input_value() == "7"
+    assert recipe_frame.locator('[data-recipe-included="Internal_2"]').count() == 1
     assert recipe_frame.locator("#recipeApply").is_enabled()
     recipe_frame.locator("#recipeApply").click()
     assert recipe_frame.locator("#stage .o.value .in").inner_text() == "7"
@@ -841,7 +845,7 @@ with sync_playwright() as pw:
     page.locator('[data-recipe-toggle="0"][data-name="SpeedPLC"]').check()
     page.locator('[data-recipe-value="0"][data-name="SpeedPLC"]').fill("60")
     page.locator('[data-recipe-value="0"][data-name="SpeedPLC"]').press("Tab")
-    assert page.locator('#recipeVariableEditor [data-recipe-var="SpeedPLC"]').is_checked()
+    assert "1 / 20 variables" in page.locator('[data-recipe-capacity="0"]').inner_text()
     page.locator('[data-recipe-scope="0"]').select_option("shared")
     assert page.locator('[data-recipe-scope="0"]').input_value() == "shared"
     assert page.locator("#diagnostics .diagnostic.error").count() == 0
