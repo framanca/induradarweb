@@ -230,21 +230,24 @@ function recipeValueOptions(r,i){
   return `<div class="recipe-value-row ${checked?'is-selected':''}"><label class="recipe-value-label"><input type="checkbox" data-recipe-toggle="${i}" data-name="${key}" ${checked?'checked':''}><span><strong>${key}</strong><small>${C.esc(v.type)} · ${p.variables.includes(v)?'PLC RW':'HMI interna'}</small></span></label>${input}</div>`;
  }).join('')+'</div>';
 }
-function renderRecipeVariables(){
- const host=$('#recipeVariableEditor'),available=[
-  ...p.variables.filter(v=>v.live&&v.access==='RW'&&v.writeSupported).map(v=>({name:v.name,type:v.type,kind:'PLC RW'})),
-  ...p.internalVariables.filter(v=>v.name).map(v=>({name:v.name,type:v.type,kind:'HMI interna'}))
- ];
- host.innerHTML=available.map(v=>'<label><input type="checkbox" data-recipe-var="'+C.esc(v.name)+'" '+(p.recipeVariables.includes(v.name)?'checked':'')+'><span>'+C.esc(v.name)+' · '+C.esc(v.type)+' · '+v.kind+'</span></label>').join('')||'<p class="hint">Importa primero una variable PLC RW o crea una variable interna.</p>';
- host.querySelectorAll('[data-recipe-var]').forEach(x=>x.onchange=()=>{
-  const name=x.dataset.recipeVar,enabled=x.checked,dependent=p.recipes.filter(r=>Object.hasOwn(r.values||{},name));
-  if(!enabled&&dependent.length&&!confirm('La variable '+name+' aparece en '+dependent.length+' recetas. ¿Eliminar también esos valores de todas las recetas?')){x.checked=true;return}
-  editAction(()=>{
-   if(enabled){if(!p.recipeVariables.includes(name))p.recipeVariables.push(name);const v=p.variables.find(v=>v.name===name);if(v)v.expose=true;}
-   else{p.recipeVariables=p.recipeVariables.filter(n=>n!==name);for(const r of p.recipes)delete r.values[name]}
-   render();
-  });
- });
+function updateRecipeCapacity(){
+ const shared=p.recipes.filter(r=>r.scope==='shared').length;
+ const local=p.recipes.filter(r=>r.scope==='local').length;
+ const summary=$('#recipeCapacitySummary');
+ if(summary){
+  summary.textContent='Banco NX: '+shared+' / '+C.RECIPE_SHARED_MAX+' recetas compartidas · Navegador: '+local+' / '+C.RECIPE_LOCAL_MAX+' recetas locales iniciales.';
+  summary.classList.toggle('recipe-capacity-warning',shared>C.RECIPE_SHARED_MAX||local>C.RECIPE_LOCAL_MAX);
+ }
+ for(const [i,r] of p.recipes.entries()){
+  const node=document.querySelector('[data-recipe-capacity="'+i+'"]');
+  if(!node)continue;
+  const used=Object.keys(r.values||{}).length;
+  const bytes=r.scope==='shared'?new TextEncoder().encode(C.recipeWireJSON(r)).length:null;
+  const over=used>20||bytes!==null&&bytes>C.RECIPE_BYTES_MAX;
+  node.textContent=used+' / 20 variables'+(bytes!==null?' · '+bytes+' / '+C.RECIPE_BYTES_MAX+' bytes JSON Retain NX':' · Receta local');
+  node.classList.toggle('recipe-capacity-warning',over);
+  if(over)node.textContent+=' · LÍMITE SUPERADO: exportación bloqueada';
+ }
 }
 function duplicateEditorRecipe(index){
  const source=p.recipes[index];
@@ -262,7 +265,6 @@ function duplicateEditorRecipe(index){
  toast('Receta duplicada: '+clone.name);
 }
 function renderRecipes(){
- renderRecipeVariables();
  const host=$('#recipeEditor');
  host.innerHTML=p.recipes.map((r,i)=>'<div class="editor-card">'+
   '<label>Nombre<input data-recipe-name="'+i+'" maxlength="48" value="'+C.esc(r.name)+'"></label>'+
@@ -271,19 +273,28 @@ function renderRecipes(){
   '<option value="local" '+(r.scope==='local'?'selected':'')+'>Local · navegador</option></select></label>'+
   '<p class="recipe-check-title">Variables y valores de esta receta</p>'+
   recipeValueOptions(r,i)+
+  '<p class="recipe-capacity-info" data-recipe-capacity="'+i+'"></p>'+
   '<div class="recipe-card-actions"><button type="button" data-duplicate-recipe="'+i+'">Duplicar</button><button type="button" data-del-recipe="'+i+'">Eliminar</button></div></div>').join('')||'<p class="hint">Sin recetas. Pulsa «+ Receta» y marca las variables que quieras incluir.</p>';
- host.querySelectorAll('[data-recipe-name]').forEach(x=>x.onchange=()=>editAction(()=>{p.recipes[+x.dataset.recipeName].name=x.value;renderDiag();},x));
- host.querySelectorAll('[data-recipe-scope]').forEach(x=>x.onchange=()=>editAction(()=>{p.recipes[+x.dataset.recipeScope].scope=x.value;renderDiag();},x));
+ updateRecipeCapacity();
+ host.querySelectorAll('[data-recipe-name]').forEach(x=>x.onchange=()=>editAction(()=>{p.recipes[+x.dataset.recipeName].name=x.value;updateRecipeCapacity();renderDiag();},x));
+ host.querySelectorAll('[data-recipe-scope]').forEach(x=>x.onchange=()=>{
+  const i=Number(x.dataset.recipeScope),previous=p.recipes[i].scope,next=x.value;
+  if(next!==previous){
+   const max=next==='shared'?C.RECIPE_SHARED_MAX:C.RECIPE_LOCAL_MAX;
+   if(p.recipes.filter((r,j)=>j!==i&&r.scope===next).length>=max){
+    toast('Máximo '+max+' recetas '+(next==='shared'?'compartidas NX':'locales iniciales'));x.value=previous;return;
+   }
+  }
+  editAction(()=>{p.recipes[i].scope=next;updateRecipeCapacity();renderDiag();},x);
+ });
  host.querySelectorAll('[data-recipe-toggle]').forEach(x=>x.onchange=()=>{
   const i=Number(x.dataset.recipeToggle),name=x.dataset.name,enabled=x.checked;
   const r=p.recipes[i],v=recipeAvailableVariables().find(v=>v.name===name);
   if(!r||!v){x.checked=!enabled;return}
   if(enabled&&!Object.hasOwn(r.values,name)&&Object.keys(r.values).length>=20){x.checked=false;toast('Máximo 20 variables por receta');return}
-  if(enabled&&!p.recipeVariables.includes(name)&&p.recipeVariables.length>=20){x.checked=false;toast('Máximo 20 variables autorizadas para recetas');return}
   editAction(()=>{
    if(enabled){
     r.values[name]=C.recipeDefaultValue(v);
-    if(!p.recipeVariables.includes(name))p.recipeVariables.push(name);
     if(p.variables.includes(v))v.expose=true;
    }else delete r.values[name];
    render();
@@ -295,7 +306,11 @@ function renderRecipes(){
   if(!r||!v||!Object.hasOwn(r.values,name))return;
   try{
    const value=recipeTypedEditor(v,x.value);
-   editAction(()=>{r.values[name]=value;renderDiag();},x);
+   editAction(()=>{
+    r.values[name]=value;
+    updateRecipeCapacity();renderDiag();
+    if(r.scope==='shared'&&new TextEncoder().encode(C.recipeWireJSON(r)).length>C.RECIPE_BYTES_MAX)toast('Receta '+r.name+': supera '+C.RECIPE_BYTES_MAX+' bytes NX. Reduce el contenido.');
+   },x);
   }catch(e){toast(e.message);x.value=String(r.values[name])}
  });
  host.querySelectorAll('[data-duplicate-recipe]').forEach(x=>x.onclick=()=>duplicateEditorRecipe(Number(x.dataset.duplicateRecipe)));
@@ -459,7 +474,12 @@ $('#screenBinding').onchange=e=>editAction(()=>{p.screenBinding=e.target.value;c
 $('#addScreen').onclick=()=>{if(!canAddScreen())return;editAction(()=>{const s=C.newScreen(uniqueScreenName('Pantalla '+(p.screens.length+1)),C.nextScreenNumber(p.screens));p.screens.push(s);screenId=s.id;selected=null;render();});};$('#copyScreen').onclick=()=>{if(isBaseScreen()||!canAddScreen())return;editAction(()=>{const original=activeScreen(),s=C.duplicateScreen(original,uniqueScreenName(original.name+' (copia)'),C.nextScreenNumber(p.screens));p.screens.push(s);screenId=s.id;selected=null;render();});toast('Pantalla copiada: puedes editarla sin modificar la original');};$('#deleteScreen').onclick=()=>{if(isBaseScreen()){deleteSafely('la pantalla base','Se perderán sus '+p.baseScreen.objects.length+' objetos y se desactivará su uso en todas las pantallas.',()=>{p.baseScreen=null;p.screens.forEach(s=>{s.useBase=false});screenId=p.screens[0].id;selected=null;render();});return;}if(p.screens.length<=1)return;const s=activeScreen();deleteSafely('la pantalla «'+s.name+'»','Se eliminará la pantalla completa y sus '+s.objects.length+' objetos.',()=>{p.screens=p.screens.filter(x=>x.id!==s.id);screenId=p.screens[0].id;selected=null;render();});};
 $('#imageBtn').onclick=()=>{imageUploadTarget=null;$('#imageFile').click()};$('#imageFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;const uploadTarget=imageUploadTarget;try{const current=p.assets.reduce((n,a)=>n+C.dataUrlBytes(a.data),0),remaining=C.IMAGE_TOTAL_MAX_BYTES-current;if(remaining<=1024)throw new Error('No queda presupuesto de imágenes en el proyecto (256 KB total)');const proceed=confirm('La imagen se incrusta dentro del programa del NX. Límite: 64 KB por imagen y 256 KB total. Si es necesario se redimensionará y convertirá a WebP (máximo 1024 px) para reducir memoria y tiempo de carga. ¿Continuar?');if(!proceed)return;const target=Math.min(C.IMAGE_MAX_BYTES,remaining),result=await optimizeImage(file,target);if(result.bytes>C.IMAGE_MAX_BYTES||result.bytes>remaining)throw new Error('La imagen optimizada sigue superando el presupuesto permitido');const finalName=result.optimized?file.name.replace(/\.[^.]+$/,'')+'.webp':file.name;const asset={id:C.id(),name:finalName,data:result.data,optimized:result.optimized,sourceBytes:result.originalBytes,bytes:result.bytes,width:result.width,height:result.height};editAction(()=>{p.assets.push(asset);if(uploadTarget){const targetObj=[...p.screens,...(p.baseScreen?[p.baseScreen]:[])].flatMap(s=>s.objects).find(o=>o.id===uploadTarget.objectId);if(!targetObj||targetObj.kind!=='image')throw new Error('El objeto de imagen ya no existe');targetObj[uploadTarget.prop]=asset.id;selected=targetObj.id;}else{const o=C.newObject('image');o.assetId=asset.id;o.text=finalName;activeScreen().objects.push(o);selected=o.id;}render();});if(result.optimized)toast('Imagen optimizada: '+(result.originalBytes/1024).toFixed(1)+' → '+(result.bytes/1024).toFixed(1)+' KB'+(result.width?' · '+result.width+'×'+result.height+' WebP':''));else toast('Imagen añadida sin reducción: '+(result.bytes/1024).toFixed(1)+' KB');}catch(err){toast('Imagen rechazada: '+err.message)}finally{imageUploadTarget=null;e.target.value='';}};
 $('#addInternalVar').onclick=()=>editAction(()=>{const names=new Set([...p.variables,...p.internalVariables].map(v=>v.name));let i=1;while(names.has('Internal_'+i))i++;p.internalVariables.push({name:'Internal_'+i,type:'BOOL',value:false});render();});
-$('#addAlarm').onclick=()=>editAction(()=>{const v=p.variables.find(v=>v.live)||p.internalVariables.find(v=>v.name);p.alarms.push({id:C.id(),name:'Nueva alarma',binding:v?.name||'',operator:v?.type==='BOOL'?'eq':'gt',value:v?.type==='BOOL'?true:0,severity:'warning'});if(v&&p.variables.includes(v))v.expose=true;render();});$('#addRecipe').onclick=()=>editAction(()=>{const vars=p.recipeVariables.map(name=>p.variables.find(v=>v.name===name)||p.internalVariables.find(v=>v.name===name)).filter(Boolean),values={};let i=1;while(p.recipes.some(r=>r.name==='Receta '+i))i++;p.recipes.push({id:C.id(),name:'Receta '+i,scope:vars.some(v=>p.variables.includes(v))?'shared':'local',values});render();});
+$('#addAlarm').onclick=()=>editAction(()=>{const v=p.variables.find(v=>v.live)||p.internalVariables.find(v=>v.name);p.alarms.push({id:C.id(),name:'Nueva alarma',binding:v?.name||'',operator:v?.type==='BOOL'?'eq':'gt',value:v?.type==='BOOL'?true:0,severity:'warning'});if(v&&p.variables.includes(v))v.expose=true;render();});$('#addRecipe').onclick=()=>{
+ const scope=p.recipeVariables.some(name=>p.variables.some(v=>v.name===name))?'shared':'local';
+ const max=scope==='shared'?C.RECIPE_SHARED_MAX:C.RECIPE_LOCAL_MAX;
+ if(p.recipes.filter(r=>r.scope===scope).length>=max){toast('Banco de recetas lleno: máximo '+max+' '+(scope==='shared'?'NX Retain':'locales iniciales'));return;}
+ editAction(()=>{let i=1;while(p.recipes.some(r=>r.name==='Receta '+i))i++;p.recipes.push({id:C.id(),name:'Receta '+i,scope,values:{}});render();});
+};
 $('#demoBtn').onclick=()=>p0ProtectReplace('cargar demo',()=>{p=C.demoProject();screenId=p.screens[0].id;selected=null;render()});$('#newBtn').onclick=()=>p0ProtectReplace('crear proyecto nuevo',()=>{p=C.newProject();screenId=p.screens[0].id;selected=null;render()});
 $('#importFileBtn').onclick=()=>$('#varsFile').click();$('#varsFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{importText(await file.text())}catch(err){toast(err.message)}e.target.value='';};$('#pasteBtn').onclick=()=>{$('#pasteText').value='';$('#pasteError').textContent='';$('#pasteDialog').showModal()};$('#pasteImport').onclick=()=>{try{importText($('#pasteText').value);$('#pasteDialog').close()}catch(e){$('#pasteError').textContent=e.message}};
 $('#previewBtn').onclick=preview;$('#closePreview').onclick=()=>$('#previewDialog').close();$('#recoveryBtn').onclick=()=>{p0RenderRecovery();$('#recoveryDialog').showModal()};$('#closeRecovery').onclick=$('#closeRecovery2').onclick=()=>$('#recoveryDialog').close();$('#discardDrafts').onclick=()=>{if(confirm('¿Borrar todas las copias automáticas locales de HMI NX ST?')){localStorage.removeItem(P0_LATEST);localStorage.removeItem(P0_HISTORY);p0LastSavedJSON='';p0LastHistoryJSON='';p0RenderRecovery();p0Status('Copias locales borradas','dirty')}};$('#saveBtn').onclick=()=>{syncProjectInputs();const data=JSON.stringify(C.normalize(p),null,2);download((p.name||'project').replace(/[^A-Za-z0-9_-]+/g,'_')+'.nxst',data,'application/json');p0Checkpoint();p0Snapshot('guardado-manual',true);toast('Proyecto guardado y copia local actualizada')};$('#loadBtn').onclick=()=>$('#projectFile').click();$('#projectFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{const q=C.normalize(JSON.parse(await file.text()));p0Snapshot('antes-abrir-archivo',true);if(p0Dirty()&&!confirm('Hay cambios no descargados. Se ha creado una copia automática. ¿Abrir el archivo y sustituir el proyecto actual?')){e.target.value='';return}p=q;screenId=p.screens[0].id;selected=null;editReset();render();p0Checkpoint();p0Snapshot('archivo-abierto',true);toast('Proyecto abierto')}catch(err){toast('Proyecto no válido: '+err.message)}e.target.value='';};$('#exportBtn').onclick=()=>{syncProjectInputs();try{const out=C.exportPackage(p),name=(p.name||'WebHMI_ST').replace(/[^A-Za-z0-9_-]+/g,'_')+'_Sysmac.zip';download(name,out.zip,'application/zip');p0Checkpoint();p0Snapshot('exportado-sysmac',true);toast('Paquete Sysmac generado')}catch(e){toast(e.message)}};
