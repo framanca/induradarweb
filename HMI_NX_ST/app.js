@@ -533,7 +533,7 @@ $('#previewBtn').onclick=preview;$('#closePreview').onclick=()=>$('#previewDialo
   download(name,out.zip,'application/zip');p0Checkpoint();p0Snapshot('exportado-sysmac',true);toast('Paquete Sysmac generado');
  }catch(e){openExportDiagnostics('No se pudo exportar: '+e.message)}
 };
-$('#closeDiagnostics').onclick=$('#closeDiagnosticsBottom').onclick=()=>$('#diagnosticsDialog').close();
+$('#closeDiagnostics').onclick=$('#closeDiagnosticsBottom').onclick=()=>{$('#diagnosticsDialog').close();$('#exportBtn').setAttribute('aria-expanded','false')};
 $('#diagnosticsDialog').addEventListener('close',()=>$('#exportBtn').setAttribute('aria-expanded','false'));
 $('#undoBtn').onclick=editUndo;$('#redoBtn').onclick=editRedo;
 $('#widgetMenu').addEventListener('click',e=>{const action=e.target.closest('[data-widget-action]')?.dataset.widgetAction;hideWidgetMenu();if(action==='copy')copyWidget();if(action==='paste')pasteWidget();if(action==='front')changeWidgetLayer('front');if(action==='back')changeWidgetLayer('back');});
