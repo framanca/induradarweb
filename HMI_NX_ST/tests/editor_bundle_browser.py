@@ -609,9 +609,8 @@ with sync_playwright() as pw:
     checks.append("unused_selector_hidden_and_dropdown_still_changes_internal_variable")
 
 
-    # No automatic type-name captions; the switch is the one control that explicitly
-    # displays its configured text above the ON/OFF control.
-    # Standalone Text, command-button captions and the counter's target remain visible.
+    # A configured label is visible on every widget that supports it; blank labels
+    # do not fall back to the widget type. The switch retains its existing title.
     page.locator("#newBtn").click()
     select_sidebar("variables")
     page.locator("#addInternalVar").click()  # Internal_1 BOOL
@@ -651,7 +650,20 @@ with sync_playwright() as pw:
     assert stage.locator(".o > .label").count() == 0
     assert stage.locator(".o.status .caption").count() == 0
     assert stage.locator(".o.tank .caption").count() == 0
+    for kind, binding, label in without_header:
+        if kind in ("text", "button", "switch"):
+            continue
+        title = stage.locator(f".o.{kind} > .widget-title")
+        assert title.count() == 1, (kind, "title missing")
+        assert title.inner_text() == label, kind
+        editor_title = page.locator(f"#canvas .widget.{kind} > .widget-title")
+        assert editor_title.count() == 1 and editor_title.inner_text() == label, kind
     assert stage.locator(".o:not(.counter):not(.switch) .control-panel > .caption").count() == 0
+    for kind, visual in (("gauge", ".gauge-ring"), ("counter", ".reading"), ("tank", ".symbol"), ("bar", ".track")):
+        title_box = stage.locator(f".o.{kind} > .widget-title").bounding_box()
+        visual_box = stage.locator(f".o.{kind} {visual}").bounding_box()
+        assert title_box is not None and visual_box is not None
+        assert title_box["y"] + title_box["height"] <= visual_box["y"] + 1, (kind, "caption overlays value")
     assert stage.locator(".o.switch .switch-title").inner_text() == "Interruptor"
     assert stage.locator(".o.switch .switch-title").bounding_box()["y"] < stage.locator(".o.switch .switch-button").bounding_box()["y"]
     assert stage.locator(".o.status .status-visual svg").count() == 1
@@ -675,20 +687,21 @@ with sync_playwright() as pw:
         field.press("Tab")
         assert field.input_value() == "", kind
         updated = page.locator("#canvas .widget." + kind)
-        if kind == "status":
-            assert updated.locator(".caption").inner_text() == ""
-        elif kind == "tank":
-            assert updated.locator(".caption").inner_text() == ""
+        if kind in ("status", "tank"):
+            assert updated.locator(".widget-title").count() == 0
         elif kind == "selector":
             assert updated.locator(".selector-mock-title").count() == 0
+            assert updated.locator(".widget-title").count() == 0
         elif kind == "switch":
             assert updated.locator(".switch-preview-label").count() == 0
             assert "OFF / ON" in updated.inner_text()
         elif kind in ("text", "value", "input"):
             assert updated.locator(".inner").inner_text() == "", kind
+            assert updated.locator(".widget-title").count() == 0
         elif kind == "button":
             assert updated.locator(".inner").inner_text() == ""
         else:
+            assert updated.locator(".widget-title").count() == 0, kind
             assert updated.locator(".inner strong").count() == 0, kind
     assert page.locator("#diagnostics .diagnostic.error").count() == 0
     page.locator("#previewBtn").click()
@@ -698,9 +711,12 @@ with sync_playwright() as pw:
     assert stage.locator(".o.status .caption").count() == 0
     assert stage.locator(".o.tank .caption").count() == 0
     assert stage.locator(".o.selector .caption").count() == 0
+    assert stage.locator(".o .widget-title").count() == 0
+    assert stage.locator(".o.counter .reading").inner_text() != ""
+    assert stage.locator(".o.value .in").inner_text() == "1"
     assert stage.locator(".o.button .in").inner_text() == ""
     page.locator("#closePreview").click()
-    checks.append("empty_widget_text_hides_type_defaults_and_switch_caption_is_above_control")
+    checks.append("widget_text_visible_for_all_types_gauge_counter_and_empty_titles_hidden")
 
 
     # Lamp stays a single SVG circle and its ON fill comes from Properties.
