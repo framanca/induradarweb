@@ -37,6 +37,15 @@ with sync_playwright() as pw:
     assert page.locator("#recipeEnabled").is_checked()
     assert page.locator("#addRecipe").is_enabled()
     checks.append("first_open_recipes_disabled_demo_explicitly_enables_recipes")
+    # The removed NX102 banner is replaced by a live summary inside the Project tab.
+    assert page.locator(".notice").count() == 0
+    summary = page.locator("#projectResourceSummary")
+    assert page.locator("#sidebar-panel-project #projectResourceSummary").count() == 1
+    text = summary.text_content()
+    assert "HTML: " in text and " / 512 KB" in text
+    assert "imágenes: 0.0 / 256 KB" in text
+    assert "1 pantallas · 0 alarmas · 1 recetas." in text
+    checks.append("project_tab_live_resource_summary_replaces_NX102_banner")
 
     def select_sidebar(tab):
         button = page.locator(f"#sidebar-tab-{tab}")
@@ -93,6 +102,7 @@ with sync_playwright() as pw:
     page.locator("#newBtn").click()
     assert page.locator("#projectName").input_value() == "WebHMI ST"
     assert page.locator("#canvas .widget").count() == 0
+    assert "1 pantallas · 0 alarmas · 0 recetas." in summary.text_content()
     checks.append("new_button_creates_empty_project")
 
     # Export becomes a diagnostic trigger when the project is invalid.
@@ -126,6 +136,7 @@ with sync_playwright() as pw:
 
     page.locator("#copyScreen").click()
     assert page.locator("#screenSelect option").count() == 2
+    assert "2 pantallas · 0 alarmas · 0 recetas." in summary.text_content()
     assert "1 · Principal personalizada (copia)" in page.locator("#screenSelect option").last.inner_text()
     assert page.locator("#canvas").evaluate("(e) => getComputedStyle(e).backgroundColor") == "rgb(204, 238, 255)"
     page.locator("#screenSelect").select_option(first_id)
@@ -365,21 +376,28 @@ with sync_playwright() as pw:
     alarm_count = page.locator("#alarmEditor .editor-card").count()
     page.locator("#addAlarm").click()
     assert page.locator("#alarmEditor .editor-card").count() == alarm_count + 1
+    assert "1 alarmas" in summary.text_content()
     page.locator("#undoBtn").click()
     assert page.locator("#alarmEditor .editor-card").count() == alarm_count
+    assert "0 alarmas" in summary.text_content()
     select_sidebar("recipes")
     assert page.locator("#addRecipe").is_disabled()
     page.locator("#recipeEnabled").check()
     recipe_count = page.locator("#recipeEditor .editor-card").count()
+    assert "0 recetas." in summary.text_content()
     page.locator("#addRecipe").click()
     assert page.locator("#recipeEditor .editor-card").count() == recipe_count + 1
+    assert "1 recetas." in summary.text_content()
     page.locator(f'[data-duplicate-recipe="{recipe_count}"]').click()
     assert page.locator("#recipeEditor .editor-card").count() == recipe_count + 2
+    assert "2 recetas." in summary.text_content()
     assert page.locator(f'[data-recipe-name="{recipe_count + 1}"]').input_value().endswith(" (copia)")
     page.locator("#undoBtn").click()  # recipe duplication
     assert page.locator("#recipeEditor .editor-card").count() == recipe_count + 1
+    assert "1 recetas." in summary.text_content()
     page.locator("#undoBtn").click()  # recipe creation
     assert page.locator("#recipeEditor .editor-card").count() == recipe_count
+    assert "0 recetas." in summary.text_content()
     assert page.locator("#canvas .widget").count() == 1
     select_sidebar("project")
     checks.append("tab_switching_preserves_widgets_and_alarm_recipe_actions")
@@ -397,6 +415,7 @@ with sync_playwright() as pw:
 
     page.locator("#demoBtn").click()
     assert page.locator("#projectName").input_value() == "Demo NX ST"
+    assert "1 alarmas · 1 recetas." in summary.text_content()
     checks.append("demo_button_loads_demo_explicitly")
 
     with page.expect_download() as export_event:
@@ -410,12 +429,14 @@ with sync_playwright() as pw:
     open_event.value.set_files(str(backup))
     page.wait_for_function("document.querySelector('#projectName').value === 'Prueba de recuperación'")
     assert page.locator("#canvas .widget").count() == 1
+    assert "2 pantallas · 0 alarmas · 0 recetas." in summary.text_content()
     checks.append("open_button_imports_nxst_project")
 
     page.reload(wait_until="load")
     page.wait_for_function("document.querySelector('#saveStatus').textContent.includes('Guardado local')")
     assert page.locator("#projectName").input_value() == "Prueba de recuperación"
     assert page.locator("#canvas .widget").count() == 1
+    assert "2 pantallas · 0 alarmas · 0 recetas." in page.locator("#projectResourceSummary").text_content()
     checks.append("refresh_restores_last_project_not_demo")
 
     page.locator("#recoveryBtn").click()
