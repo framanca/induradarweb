@@ -40,16 +40,22 @@ with sync_playwright() as pw:
     # The removed NX102 banner is replaced by a live summary inside the Project tab.
     assert page.locator(".notice").count() == 0
     summary = page.locator("#projectResourceSummary")
+    strip = page.locator("#globalResourceSummary")
+    assert strip.is_visible()
+    assert strip.bounding_box()["y"] < page.locator(".layout").bounding_box()["y"]
     assert page.locator("#sidebar-panel-project #projectResourceSummary").count() == 1
     text = summary.text_content()
+    assert strip.text_content() == text
     assert "HTML: " in text and " / 512 KB" in text
     assert "imágenes: 0.0 / 256 KB" in text
     assert "1 pantallas · 1 alarmas · 1 recetas." in text
-    checks.append("project_tab_live_resource_summary_replaces_NX102_banner")
+    checks.append("project_summary_always_visible_above_all_editor_tabs")
 
     def select_sidebar(tab):
         button = page.locator(f"#sidebar-tab-{tab}")
         button.click()
+        assert strip.is_visible(), "Resource strip must stay visible in every tab"
+        assert strip.text_content() == summary.text_content(), "Resource strip and Project metrics must agree"
         assert button.get_attribute("aria-selected") == "true"
         assert page.locator(f"#sidebar-panel-{tab}").is_visible()
         assert page.locator(".left-panels [role='tabpanel']:visible").count() == 1
@@ -102,6 +108,7 @@ with sync_playwright() as pw:
     page.locator("#newBtn").click()
     assert page.locator("#projectName").input_value() == "WebHMI ST"
     assert page.locator("#canvas .widget").count() == 0
+    assert "1 pantallas · 0 alarmas · 0 recetas." in strip.text_content()
     assert "1 pantallas · 0 alarmas · 0 recetas." in summary.text_content()
     checks.append("new_button_creates_empty_project")
 
@@ -137,6 +144,7 @@ with sync_playwright() as pw:
     page.locator("#copyScreen").click()
     assert page.locator("#screenSelect option").count() == 2
     assert "2 pantallas · 0 alarmas · 0 recetas." in summary.text_content()
+    assert "2 pantallas · 0 alarmas · 0 recetas." in strip.text_content()
     assert "1 · Principal personalizada (copia)" in page.locator("#screenSelect option").last.inner_text()
     assert page.locator("#canvas").evaluate("(e) => getComputedStyle(e).backgroundColor") == "rgb(204, 238, 255)"
     page.locator("#screenSelect").select_option(first_id)
@@ -715,6 +723,23 @@ with sync_playwright() as pw:
     assert lamp.locator("path").count() == 0
     assert page.frame_locator("#previewFrame").locator("#stage .o").evaluate_all("(els) => els.map(e=>e.classList[1])") == ["status","text","shape"]
     page.locator("#closePreview").click()
+    # Context menu must delete the right-clicked widget through the same safeguarded
+    # action as Properties > Delete, and Undo must recover it.
+    current_ids = all_widgets.evaluate_all("(els) => els.map(e=>e.dataset.id)")
+    page.locator("#canvas .widget.shape").click(button="right")
+    assert page.locator("#widgetMenu").is_visible()
+    assert page.locator('#widgetMenu [data-widget-action="delete"]').is_visible()
+    page.locator('#widgetMenu [data-widget-action="delete"]').click()
+    assert all_widgets.count() == 2
+    assert all_widgets.evaluate_all("(els) => els.map(e=>e.dataset.id)") == [x for x in current_ids if x != initial[1]]
+    assert page.locator("#widgetMenu").is_hidden()
+    page.locator("#undoBtn").click()
+    assert all_widgets.evaluate_all("(els) => els.map(e=>e.dataset.id)") == current_ids
+    page.locator("#redoBtn").click()
+    assert all_widgets.count() == 2
+    page.locator("#undoBtn").click()
+    assert all_widgets.count() == 3
+    checks.append("context_menu_delete_uses_safeguard_and_is_undo_redo_safe")
     checks.append("lamp_custom_on_color_no_rays_and_layer_order_undo_redo_preview")
 
 
