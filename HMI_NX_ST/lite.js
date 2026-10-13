@@ -160,14 +160,17 @@ function buildLiteST(input){
  st=st.slice(0,a)+head+cases+st.slice(b);
  st=st.replace(/HTML embebido: \d+ bytes \/ \d+ fragmentos/,'HTML embebido: '+enc.encode(html).length+' bytes / '+parts.length+' fragmentos (Extra Light)');
  st=st.replace(/IF Web_Chunk >= UINT#\d+ THEN Web_State/,'IF Web_Chunk >= UINT#'+(parts.length-1)+' THEN Web_State');
- // No route or protocol handling for alarm acknowledgements in Extra Light.
+ // Prune all non-Light PLC features. This also supports older protected
+ // Supabase compiler versions that unconditionally emitted recipe branches.
+ st=st.replace(/\n\(\* Banco de recetas retenido\.[\s\S]*?\nEND_IF;\n/,'\n');
+ st=st.replace(/\n\s*ELSIF FIND\(Web_RxText, 'POST \/api\/recipe\?slot='\)[\s\S]*?(?=\n\s*ELSIF FIND\(Web_RxText, 'POST \/api\/ack\?')/,'');
  st=st.replace(/\n\s*ELSIF FIND\(Web_RxText, 'POST \/api\/ack\?'\) = 1 THEN\s+Web_Request := UINT#5;/,'');
- st=st.replace(/\n    5:[\s\S]*?(?=\n    ELSE\n        Web_ApiBody := 'NOT FOUND';)/,'');
+ st=st.replace(/\n    4:[\s\S]*?(?=\n    ELSE\n        Web_ApiBody := 'NOT FOUND';)/,'');
  if(st.includes('Web_Recipe')||st.includes('Web_AlarmAck')||st.includes('/api/ack')||st.includes('/api/recipe'))throw Error('Rutas o variables no permitidas en ST Extra Light');
  return st;
 }
 function liteLocalVariablesTSV(input){
- return C.localVariablesTSV(liteProjection(input)).split(/\r?\n/).filter(line=>!line.startsWith('Web_AlarmAck\t')).join('\r\n');
+ return C.localVariablesTSV(liteProjection(input)).split(/\r?\n/).filter(line=>!/^Web_(Recipe|AlarmAck|PosSlot|PosRev|BodyLen|SlotText|RevText)\t/.test(line)).join('\r\n');
 }
 function liteReadme(input,html,st){
  const p=liteProjection(input);
