@@ -367,7 +367,6 @@ function localVariablesTSV(input){const p=C.normalize(input);const rows=[
 ['Web_Chunk','UINT','0','','','','Fragmento HTML'],
 ['Web_WriteId','UINT','0','','','','ID escritura/receta'],
 ['Web_PosId','UINT','0','','','','Posición id'],
-['Web_PosVal','UINT','0','','','','Posición valor'],
 ['Web_PosEnd','UINT','0','','','','Fin request line'],
 ['Web_PosBody','UINT','0','','','','Inicio cuerpo HTTP'],
 ['Web_TxSize','UINT','0','','','','Bytes a enviar'],

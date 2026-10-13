@@ -29,6 +29,15 @@ test('Sysmac literals escape JavaScript dollar signs',()=>{const p=C.demoProject
 
 test('generated ST uses CONCAT for STRING assembly',()=>{const p=C.demoProject();const s=C.buildST(p);assert.match(s,/Web_ApiBody := CONCAT\(Web_ApiBody,/);assert.ok(!/Web_ApiBody := Web_ApiBody &/.test(s));});
 
+test('unused Web_PosVal is never declared in generated Sysmac Internals',()=>{
+ for(const project of [C.newProject(),C.demoProject()]){
+  const tsv=C.localVariablesTSV(project);
+  const st=C.buildST(project);
+  assert.ok(!tsv.includes('Web_PosVal'));
+  assert.ok(!st.includes('Web_PosVal'));
+  assert.ok(tsv.includes('Web_PosId'+String.fromCharCode(9)+'UINT'));
+ }
+});
 test('external variable TSV references exposed global variables',()=>{const p=C.demoProject();const x=C.externalVariablesTSV(p).split(/\r?\n/);assert.equal(x.length,4);assert.equal(x[0],'Machine_Running\tBOOL');assert.ok(x.some(line=>line==='Process_Setpoint\tREAL'));const o=C.exportPackage(p);assert.ok(o.files['WebHMI_ExternalVariables.tsv']);});
 
 test('REAL and LREAL display use decimal dot like input and PLC wire',()=>{const h=C.buildRuntimeHTML(C.demoProject());assert.match(h,/n\.toFixed\(d\):String\(v\)/);assert.doesNotMatch(h,/n\.toFixed\(d\)\.replace\("\.",","\)/);assert.match(h,/n\.entry\.value=fmt\(o,v,""\)/);assert.match(h,/body:item\.raw/);const script=h.match(/<script>([\s\S]*)<\/script>/)[1];assert.doesNotThrow(()=>new Function(script));});
