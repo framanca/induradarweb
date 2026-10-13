@@ -193,6 +193,78 @@ function validate(input){const p=normalize(input),e=[];if(!Number.isInteger(+p.p
  }
  }
  return [...new Set(e)];}
-root.NXST=Object.assign(root.NXST||{},{LIVE_TYPES,WRITE_TYPES,NUMERIC_TYPES,INTEGER_TYPES,MAX_SCREEN_NUMBER,BOOL_WIDGETS,STATUS_SYMBOLS,STATUS_LABELS,SHAPE_TYPES,SHAPE_LABELS,defaultShapePoints,shapeCoordinates,shapeSvg,LEGACY_STATUS_KINDS,statusSvg,optionalNumber,IMAGE_MAX_BYTES,IMAGE_TOTAL_MAX_BYTES,HTML_MAX_BYTES,IMAGE_OPTIMIZE_MAX_DIM,dataUrlBytes,id,copy,esc,typeInfo,nameOK,parseDelimited,importSysmac,RECIPE_SHARED_MAX,RECIPE_LOCAL_MAX,RECIPE_BYTES_MAX,recipeWireJSON,recipeDefaultValue,nextRecipeCopyName,duplicateRecipe,newProject,newScreen,newBaseScreen,screenObjects,moveWidgetLayer,setScreenMode,nextScreenNumber,duplicateScreen,newObject,demoProject,normalize,typedFor,validate});
+
+// Extra Light is an export profile, never an editor downgrade. Unused PLC variables
+// do not consume its 16-tag budget, but every visible supported widget is retained.
+const LITE_KINDS=new Set(['text','value','status','button','input','bar']);
+const LITE_TYPES=new Set(['BOOL','INT','REAL']);
+const LITE_MAX_VARS=16;
+function liteWidgetIssue(o,variables){
+ if(!LITE_KINDS.has(o.kind))return 'tipo '+o.kind+' no disponible';
+ if(['expressionText','expressionColor','expressionBackground','expressionVisible'].some(k=>String(o[k]||'').trim()))return 'expresiones dinámicas no disponibles';
+ if(o.kind==='text')return o.binding||String(o.optionsText||'').trim()?'texto dinámico no disponible':'';
+ if(o.kind==='status'&&o.symbolType!=='lamp')return 'símbolo '+o.symbolType+' no disponible (usar lámpara)';
+ if(o.kind==='button'){
+  if(o.actionType!=='write'||!['set','reset'].includes(o.actionMode))return 'pulsador: solamente SET/RESET de BOOL';
+  if(o.feedbackBinding||o.feedbackTextOn||o.feedbackTextOff)return 'feedback avanzado no disponible';
+ }
+ const v=variables.get(o.binding);
+ if(!v)return 'variable PLC '+(o.binding||'(sin asociar)')+' no disponible';
+ if(!v.expose||!v.live)return 'variable '+v.name+' no expuesta';
+ if(!LITE_TYPES.has(v.type))return 'tipo de variable '+v.type+' no disponible';
+ if(['status','button'].includes(o.kind)&&v.type!=='BOOL')return 'requiere variable BOOL';
+ if(['value','input','bar'].includes(o.kind)&&!['INT','REAL'].includes(v.type))return 'requiere INT o REAL';
+ if(['button','input'].includes(o.kind)&&(v.access!=='RW'||!v.writeSupported))return 'variable '+v.name+' sin permiso de escritura';
+ if(o.kind==='bar'&&!(o.max>o.min))return 'rango de barra incorrecto';
+ if(o.kind==='input'&&o.inputMin!==null&&o.inputMax!==null&&o.inputMin>o.inputMax)return 'límites de entrada invertidos';
+ return '';
+}
+function liteAnalysis(input,screenId){
+ const p=normalize(input),s=p.screens.find(s=>s.id===screenId)||p.screens[0];
+ const variables=new Map(p.variables.map(v=>[v.name,v]));
+ const issues=[],omitted=[],used=new Set(),supported=[];
+ if(p.screens.length!==1)issues.push('Extra Light permite una pantalla; el proyecto tiene '+p.screens.length+'.');
+ if(p.recipeEnabled||p.recipes.length)issues.push('Las recetas no se incluyen en Extra Light.');
+ if(p.alarms.length)issues.push('Las '+p.alarms.length+' alarmas no se incluyen en Extra Light.');
+ if(p.assets.length)issues.push('Las imágenes embebidas no están disponibles en Extra Light.');
+ if(p.screenBinding)issues.push('La navegación gobernada por PLC no está disponible.');
+ const objects=screenObjects(p,s);
+ for(const o of objects){
+  const why=liteWidgetIssue(o,variables);
+  if(why){const message=s.name+' / '+(o.text||o.kind)+': '+why;omitted.push(message);issues.push(message);}
+  else{supported.push(o);if(o.kind!=='text')used.add(o.binding);}
+ }
+ if(used.size>LITE_MAX_VARS)issues.push('Se usan '+used.size+' variables PLC; Extra Light admite hasta '+LITE_MAX_VARS+'.');
+ // Do not bypass existing project validation when exporting the untouched design.
+ for(const err of validate(p))if(!issues.includes(err))issues.push('Proyecto: '+err);
+ return {screenId:s.id,screenName:s.name,issues,omitted,usedVariables:[...used],supportedCount:supported.length,totalCount:objects.length};
+}
+function liteCopy(input,screenId){
+ const p=normalize(input),screen=p.screens.find(s=>s.id===screenId);
+ if(!screen)throw Error('Selecciona una pantalla válida para la copia Extra Light.');
+ const variables=new Map(p.variables.map(v=>[v.name,v])),kept=[],omitted=[],used=new Set();
+ for(const o of screenObjects(p,screen)){
+  const problem=liteWidgetIssue(o,variables);
+  if(problem){omitted.push((o.text||o.kind)+': '+problem);continue}
+  kept.push(copy(o));if(o.kind!=='text')used.add(o.binding);
+ }
+ if(used.size>LITE_MAX_VARS)throw Error('La pantalla seleccionada usa '+used.size+' variables compatibles; reduce a '+LITE_MAX_VARS+' antes de generar una copia.');
+ const q=copy(p);q.name=(p.name+' Extra Light').slice(0,100);
+ q.screens=[{...copy(screen),objects:kept,useBase:false}];q.baseScreen=null;
+ q.variables=p.variables.filter(v=>used.has(v.name)).map(copy);q.internalVariables=[];
+ q.screenBinding='';q.alarms=[];q.assets=[];q.recipes=[];q.recipeVariables=[];
+ q.recipeEnabled=false;
+ const normalized=normalize(q),errors=validate(normalized);
+ if(errors.length)throw Error('La copia requiere corregir: '+errors.join('; '));
+ const changes=[];
+ if(p.screens.length>1)changes.push((p.screens.length-1)+' pantallas excluidas');
+ if(p.alarms.length)changes.push(p.alarms.length+' alarmas excluidas');
+ if(p.recipeEnabled||p.recipes.length)changes.push('banco de recetas excluido');
+ if(p.assets.length)changes.push(p.assets.length+' imágenes excluidas');
+ if(p.screenBinding)changes.push('navegación PLC excluida');
+ if(p.baseScreen&&screen.useBase)changes.push('capa base incorporada como elementos independientes');
+ return {project:normalized,omitted,changes,retained:kept.length};
+}
+root.NXST=Object.assign(root.NXST||{},{LIVE_TYPES,WRITE_TYPES,NUMERIC_TYPES,INTEGER_TYPES,MAX_SCREEN_NUMBER,BOOL_WIDGETS,STATUS_SYMBOLS,STATUS_LABELS,SHAPE_TYPES,SHAPE_LABELS,defaultShapePoints,shapeCoordinates,shapeSvg,LEGACY_STATUS_KINDS,statusSvg,optionalNumber,IMAGE_MAX_BYTES,IMAGE_TOTAL_MAX_BYTES,HTML_MAX_BYTES,IMAGE_OPTIMIZE_MAX_DIM,dataUrlBytes,id,copy,esc,typeInfo,nameOK,parseDelimited,importSysmac,RECIPE_SHARED_MAX,RECIPE_LOCAL_MAX,RECIPE_BYTES_MAX,recipeWireJSON,recipeDefaultValue,nextRecipeCopyName,duplicateRecipe,newProject,newScreen,newBaseScreen,screenObjects,moveWidgetLayer,setScreenMode,nextScreenNumber,duplicateScreen,newObject,demoProject,normalize,typedFor,validate,LITE_KINDS,LITE_MAX_VARS,liteWidgetIssue,liteAnalysis,liteCopy});
 })(globalThis);
 
