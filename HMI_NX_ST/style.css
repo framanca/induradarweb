@@ -135,3 +135,9 @@
 
 .widget-menu [data-widget-action="delete"]{border-top:1px solid #e7ecf2;margin-top:3px;color:#b42318}
 .widget-menu [data-widget-action="delete"]:hover{background:#fff1f0}
+
+/* Editor preview: empty switch captions do not occupy space; nonempty
+   captions sit above the ON/OFF control, exactly like generated runtime. */
+.widget.switch .switch-preview{display:flex;flex-direction:column;align-items:stretch;justify-content:center;gap:3px;padding:4px 6px;background:#fff;border:1px solid #94a3b8;border-radius:6px}
+.widget.switch .switch-preview-label{font-size:11px;line-height:1.2;font-weight:600;text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;flex:0 0 auto}
+.widget.switch .switch-preview-control{display:flex;align-items:center;justify-content:center;min-height:22px;max-height:37px;flex:1 1 auto;background:#64748b;color:white;border-radius:18px;font-size:13px;font-weight:700}
