@@ -331,10 +331,19 @@ function renderRecipes(){
  host.querySelectorAll('[data-duplicate-recipe]').forEach(x=>x.onclick=()=>duplicateEditorRecipe(Number(x.dataset.duplicateRecipe)));
  host.querySelectorAll('[data-del-recipe]').forEach(x=>x.onclick=()=>{const i=+x.dataset.delRecipe,r=p.recipes[i];if(r)deleteSafely('la receta «'+r.name+'»','Se eliminarán también sus consignas guardadas.',()=>{p.recipes.splice(i,1);render();});});
 }
+function renderProjectSummary(htmlBytes=null){
+ const assetBytes=p.assets.reduce((n,a)=>n+C.dataUrlBytes(a.data),0);
+ const htmlUsage=Number.isFinite(htmlBytes)?(htmlBytes/1024).toFixed(1)+' / 512 KB':'pendiente de compilar (máx. 512 KB)';
+ const text='HTML: '+htmlUsage+' · imágenes: '+(assetBytes/1024).toFixed(1)+' / 256 KB · '+p.screens.length+' pantallas · '+p.alarms.length+' alarmas · '+(p.recipeEnabled?p.recipes.length:0)+' recetas.';
+ const summary=$('#projectResourceSummary');
+ summary.textContent=text;
+ summary.parentElement.classList.toggle('over-limit',assetBytes>C.IMAGE_TOTAL_MAX_BYTES||Number.isFinite(htmlBytes)&&htmlBytes>C.HTML_MAX_BYTES);
+ return text;
+}
 function renderDiag(){
  syncProjectInputs();
  const errors=C.validate(p),html=C.buildRuntimeHTML(p),bytes=new TextEncoder().encode(html).length;
- const assetBytes=p.assets.reduce((n,a)=>n+C.dataUrlBytes(a.data),0);
+ const projectSummary=renderProjectSummary(bytes);
  if(bytes>C.HTML_MAX_BYTES)errors.push('HTML supera 512 KB: exportación bloqueada.');
  const uniqueErrors=[...new Set(errors)],ok=uniqueErrors.length===0;
  const exportButton=$('#exportBtn');
@@ -343,8 +352,7 @@ function renderDiag(){
  $('#exportWarningIcon').hidden=ok;
  const list=[`<div class="diagnostic ${ok?'ok':'error'}">${ok?'Proyecto exportable':'Bloqueos: '+uniqueErrors.length}</div>`];
  for(const message of uniqueErrors)list.push(`<div class="diagnostic error">${C.esc(message)}</div>`);
- list.push(`<div class="diagnostic">HTML: ${(bytes/1024).toFixed(1)} / 512 KB · imágenes: ${(assetBytes/1024).toFixed(1)} / 256 KB · ${p.screens.length} pantallas · ${p.alarms.length} alarmas · ${p.recipes.length} recetas.</div>`);
- list.push('<div class="diagnostic ok">Base servidor/lectura validada en NX102 real.</div>');
+ list.push('<div class="diagnostic">'+C.esc(projectSummary)+'</div>');
  $('#diagnostics').innerHTML=list.join('');
  return ok;
 }

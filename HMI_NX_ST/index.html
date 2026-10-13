@@ -20,7 +20,6 @@
   <div><strong>HMI NX ST</strong><span>WebHMI embebida en Structured Text</span></div>
   <div class="top-actions"><span id="saveStatus" class="save-status" title="Copia automática local">Iniciando autosave…</span><button id="recoveryBtn">Recuperar</button><button id="undoBtn" title="Deshacer (Ctrl+Z)" aria-label="Deshacer" disabled>↶ Deshacer</button><button id="redoBtn" title="Rehacer (Ctrl+Y / Ctrl+Mayús+Z)" aria-label="Rehacer" disabled>↷ Rehacer</button><button id="demoBtn">Demo</button><button id="newBtn">Nuevo</button><button id="saveBtn">Guardar proyecto</button><button id="loadBtn">Abrir</button><button id="exportBtn" class="primary" type="button" aria-haspopup="dialog" aria-controls="diagnosticsDialog" aria-expanded="false">Exportar Sysmac <span id="exportWarningIcon" class="export-warning-icon" role="img" aria-label="Errores de exportación" hidden>⚠</span></button></div>
 </header>
-<div class="notice"><strong>NX102 validado:</strong> servidor ST, HTML embebido y lectura real. Escritura, pantallas, alarmas y recetas deben volver a validarse en hardware tras cada evolución.</div>
 <main class="layout">
   <aside class="left" aria-label="Herramientas del editor">
     <nav class="left-tabs" role="tablist" aria-label="Secciones del editor">
@@ -43,6 +42,7 @@
     <div class="left-panels">
     <section id="sidebar-panel-project" role="tabpanel" aria-labelledby="sidebar-tab-project" data-sidebar-panel="project" tabindex="0">
       <h2>Proyecto</h2>
+      <div class="project-resource-summary" aria-label="Consumo de memoria y recursos del proyecto"><strong>Resumen del proyecto</strong><p id="projectResourceSummary" role="status" aria-live="polite">Calculando…</p></div>
       <label>Nombre<input id="projectName" value="WebHMI ST"></label>
       <div class="grid2"><label>Puerto<input id="port" type="number" min="1024" max="65535" value="8080"></label><label>Polling ms<input id="pollMs" type="number" min="100" max="5000" value="500"></label></div>
       <div class="grid2"><label>Ancho diseño<input id="screenW" type="number" min="320" max="3840" value="1024"></label><label>Alto diseño<input id="screenH" type="number" min="240" max="2160" value="600"></label></div>

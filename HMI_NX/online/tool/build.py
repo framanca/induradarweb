@@ -33,6 +33,8 @@ def build(dest):
             start=text.index('function renderDiag()'); end=text.index('\nfunction ',start+10)
             text=text[:start]+'''function renderDiag(){
  syncProjectInputs();
+ // HTML is generated in Supabase, so do not invent a local byte count.
+ renderProjectSummary();
  const errors=C.validate(p),ok=!errors.length;
  const button=$('#exportBtn');
  button.dataset.exportable=String(ok);
