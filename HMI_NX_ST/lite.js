@@ -2,7 +2,7 @@
 const C=root.NXST,enc=new TextEncoder();
 const LITE_HTML_LIMIT=128*1024;
 function htmlText(value){return C.esc(String(value==null?'':value)).replace(/[^\x00-\x7f]/g,c=>'&#'+c.codePointAt(0)+';');}
-function jsJSON(value){return JSON.stringify(value).replace(/</g,'\\u003c').replace(/>/g,'\\u003e').replace(/&/g,'\\u0026').replace(/[^\\x00-\\x7f]/g,c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0'));}
+function jsJSON(value){return JSON.stringify(value).replace(/</g,'\\u003c').replace(/>/g,'\\u003e').replace(/&/g,'\\u0026').replace(/[^\x00-\x7f]/g,c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0'));}
 function number(value,fallback){const n=Number(value);return Number.isFinite(n)?String(n):String(fallback);}
 function liteProjection(input){
  const original=C.normalize(input),report=C.liteAnalysis(original);
