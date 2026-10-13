@@ -54,6 +54,7 @@ with sync_playwright() as pw:
         assert page.locator("#globalResourceSummary").count() == 0
         assert button.get_attribute("aria-selected") == "true"
         assert page.locator(f"#sidebar-panel-{tab}").is_visible()
+        assert summary.is_visible() == (tab == "project"), "Resource metrics belong only to Project"
         assert page.locator(".left-panels [role='tabpanel']:visible").count() == 1
         for other in ("project", "variables", "elements", "alarms", "recipes"):
             assert page.locator(f"#sidebar-tab-{other}").get_attribute("aria-selected") == ("true" if other == tab else "false")
