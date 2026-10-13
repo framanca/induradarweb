@@ -16,7 +16,7 @@ async function request(action,project){
  await refresh();
  const response=await fetch(endpoint+'/functions/v1/'+config.functionName,{method:'POST',headers:headers(),body:JSON.stringify({action,project}),signal:AbortSignal.timeout(30000)});
  if(!response.ok){if(response.status===401||response.status===403)lock('Acceso no autorizado.');await parse(response);}
- return action==='compile'?await response.blob():await parse(response);
+ return (action==='compile'||action==='compile-lite')?await response.blob():await parse(response);
 }
 window.NXOnline=Object.freeze({request});
 document.addEventListener('DOMContentLoaded',()=>{
