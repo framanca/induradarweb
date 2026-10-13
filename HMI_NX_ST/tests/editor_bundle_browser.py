@@ -1087,6 +1087,55 @@ with sync_playwright() as pw:
     assert page.locator("#keyboardMode").input_value() == "webhmi"
     checks.append("virtual_keyboards_numeric_alpha_cancel_accept_validation_recipe_and_project_config")
 
+    # Configurable fill colors: editor picker, canvas preview, undo/redo
+    # and actual NX-served HTML preview must agree for all four widgets.
+    page.locator("#newBtn").click()
+    select_sidebar("variables")
+    page.locator("#addInternalVar").click()
+    page.locator('#internalVarList [data-iv="0"][data-key="type"]').select_option("INT")
+    page.locator('#internalVarList [data-iv="0"][data-key="value"]').fill("55")
+    page.locator('#internalVarList [data-iv="0"][data-key="value"]').press("Tab")
+    select_sidebar("elements")
+    widget_colors = [
+        ("tank", "#cc3300", ".level", "rgb(204, 51, 0)"),
+        ("bar", "#1565c0", ".fill", "rgb(21, 101, 192)"),
+        ("gauge", "#893bd6", ".gauge-ring", "rgb(137, 59, 214)"),
+        ("counter", "#287d47", ".gauge-fill", "rgb(40, 125, 71)"),
+    ]
+    for idx, (kind, color, selector, rgb) in enumerate(widget_colors):
+        page.locator(f'.tool-grid [data-kind="{kind}"]').click()
+        page.locator("#properties [data-p='binding']").select_option("Internal_1")
+        field = page.locator("#properties [data-p='fillColor']")
+        assert field.get_attribute("type") == "color"
+        field.evaluate("(el, color) => {el.value=color;el.dispatchEvent(new Event('change',{bubbles:true}));}", color)
+        assert page.locator("#properties [data-p='fillColor']").input_value() == color
+        visual = page.locator(f"#canvas .widget.{kind} {selector}")
+        assert visual.count() == 1
+        if kind == "gauge":
+            assert rgb in visual.evaluate("(el) => getComputedStyle(el).backgroundImage")
+        else:
+            assert visual.evaluate("(el) => getComputedStyle(el).backgroundColor") == rgb
+        if kind == "counter":
+            assert page.locator("#canvas .widget.counter .reading").evaluate("(el) => getComputedStyle(el).color") == rgb
+    page.locator("#undoBtn").click()
+    assert page.locator("#properties [data-p='fillColor']").input_value() == "#16a34a"
+    page.locator("#redoBtn").click()
+    assert page.locator("#properties [data-p='fillColor']").input_value() == "#287d47"
+    assert page.locator("#diagnostics .diagnostic.error").count() == 0
+    page.locator("#previewBtn").click()
+    color_stage = page.frame_locator("#previewFrame").locator("#stage")
+    for kind, color, selector, rgb in widget_colors:
+        visual = color_stage.locator(f".o.{kind} {selector}")
+        assert visual.count() == 1
+        if kind == "gauge":
+            assert visual.evaluate("(el) => getComputedStyle(el).getPropertyValue('--active-color').trim()") == color
+            assert rgb in visual.evaluate("(el) => getComputedStyle(el).backgroundImage")
+        else:
+            assert visual.evaluate("(el) => getComputedStyle(el).backgroundColor") == rgb
+    assert color_stage.locator(".o.counter .reading").evaluate("(el) => getComputedStyle(el).color") == "rgb(40, 125, 71)"
+    page.locator("#closePreview").click()
+    checks.append("industrial_fill_colors_tank_bar_gauge_counter_editor_undo_redo_runtime")
+
     assert not errors, "Browser JavaScript errors: " + repr(errors)
     report = {
         "status": "PASS",
