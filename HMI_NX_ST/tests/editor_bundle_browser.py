@@ -627,6 +627,7 @@ with sync_playwright() as pw:
         ("input", "Internal_2", "Entrada"),
         ("slider", "Internal_2", "Ajuste"),
         ("switch", "Internal_1", "Interruptor"),
+        ("selector", "Internal_2", "Selector manual"),
         ("multistate", "Internal_2", "Estado de modo"),
         ("gauge", "Internal_2", "Indicador"),
         ("stepper", "Internal_2", "Ajuste +/-"),
