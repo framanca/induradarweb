@@ -173,6 +173,32 @@ test('tank bar gauge counter custom colors survive normalization and reach the g
  const rejected=C.normalize(migrated);
  for(const o of rejected.screens[0].objects)assert.equal(o.fillColor,defaultColors[o.kind]);
 });
+test('configured labels are visible in NX runtime for gauge, counter and all text-capable widgets',()=>{
+ const p=C.newProject();
+ p.internalVariables.push({name:'Value_1',type:'INT',value:50},{name:'Run_1',type:'BOOL',value:false});
+ const labeled=['status','tank','bar','value','input','slider','selector','multistate','gauge','stepper','counter','dropdown','image'];
+ for(const kind of labeled){
+  // Image without an asset is tested for runtime caption construction, not export validation.
+  const o=C.newObject(kind);o.text='My '+kind;o.binding=kind==='status'?'Run_1':'Value_1';
+  p.screens[0].objects.push(o);
+ }
+ const html=C.buildRuntimeHTML(p);
+ const js=html.match(/<script>([\s\S]*)<\/script>/)[1];
+ assert.match(js,/const WIDGET_TITLE_KINDS=new Set/);
+ assert.match(js,/title\.textContent=o\.text/);
+ assert.match(js,/String\(o\.text\|\|""\)\.trim\(\)/);
+ assert.match(js,/n\.prepend\(title\)/);
+ assert.match(html,/\.o\.has-widget-title\>\.widget-title/);
+ assert.doesNotThrow(()=>new Function(js));
+ assert.ok([...html].every(c=>c.charCodeAt(0)<128));
+ const app=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8');
+ assert.match(app,/node\.prepend\(title\)/);
+ assert.match(app,/node\.classList\.add\('has-widget-title'\)/);
+ assert.match(app,/String\(o\.text\|\|''\)\.trim\(\)/);
+ for(const o of p.screens[0].objects)o.text='';
+ const blank=C.buildRuntimeHTML(p);
+ assert.match(blank,/WIDGET_TITLE_KINDS/); // Reusable JS; individual DOM titles are conditional.
+});
 test('editor exposes state OFF ON previews and numeric input limit fields',()=>{const app=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8');assert.match(app,/Estado ON cuando BOOL =/);assert.match(app,/class="state-pair"/);assert.match(app,/C\.statusSvg\(o\.symbolType,false,o\.lampOnColor\)/);assert.match(app,/C\.statusSvg\(o\.symbolType,true,o\.lampOnColor\)/);assert.match(app,/data-p="inputMin"/);assert.match(app,/data-p="inputMax"/);assert.match(app,/Se admiten valores negativos/);});
 
 test('editor supports context menu and keyboard widget copy paste',()=>{const app=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8'),html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8'),css=fs.readFileSync(path.join(__dirname,'..','style.css'),'utf8');assert.match(app,/function copyWidget\(\)/);assert.match(app,/function pasteWidget\(\)/);assert.match(app,/o\.id=C\.id\(\)/);assert.match(app,/node\.oncontextmenu=e=>showWidgetMenu\(e,o\.id\)/);assert.match(app,/node\.setPointerCapture\(e\.pointerId\)/);assert.match(app,/className='resize-handle resize-'/);assert.match(app,/key==='c'/);assert.match(app,/key==='v'/);assert.match(app,/input,textarea,select,\[contenteditable\]/);assert.match(html,/id="widgetMenu"/);assert.match(css,/widget-menu\[hidden\]/);});

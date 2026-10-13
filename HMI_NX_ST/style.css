@@ -150,3 +150,10 @@
 .widget.gauge .limits{width:80%;display:flex;justify-content:space-between;font-size:10px}
 .widget.counter .gauge-track{width:90%;height:9px;border-radius:6px;background:#e2e8f0;overflow:hidden}
 .widget.counter .gauge-fill{width:55%;height:100%;background:var(--active-color,#16a34a)}
+
+/* Configured widget text is always visible, and absent when left blank. */
+#canvas .widget.has-widget-title{display:flex;flex-direction:column}
+#canvas .widget.has-widget-title>.widget-title{flex:0 0 auto;max-width:100%;min-width:0;padding:2px 4px;font-size:12px;font-weight:600;line-height:16px;color:#334155;text-align:center;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+#canvas .widget.has-widget-title>.inner,#canvas .widget.has-widget-title>.track,#canvas .widget.has-widget-title>.status-visual,#canvas .widget.has-widget-title>.symbol,#canvas .widget.has-widget-title>img{flex:1 1 auto;height:auto;min-height:0}
+#canvas .widget.tank.has-widget-title>.symbol{height:auto;margin:0 auto;width:70%}
+#canvas .widget.has-widget-title>.widget-fill-preview{justify-content:center}
