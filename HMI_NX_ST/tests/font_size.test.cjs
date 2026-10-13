@@ -33,7 +33,7 @@ test('font size persists through project normalization and protected ZIP export'
  assert.match(html,/"fontSize":42/);
  assert.match(html,/"fontSize":24/);
  assert.match(html,/function applyObjectFontSize\(node,o\)/);
- assert.match(html,/\.in,\.label,\.caption,\.control-panel,\.reading,\.limits,input,select,button/);
+ assert.match(html,/\.in,\.label,\.caption,\.widget-title,\.control-panel,\.reading,\.limits,input,select,button/);
  assert.doesNotThrow(()=>new Function(html.match(/<script>([\s\S]*?)<\/script>/)[1]));
  const pkg=C.exportPackage(p);
  assert.equal(JSON.parse(pkg.files['project.nxst']).screens[0].objects[0].fontSize,34);
