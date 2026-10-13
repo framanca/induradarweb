@@ -139,6 +139,40 @@ test('built-in state symbols provide distinct OFF and ON SVGs',()=>{for(const ty
 
 test('status widget can map visual ON to TRUE or FALSE',()=>{const p=C.newProject();p.variables=[{id:1,name:'Run',type:'BOOL',stringLength:255,comment:'',access:'R',expose:true,live:true,writeSupported:true}];const o=C.newObject('status');o.binding='Run';o.symbolType='pump';o.stateOnWhen='false';p.screens[0].objects.push(o);assert.equal(C.validate(p).length,0);const h=C.buildRuntimeHTML(p);assert.match(h,/"stateOnWhen":"false"/);assert.match(h,/visualOn=boolValue\(v\)===\(o\.stateOnWhen!=="false"\)/);assert.match(h,/statusSvg\(o\.symbolType\|\|"lamp",visualOn,o\.lampOnColor\)/);});
 
+test('tank bar gauge counter custom colors survive normalization and reach the generated HTML',()=>{
+ const p=C.newProject();
+ p.internalVariables.push({name:'Numeric_1',type:'INT',value:55});
+ const defaultColors={tank:'#38bdf8',bar:'#16a34a',gauge:'#16a34a',counter:'#16a34a'};
+ const selectedColors={tank:'#cc3300',bar:'#1565c0',gauge:'#893bd6',counter:'#287d47'};
+ for(const kind of Object.keys(defaultColors)){
+  const o=C.newObject(kind);
+  assert.equal(o.fillColor,defaultColors[kind],kind+' original default');
+  o.binding='Numeric_1';o.fillColor=selectedColors[kind];p.screens[0].objects.push(o);
+ }
+ const restored=C.normalize(JSON.parse(JSON.stringify(p)));
+ assert.equal(C.validate(restored).length,0);
+ for(const o of restored.screens[0].objects)assert.equal(o.fillColor,selectedColors[o.kind]);
+ const html=C.buildRuntimeHTML(restored);
+ for(const kind of Object.keys(defaultColors))assert.ok(html.includes('"fillColor":"'+selectedColors[kind]+'"'),kind+' exported');
+ assert.match(html,/l\.style\.backgroundColor=o\.fillColor/);
+ assert.match(html,/f\.style\.backgroundColor=o\.fillColor/);
+ assert.match(html,/ring\.style\.setProperty\("--active-color",o\.fillColor\)/);
+ assert.match(html,/progress\.style\.backgroundColor=o\.fillColor/);
+ assert.match(html,/background:conic-gradient\(var\(--active-color,#16a34a\)/);
+ assert.match(html,/<script>const P=/);
+ assert.ok([...html].every(x=>x.charCodeAt(0)<128));
+ assert.doesNotThrow(()=>new Function(html.match(/<script>([\s\S]*)<\/script>/)[1]));
+ const st=C.buildST(restored);
+ assert.match(st,/cc3300/);
+ assert.match(st,/893bd6/);
+ // Existing projects and malformed imported colors keep the original visuals.
+ for(const o of restored.screens[0].objects){delete o.fillColor}
+ const migrated=C.normalize(restored);
+ for(const o of migrated.screens[0].objects)assert.equal(o.fillColor,defaultColors[o.kind]);
+ for(const o of migrated.screens[0].objects)o.fillColor='red";alert(1);//';
+ const rejected=C.normalize(migrated);
+ for(const o of rejected.screens[0].objects)assert.equal(o.fillColor,defaultColors[o.kind]);
+});
 test('editor exposes state OFF ON previews and numeric input limit fields',()=>{const app=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8');assert.match(app,/Estado ON cuando BOOL =/);assert.match(app,/class="state-pair"/);assert.match(app,/C\.statusSvg\(o\.symbolType,false,o\.lampOnColor\)/);assert.match(app,/C\.statusSvg\(o\.symbolType,true,o\.lampOnColor\)/);assert.match(app,/data-p="inputMin"/);assert.match(app,/data-p="inputMax"/);assert.match(app,/Se admiten valores negativos/);});
 
 test('editor supports context menu and keyboard widget copy paste',()=>{const app=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8'),html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8'),css=fs.readFileSync(path.join(__dirname,'..','style.css'),'utf8');assert.match(app,/function copyWidget\(\)/);assert.match(app,/function pasteWidget\(\)/);assert.match(app,/o\.id=C\.id\(\)/);assert.match(app,/node\.oncontextmenu=e=>showWidgetMenu\(e,o\.id\)/);assert.match(app,/node\.setPointerCapture\(e\.pointerId\)/);assert.match(app,/className='resize-handle resize-'/);assert.match(app,/key==='c'/);assert.match(app,/key==='v'/);assert.match(app,/input,textarea,select,\[contenteditable\]/);assert.match(html,/id="widgetMenu"/);assert.match(css,/widget-menu\[hidden\]/);});
