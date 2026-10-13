@@ -677,7 +677,7 @@ with sync_playwright() as pw:
     assert stage.locator(".o.multistate .reading").inner_text() == "Manual"
     page.locator("#closePreview").click()
     # Clearing labels in Properties never falls back to widget names in the editor.
-    for kind in ("status", "tank", "value", "input", "switch",
+    for kind in ("status", "tank", "value", "input", "switch", "slider",
                  "multistate", "gauge", "stepper", "counter", "dropdown",
                  "bar", "text", "button"):
         widget = page.locator("#canvas .widget." + kind)
