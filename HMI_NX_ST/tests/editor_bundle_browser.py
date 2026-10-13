@@ -609,8 +609,9 @@ with sync_playwright() as pw:
     checks.append("unused_selector_hidden_and_dropdown_still_changes_internal_variable")
 
 
-    # Names in Properties must NOT appear as automatic visual headers in the runtime.
-    # Standalone Text, command-button captions and the counter's target are still useful.
+    # No automatic type-name captions; the switch is the one control that explicitly
+    # displays its configured text above the ON/OFF control.
+    # Standalone Text, command-button captions and the counter's target remain visible.
     page.locator("#newBtn").click()
     select_sidebar("variables")
     page.locator("#addInternalVar").click()  # Internal_1 BOOL
@@ -650,7 +651,9 @@ with sync_playwright() as pw:
     assert stage.locator(".o > .label").count() == 0
     assert stage.locator(".o.status .caption").count() == 0
     assert stage.locator(".o.tank .caption").count() == 0
-    assert stage.locator(".o:not(.counter) .control-panel > .caption").count() == 0
+    assert stage.locator(".o:not(.counter):not(.switch) .control-panel > .caption").count() == 0
+    assert stage.locator(".o.switch .switch-title").inner_text() == "Interruptor"
+    assert stage.locator(".o.switch .switch-title").bounding_box()["y"] < stage.locator(".o.switch .switch-button").bounding_box()["y"]
     assert stage.locator(".o.status .status-visual svg").count() == 1
     assert stage.locator(".o.tank .symbol .level").count() == 1
     assert stage.locator(".o.value .in").inner_text() == "1"
@@ -661,7 +664,43 @@ with sync_playwright() as pw:
     assert stage.locator(".o.button .in").inner_text() == "Accionar"
     assert stage.locator(".o.multistate .reading").inner_text() == "Manual"
     page.locator("#closePreview").click()
-    checks.append("runtime_widget_headings_removed_but_data_and_command_text_preserved")
+    # Clearing labels in Properties never falls back to widget names in the editor.
+    for kind in ("status", "tank", "selector", "value", "input", "switch",
+                 "multistate", "gauge", "stepper", "counter", "dropdown",
+                 "bar", "text", "button"):
+        widget = page.locator("#canvas .widget." + kind)
+        page.locator("#layerSelect").select_option(widget.get_attribute("data-id"))
+        field = page.locator("#properties [data-p='text']")
+        field.fill("")
+        field.press("Tab")
+        assert field.input_value() == "", kind
+        updated = page.locator("#canvas .widget." + kind)
+        if kind == "status":
+            assert updated.locator(".caption").inner_text() == ""
+        elif kind == "tank":
+            assert updated.locator(".caption").inner_text() == ""
+        elif kind == "selector":
+            assert updated.locator(".selector-mock-title").count() == 0
+        elif kind == "switch":
+            assert updated.locator(".switch-preview-label").count() == 0
+            assert "OFF / ON" in updated.inner_text()
+        elif kind in ("text", "value", "input"):
+            assert updated.locator(".inner").inner_text() == "", kind
+        elif kind == "button":
+            assert updated.locator(".inner").inner_text() == ""
+        else:
+            assert updated.locator(".inner strong").count() == 0, kind
+    assert page.locator("#diagnostics .diagnostic.error").count() == 0
+    page.locator("#previewBtn").click()
+    assert stage.locator(".o.switch .switch-title").count() == 0
+    assert stage.locator(".o.switch .switch-button").count() == 1
+    assert stage.locator(".o.text .in").inner_text() == ""
+    assert stage.locator(".o.status .caption").count() == 0
+    assert stage.locator(".o.tank .caption").count() == 0
+    assert stage.locator(".o.selector .caption").count() == 0
+    assert stage.locator(".o.button .in").inner_text() == ""
+    page.locator("#closePreview").click()
+    checks.append("empty_widget_text_hides_type_defaults_and_switch_caption_is_above_control")
 
 
     # Lamp stays a single SVG circle and its ON fill comes from Properties.
