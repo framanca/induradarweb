@@ -44,7 +44,7 @@ with sync_playwright() as pw:
     text = summary.text_content()
     assert "HTML: " in text and " / 512 KB" in text
     assert "imágenes: 0.0 / 256 KB" in text
-    assert "1 pantallas · 0 alarmas · 1 recetas." in text
+    assert "1 pantallas · 1 alarmas · 1 recetas." in text
     checks.append("project_tab_live_resource_summary_replaces_NX102_banner")
 
     def select_sidebar(tab):
