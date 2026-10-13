@@ -377,6 +377,26 @@ function openExportDiagnostics(message){
  if(!dialog.open)dialog.showModal();
  $('#exportBtn').setAttribute('aria-expanded','true');
 }
+
+async function liteCompile(snapshot){return C.exportLitePackage(snapshot)}
+async function litePreview(snapshot){return C.buildLiteRuntimeHTML(snapshot,{preview:true})}
+function liteRefresh(){
+ const picker=$('#liteScreen'),screenId=picker.value||p.screens[0].id,report=C.liteAnalysis(p,screenId);
+ $('#liteSummary').textContent=report.supportedCount+' de '+report.totalCount+' elementos compatibles en "'+report.screenName+'". Variables utilizadas: '+report.usedVariables.length+' / '+C.LITE_MAX_VARS+'.';
+ $('#liteIssues').innerHTML=report.issues.length?'<div class="diagnostic error"><strong>Exportación directa bloqueada ('+report.issues.length+').</strong> Ningún elemento se eliminará automáticamente.</div>'+report.issues.map(e=>'<div class="diagnostic warn">'+C.esc(e)+'</div>').join(''):'<div class="diagnostic ok">Proyecto compatible. Puedes previsualizar y exportar Extra Light sin modificar el proyecto.</div>';
+ $('#liteGenerate').disabled=report.issues.length!==0;
+ $('#litePreview').disabled=report.issues.length!==0;
+ $('#liteCopy').disabled=report.issues.length===0;
+ return report;
+}
+function liteOpen(){
+ syncProjectInputs();
+ const select=$('#liteScreen');select.innerHTML=p.screens.map(s=>'<option value="'+C.esc(s.id)+'">'+C.esc(s.name)+'</option>').join('');
+ select.value=screenId&&p.screens.some(s=>s.id===screenId)?screenId:p.screens[0].id;
+ liteRefresh();
+ $('#liteDialog').showModal();
+}
+
 function importText(text){const old=new Map(p.variables.map(v=>[v.name,v]));const vars=C.importSysmac(text);for(const v of vars){const prev=old.get(v.name);if(prev){v.access=prev.access;v.expose=prev.expose;}}editAction(()=>{p.variables=vars;render();toast(vars.length+' variables importadas');});}
 function download(name,data,type='application/octet-stream'){const a=document.createElement('a'),blob=new Blob([data],{type});a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);}
 
@@ -552,6 +572,43 @@ $('#previewBtn').onclick=preview;$('#closePreview').onclick=()=>$('#previewDialo
   const out=C.exportPackage(p),name=(p.name||'WebHMI_ST').replace(/[^A-Za-z0-9_-]+/g,'_')+'_Sysmac.zip';
   download(name,out.zip,'application/zip');p0Checkpoint();p0Snapshot('exportado-sysmac',true);toast('Paquete Sysmac generado');
  }catch(e){openExportDiagnostics('No se pudo exportar: '+e.message)}
+};
+$('#liteExportBtn').onclick=liteOpen;
+$('#liteClose').onclick=()=>$('#liteDialog').close();
+$('#liteScreen').onchange=liteRefresh;
+$('#liteCopy').onclick=()=>{
+ try{
+  const {project,omitted,changes}=C.liteCopy(p,$('#liteScreen').value);
+  const details=[...changes,...omitted];
+  if(!confirm('Se descargará una COPIA del proyecto (el original no cambia).\n\nNo se incluirán:\n'+(details.length?details.join('\n'):'Ninguna función')+'\n\n¿Continuar?'))return;
+  const filename=(p.name||'WebHMI').replace(/[^A-Za-z0-9_-]+/g,'_')+'_ExtraLight_copia.nxst';
+  download(filename,JSON.stringify(project,null,2),'application/json');
+  toast('Copia adaptada descargada; revisa el diseño antes de exportar');
+ }catch(e){toast('No se pudo crear la copia: '+e.message)}
+};
+$('#litePreview').onclick=async()=>{
+ if(liteRefresh().issues.length)return;
+ const btn=$('#litePreview');btn.disabled=true;
+ try{
+  const html=await litePreview(C.copy(p));
+  $('#liteDialog').close();
+  $('#previewFrame').srcdoc=html;
+  $('#previewDialog').showModal();clampPreviewDialog();
+ }catch(e){toast('No se pudo previsualizar Extra Light: '+e.message)}
+ finally{btn.disabled=false}
+};
+$('#liteGenerate').onclick=async()=>{
+ if(liteRefresh().issues.length)return;
+ const btn=$('#liteGenerate');btn.disabled=true;
+ try{
+  const snapshot=C.copy(p),out=await liteCompile(snapshot);
+  const name=(snapshot.name||'WebHMI').replace(/[^A-Za-z0-9_-]+/g,'_')+'_ExtraLight_Sysmac.zip';
+  download(name,out.zip,'application/zip');
+  p0Snapshot('exportado-extra-light',true);
+  $('#liteDialog').close();
+  toast('Paquete Extra Light generado; valida el ST en Sysmac Studio');
+ }catch(e){toast('Exportación Extra Light bloqueada: '+e.message)}
+ finally{btn.disabled=false}
 };
 $('#closeDiagnostics').onclick=$('#closeDiagnosticsBottom').onclick=()=>{$('#diagnosticsDialog').close();$('#exportBtn').setAttribute('aria-expanded','false')};
 $('#diagnosticsDialog').addEventListener('close',()=>$('#exportBtn').setAttribute('aria-expanded','false'));
