@@ -1152,6 +1152,65 @@ with sync_playwright() as pw:
     page.locator("#closePreview").click()
     checks.append("industrial_fill_colors_tank_bar_gauge_counter_editor_undo_redo_runtime")
 
+    # Extra Light is an additive export choice: no silent widget removal,
+    # full project untouched and ZIP contains a truly compact standalone HMI.
+    page.locator("#newBtn").click()
+    page.locator("#liteExportBtn").click()
+    assert page.locator("#liteDialog").is_visible()
+    assert page.locator("#liteGenerate").is_enabled()
+    assert page.locator("#liteCopy").is_disabled()
+    assert "0 de 0 elementos" in page.locator("#liteSummary").inner_text()
+    page.locator("#litePreview").click()
+    lite_preview = page.frame_locator("#previewFrame")
+    assert lite_preview.locator("#state").inner_text() == "VISTA PREVIA"
+    assert lite_preview.locator("#stage .w").count() == 0
+    page.locator("#closePreview").click()
+    page.locator("#liteExportBtn").click()
+    with page.expect_download() as dl:
+        page.locator("#liteGenerate").click()
+    lite_zip=dl.value
+    assert lite_zip.suggested_filename.endswith("_ExtraLight_Sysmac.zip")
+    import zipfile
+    with zipfile.ZipFile(lite_zip.path()) as archive:
+        assert "WebHMI_Server.st" in archive.namelist()
+        lite_st=archive.read("WebHMI_Server.st").decode("utf-8")
+        lite_html=archive.read("HMI_Embedded.html").decode("utf-8")
+        assert "SktTCPAccept" in lite_st and "/api/write" in lite_st
+        assert "Web_Recipe" not in lite_st and "Web_AlarmAck" not in lite_st
+        assert len(lite_html.encode("utf-8")) < 20000
+        assert "<!doctype html>" in lite_html
+    page.locator("#demoBtn").click()
+    page.locator("#liteExportBtn").click()
+    assert page.locator("#liteGenerate").is_disabled()
+    assert page.locator("#liteCopy").is_enabled()
+    assert "recetas" in page.locator("#liteIssues").inner_text()
+    assert "alarmas" in page.locator("#liteIssues").inner_text()
+    assert "Depósito" in page.locator("#liteIssues").inner_text()
+    old_project_name=page.locator("#projectName").input_value()
+    with page.expect_download() as dl:
+        page.locator("#liteCopy").click()
+    adapted=dl.value
+    assert adapted.suggested_filename.endswith("_ExtraLight_copia.nxst")
+    adapted_path=OUT/"extra_light_adapted.nxst"
+    adapted.save_as(str(adapted_path))
+    adapted_project=json.loads(adapted_path.read_text(encoding="utf-8"))
+    assert not adapted_project["recipeEnabled"]
+    assert len(adapted_project["screens"]) == 1
+    assert len(adapted_project["alarms"]) == 0
+    assert len(adapted_project["recipes"]) == 0
+    assert {o["kind"] for o in adapted_project["screens"][0]["objects"]} <= {"text","value","status","button","input","bar"}
+    assert page.locator("#projectName").input_value() == old_project_name
+    assert page.locator("#recipeEnabled").is_checked()  # Original remains complete.
+    page.locator("#liteClose").click()
+    page.locator("#projectFile").set_input_files(str(adapted_path))
+    assert page.locator("#projectName").input_value().endswith("Extra Light")
+    page.locator("#liteExportBtn").click()
+    assert page.locator("#liteGenerate").is_enabled()
+    with page.expect_download() as dl:
+        page.locator("#liteGenerate").click()
+    assert dl.value.suggested_filename.endswith("_ExtraLight_Sysmac.zip")
+    checks.append("extra_light_small_html_st_preview_incompatibility_and_non_destructive_copy")
+
     assert not errors, "Browser JavaScript errors: " + repr(errors)
     report = {
         "status": "PASS",
