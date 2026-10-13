@@ -1175,7 +1175,8 @@ with sync_playwright() as pw:
         assert "WebHMI_Server.st" in archive.namelist()
         lite_st=archive.read("WebHMI_Server.st").decode("utf-8")
         lite_html=archive.read("HMI_Embedded.html").decode("utf-8")
-        assert "SktTCPAccept" in lite_st and "/api/write" in lite_st
+        assert "Web_Accept(" in lite_st and "/api/write" in lite_st
+        assert b"Web_Accept\tSktTCPAccept" in archive.read("WebHMI_LocalVariables.tsv")
         assert "Web_Recipe" not in lite_st and "Web_AlarmAck" not in lite_st
         assert len(lite_html.encode("utf-8")) < 20000
         assert "<!doctype html>" in lite_html
