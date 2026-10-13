@@ -170,7 +170,7 @@ function buildLiteST(input){
  return st;
 }
 function liteLocalVariablesTSV(input){
- return C.localVariablesTSV(liteProjection(input)).split(/\r?\n/).filter(line=>!/^Web_(Recipe|AlarmAck|PosSlot|PosRev|BodyLen|SlotText|RevText)\t/.test(line)).join('\r\n');
+ return C.localVariablesTSV(liteProjection(input)).split(/\r?\n/).filter(line=>!/^Web_(Recipe\w*|AlarmAck|PosSlot|PosRev|BodyLen|SlotText|RevText)\t/.test(line)).join('\r\n');
 }
 function liteReadme(input,html,st){
  const p=liteProjection(input);
