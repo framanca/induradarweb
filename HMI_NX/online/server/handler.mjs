@@ -35,7 +35,7 @@ export function createHandler({authenticate, compiler, origins, now = Date.now})
       const bytes = new Uint8Array(size); let offset=0;
       for (const chunk of chunks) {bytes.set(chunk,offset);offset+=chunk.length;}
       const {action,project} = JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
-      if (!['access','preview','compile'].includes(action)) return json(400, {error:'Operación no válida'});
+      if (!['access','preview','compile','preview-lite','compile-lite'].includes(action)) return json(400, {error:'Operación no válida'});
       if (action === 'access') return json(200, {authorized:true});
       if (!project || typeof project !== 'object' || Array.isArray(project) ||
           !Array.isArray(project.screens) || !Array.isArray(project.variables) ||
@@ -44,6 +44,17 @@ export function createHandler({authenticate, compiler, origins, now = Date.now})
         return json(400, {error:'Estructura o tamaño de proyecto no admitidos'});
       const normalized = compiler.normalize(project), errors = compiler.validate(normalized);
       if (errors.length) return json(422, {error:'Corrige los bloqueos del proyecto', errors});
+      if (action === 'preview-lite' || action === 'compile-lite') {
+        const light = compiler.liteAnalysis(normalized);
+        if (light.issues.length) return json(422, {error:'Extra Light incompatible', errors:light.issues});
+        const html = compiler.buildLiteRuntimeHTML(normalized, {preview:action==='preview-lite'});
+        const htmlBytes = new TextEncoder().encode(html).length;
+        if (htmlBytes > compiler.LITE_HTML_LIMIT) return json(422, {error:'Extra Light supera el limite de 128 KB'});
+        if (action === 'preview-lite') return json(200, {html, htmlBytes});
+        const out = compiler.exportLitePackage(normalized);
+        const name=(normalized.name||'WebHMI').replace(/[^A-Za-z0-9_-]+/g,'_')+'_ExtraLight_Sysmac.zip';
+        return new Response(out.zip, {status:200,headers:{...headers,'Content-Type':'application/zip','Content-Disposition':'attachment; filename="'+name+'"'}});
+      }
       let html = compiler.buildRuntimeHTML(normalized);
       const htmlBytes = new TextEncoder().encode(html).length;
       if (htmlBytes > compiler.HTML_MAX_BYTES) return json(422, {error:'HTML supera 512 KB'});
