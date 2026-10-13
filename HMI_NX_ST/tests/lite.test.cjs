@@ -1,0 +1,118 @@
+'use strict';
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const context={TextEncoder};context.globalThis=context;vm.createContext(context);
+for(const name of ['expressions.js','model.js','sysmac-types.js','runtime.js','st.js','zip.js','lite.js'])
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'..',name),'utf8'),context,{filename:name});
+const C=context.NXST;
+const withVar=(project,name,type,access='RW')=>{
+ const id=project.variables.length+1;
+ project.variables.push({id,name,type,access,expose:true,live:true,writeSupported:true,stringLength:255});
+ return name;
+};
+test('Extra Light really generates a smaller standalone HTML and ST, without recipes, alarms or RETAIN',()=>{
+ const p=C.newProject();
+ const full=C.exportPackage(p),lite=C.exportLitePackage(p);
+ assert.equal(lite.files['HMI_Embedded.html'],lite.html);
+ assert.ok(lite.html.length<20000,'empty Lite HTML must be under 20 KB');
+ assert.ok(lite.html.length<full.html.length*.4,'Lite HTML at least 60% lighter');
+ assert.ok(lite.st.length<full.st.length*.5,'Lite ST at least 50% lighter');
+ assert.ok(lite.zip.length<full.zip.length*.5,'Lite ZIP at least 50% lighter');
+ assert.match(lite.files['WebHMI_LocalVariables.tsv'],/Web_Accept\tSktTCPAccept/);
+ assert.match(lite.files['WebHMI_LocalVariables.tsv'],/Web_Rcv\tSktTCPRcv/);
+ assert.match(lite.files['WebHMI_LocalVariables.tsv'],/Web_Send\tSktTCPSend/);
+ assert.match(lite.st,/GET \/api\/read/);
+ assert.match(lite.st,/POST \/api\/write/);
+ assert.doesNotMatch(lite.st,/Web_Recipe|Web_AlarmAck|\/api\/ack|\/api\/recipes/);
+ assert.doesNotMatch(lite.files['WebHMI_LocalVariables.tsv'],/Web_Recipe|Web_AlarmAck/);
+ assert.ok([...lite.html].every(c=>c.charCodeAt(0)<128));
+ assert.doesNotThrow(()=>new Function(lite.html.match(/<script>([\s\S]*?)<\/script>/)[1]));
+ assert.ok(lite.zip[0]===0x50&&lite.zip[1]===0x4b);
+});
+test('Extra Light supports all six basic widgets, retain configured text, colors, read/write and numeric keypad',()=>{
+ const p=C.newProject();
+ withVar(p,'Run','BOOL');withVar(p,'Temperature','REAL');withVar(p,'Count','INT');
+ const screen=p.screens[0],make=(kind,text,binding)=>{const o=C.newObject(kind);o.text=text;o.binding=binding||'';screen.objects.push(o);return o;};
+ make('text','Control <b> & "prueba"');
+ make('status','Marcha','Run').lampOnColor='#f97316';
+ make('button','Parar','Run').actionMode='reset';
+ const input=make('input','Setpoint','Temperature');input.inputMin=-30.5;input.inputMax=125.5;
+ make('value','Contador','Count');
+ const bar=make('bar','Nivel','Temperature');bar.fillColor='#893bd6';
+ p.keyboardMode='webhmi';
+ assert.deepEqual(Array.from(C.liteAnalysis(p).issues),[]);
+ const h=C.buildLiteRuntimeHTML(p);
+ assert.match(h,/data-set="1" data-mode="reset"/);
+ assert.match(h,/data-lamp="1"/);
+ assert.match(h,/data-low="-30.5" data-high="125.5"/);
+ assert.match(h,/data-bar="2"/);
+ assert.match(h,/background:#893bd6/);
+ assert.match(h,/&#?lt;|&lt;b&gt;/); // never render user HTML as a tag
+ assert.match(h,/id="keyboard"/);
+ assert.match(h,/id="kbCancel"/);
+ assert.match(h,/id="kbAccept"/);
+ assert.doesNotThrow(()=>new Function(h.match(/<script>([\s\S]*?)<\/script>/)[1]));
+ const st=C.buildLiteST(p);
+ assert.match(st,/Temperature := STRING_TO_REAL\(Web_ValueText\)/);
+ assert.match(st,/Count := STRING_TO_INT\(Web_ValueText\)/);
+ assert.match(st,/Run :=/);
+ assert.match(C.liteLocalVariablesTSV(p),/Web_State/);
+ assert.equal(C.liteProjection(p).variables.length,3);
+});
+test('Full export unchanged; Extra Light blocks incompatible features with precise errors',()=>{
+ const p=C.demoProject(),baseline=JSON.stringify(p),full=C.exportPackage(p);
+ const check=C.liteAnalysis(p);
+ assert.ok(check.issues.some(x=>x.includes('recetas')));
+ assert.ok(check.issues.some(x=>x.includes('alarmas')));
+ assert.ok(check.issues.some(x=>x.includes('Depósito')));
+ assert.ok(check.issues.some(x=>x.includes('motor')));
+ assert.throws(()=>C.exportLitePackage(p),/Extra Light no compatible/);
+ assert.equal(JSON.stringify(p),baseline);
+ assert.ok(full.files['HMI_Embedded.html'].includes('recipe'));
+});
+test('Create adapted copy for a selected screen; original and inherited base objects stay untouched',()=>{
+ const p=C.demoProject();
+ const extra=C.newScreen('Produccion',2);const txt=C.newObject('text');txt.text='Produccion extra';txt.optionsText='';extra.objects.push(txt);p.screens.push(extra);
+ const baseline=JSON.stringify(p);
+ const first=C.liteCopy(p,p.screens[0].id);
+ assert.equal(first.project.screens.length,1);
+ assert.equal(first.project.alarms.length,0);
+ assert.equal(first.project.recipes.length,0);
+ assert.equal(first.project.recipeEnabled,false);
+ assert.equal(first.project.assets.length,0);
+ assert.equal(first.omitted.length,2);
+ assert.deepEqual(Array.from(C.liteAnalysis(first.project).issues),[]);
+ assert.equal(JSON.stringify(p),baseline,'original project must never be altered');
+ const second=C.liteCopy(p,extra.id);
+ assert.equal(second.project.screens[0].objects.length,1);
+ assert.equal(second.project.screens[0].objects[0].text,'Produccion extra');
+ assert.deepEqual(Array.from(C.liteAnalysis(second.project).issues),[]);
+ assert.equal(JSON.stringify(p),baseline);
+ const base=C.newBaseScreen();base.objects.push(C.newObject('bar'));base.objects[0].binding='Process_Level';
+ const src=C.newProject();src.baseScreen=base;src.screens[0].useBase=true;withVar(src,'Process_Level','REAL');
+ const copy=C.liteCopy(src,src.screens[0].id);
+ assert.equal(copy.project.baseScreen,null);
+ assert.equal(copy.project.screens[0].objects.length,1);
+ assert.equal(copy.project.screens[0].useBase,false);
+});
+test('Compatible widgets are not arbitrarily limited; more than 16 *used* variables block without dropping widgets',()=>{
+ const p=C.newProject();withVar(p,'Number','REAL');
+ p.screens[0].objects=Array.from({length:60},(_,i)=>{const o=C.newObject('value');o.text='Valor '+i;o.binding='Number';return o});
+ assert.deepEqual(Array.from(C.liteAnalysis(p).issues),[]);
+ assert.equal(C.liteProjection(p).screens[0].objects.length,60);
+ const x=C.newProject();
+ for(let i=0;i<17;i++){withVar(x,'V'+i,'REAL');const o=C.newObject('value');o.binding='V'+i;x.screens[0].objects.push(o)}
+ assert.ok(C.liteAnalysis(x).issues.some(e=>e.includes('17 variables')));
+ assert.throws(()=>C.liteCopy(x,x.screens[0].id),/reduce a 16/);
+});
+test('Extra Light export is safe against stored HTML and JavaScript markup injection',()=>{
+ const p=C.newProject();p.name='Test </script><img src=x onerror=alert(1)>';
+ const o=C.newObject('text');o.text='<script>alert(1)</script> $ X';o.optionsText='';p.screens[0].objects.push(o);
+ const html=C.buildLiteRuntimeHTML(p);
+ assert.doesNotMatch(html,/<img src=x onerror/);
+ assert.doesNotMatch(html,/<script>alert\(1\)<\/script>/);
+ assert.ok(html.includes('&lt;script&gt;'));
+ assert.ok([...html].every(c=>c.charCodeAt(0)<128));
+ assert.doesNotThrow(()=>new Function(html.match(/<script>([\s\S]*?)<\/script>/)[1]));
+});

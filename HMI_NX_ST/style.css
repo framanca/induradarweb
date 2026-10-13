@@ -157,3 +157,14 @@
 #canvas .widget.has-widget-title>.inner,#canvas .widget.has-widget-title>.track,#canvas .widget.has-widget-title>.status-visual,#canvas .widget.has-widget-title>.symbol,#canvas .widget.has-widget-title>img{flex:1 1 auto;height:auto;min-height:0}
 #canvas .widget.tank.has-widget-title>.symbol{height:auto;margin:0 auto;width:70%}
 #canvas .widget.has-widget-title>.widget-fill-preview{justify-content:center}
+
+/* Non-destructive Extra Light export and incompatibility report. */
+#liteDialog .diagnostics-panel{width:min(760px,94vw);max-height:90vh;overflow:auto;padding:4px 14px 15px}
+#liteDialog .dialog-title{margin:0 -14px 10px;padding:12px 14px}
+#liteDialog .lite-screen-label{display:flex;flex-direction:column;gap:5px;margin:12px 0;font-size:13px;font-weight:600}
+#liteScreen{max-width:100%;min-height:35px;padding:6px}
+#liteSummary{font-weight:600;font-size:13px}
+#liteIssues{max-height:35vh;overflow:auto}
+#liteDialog .lite-actions{flex-wrap:wrap}
+#liteDialog .lite-actions button{min-height:36px}
+#liteDialog .lite-actions button:disabled{opacity:.4;cursor:not-allowed}
