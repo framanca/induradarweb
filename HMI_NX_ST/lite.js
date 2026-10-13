@@ -148,7 +148,7 @@ function buildLiteRuntimeHTML(input,options){
  // The Omron ST source embeds HTML in STRING chunks; keep it 7-bit ASCII.
  return html.replace(/[^\x00-\x7f]/g,c=>'&#'+c.codePointAt(0)+';');
 }
-function stEscape(s){return String(s).replace(/\$/g,()=> '$').replace(/'/g,()=> "
+function stEscape(s){return String(s).replace(/\$/g,()=> '$$').replace(/'/g,()=> "$'").replace(/\r/g,()=> '$r').replace(/\n/g,()=> '$n');}
 function buildLiteST(input){
  const p=liteProjection(input),html=buildLiteRuntimeHTML(p),parts=[];
  for(let i=0;i<html.length;i+=1400)parts.push(html.slice(i,i+1400));
