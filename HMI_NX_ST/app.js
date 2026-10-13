@@ -348,9 +348,6 @@ function renderProjectSummary(htmlBytes=null){
  summary.textContent=text;
  const exceeded=assetBytes>C.IMAGE_TOTAL_MAX_BYTES||Number.isFinite(htmlBytes)&&htmlBytes>C.HTML_MAX_BYTES;
  summary.parentElement.classList.toggle('over-limit',exceeded);
- const globalSummary=$('#globalResourceSummary');
- globalSummary.textContent=text;
- globalSummary.classList.toggle('over-limit',exceeded);
  return text;
 }
 function renderDiag(){

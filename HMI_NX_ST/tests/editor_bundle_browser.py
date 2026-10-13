@@ -40,24 +40,21 @@ with sync_playwright() as pw:
     # The removed NX102 banner is replaced by a live summary inside the Project tab.
     assert page.locator(".notice").count() == 0
     summary = page.locator("#projectResourceSummary")
-    strip = page.locator("#globalResourceSummary")
-    assert strip.is_visible()
-    assert strip.bounding_box()["y"] < page.locator(".layout").bounding_box()["y"]
+    assert page.locator("#globalResourceSummary").count() == 0
     assert page.locator("#sidebar-panel-project #projectResourceSummary").count() == 1
     text = summary.text_content()
-    assert strip.text_content() == text
     assert "HTML: " in text and " / 512 KB" in text
     assert "imágenes: 0.0 / 256 KB" in text
     assert "1 pantallas · 1 alarmas · 1 recetas." in text
-    checks.append("project_summary_always_visible_above_all_editor_tabs")
+    checks.append("project_summary_visible_only_in_project_tab")
 
     def select_sidebar(tab):
         button = page.locator(f"#sidebar-tab-{tab}")
         button.click()
-        assert strip.is_visible(), "Resource strip must stay visible in every tab"
-        assert strip.text_content() == summary.text_content(), "Resource strip and Project metrics must agree"
+        assert page.locator("#globalResourceSummary").count() == 0
         assert button.get_attribute("aria-selected") == "true"
         assert page.locator(f"#sidebar-panel-{tab}").is_visible()
+        assert summary.is_visible() == (tab == "project"), "Resource metrics belong only to Project"
         assert page.locator(".left-panels [role='tabpanel']:visible").count() == 1
         for other in ("project", "variables", "elements", "alarms", "recipes"):
             assert page.locator(f"#sidebar-tab-{other}").get_attribute("aria-selected") == ("true" if other == tab else "false")
@@ -108,7 +105,6 @@ with sync_playwright() as pw:
     page.locator("#newBtn").click()
     assert page.locator("#projectName").input_value() == "WebHMI ST"
     assert page.locator("#canvas .widget").count() == 0
-    assert "1 pantallas · 0 alarmas · 0 recetas." in strip.text_content()
     assert "1 pantallas · 0 alarmas · 0 recetas." in summary.text_content()
     checks.append("new_button_creates_empty_project")
 
@@ -144,7 +140,6 @@ with sync_playwright() as pw:
     page.locator("#copyScreen").click()
     assert page.locator("#screenSelect option").count() == 2
     assert "2 pantallas · 0 alarmas · 0 recetas." in summary.text_content()
-    assert "2 pantallas · 0 alarmas · 0 recetas." in strip.text_content()
     assert "1 · Principal personalizada (copia)" in page.locator("#screenSelect option").last.inner_text()
     assert page.locator("#canvas").evaluate("(e) => getComputedStyle(e).backgroundColor") == "rgb(204, 238, 255)"
     page.locator("#screenSelect").select_option(first_id)
