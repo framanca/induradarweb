@@ -19,9 +19,9 @@ test('Extra Light really generates a smaller standalone HTML and ST, without rec
  assert.ok(lite.html.length<full.html.length*.4,'Lite HTML at least 60% lighter');
  assert.ok(lite.st.length<full.st.length*.5,'Lite ST at least 50% lighter');
  assert.ok(lite.zip.length<full.zip.length*.5,'Lite ZIP at least 50% lighter');
- assert.match(lite.st,/SktTCPAccept/);
- assert.match(lite.st,/SktTCPRcv/);
- assert.match(lite.st,/SktTCPSend/);
+ assert.match(lite.files['WebHMI_LocalVariables.tsv'],/Web_Accept\tSktTCPAccept/);
+ assert.match(lite.files['WebHMI_LocalVariables.tsv'],/Web_Rcv\tSktTCPRcv/);
+ assert.match(lite.files['WebHMI_LocalVariables.tsv'],/Web_Send\tSktTCPSend/);
  assert.match(lite.st,/GET \/api\/read/);
  assert.match(lite.st,/POST \/api\/write/);
  assert.doesNotMatch(lite.st,/Web_Recipe|Web_AlarmAck|\/api\/ack|\/api\/recipes/);
@@ -72,8 +72,9 @@ test('Full export unchanged; Extra Light blocks incompatible features with preci
  assert.ok(full.files['HMI_Embedded.html'].includes('recipe'));
 });
 test('Create adapted copy for a selected screen; original and inherited base objects stay untouched',()=>{
- const p=C.demoProject(),baseline=JSON.stringify(p);
+ const p=C.demoProject();
  const extra=C.newScreen('Produccion',2);const txt=C.newObject('text');txt.text='Produccion extra';txt.optionsText='';extra.objects.push(txt);p.screens.push(extra);
+ const baseline=JSON.stringify(p);
  const first=C.liteCopy(p,p.screens[0].id);
  assert.equal(first.project.screens.length,1);
  assert.equal(first.project.alarms.length,0);
