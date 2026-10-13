@@ -33,9 +33,9 @@ test('unused Web_PosVal is never declared in generated Sysmac Internals',()=>{
  for(const project of [C.newProject(),C.demoProject()]){
   const tsv=C.localVariablesTSV(project);
   const st=C.buildST(project);
-  assert.doesNotMatch(tsv,/\\bWeb_PosVal\\b/);
-  assert.doesNotMatch(st,/\\bWeb_PosVal\\b/);
-  assert.match(tsv,/Web_PosId\\tUINT/);
+  assert.ok(!tsv.includes('Web_PosVal'));
+  assert.ok(!st.includes('Web_PosVal'));
+  assert.ok(tsv.includes('Web_PosId'+String.fromCharCode(9)+'UINT'));
  }
 });
 test('external variable TSV references exposed global variables',()=>{const p=C.demoProject();const x=C.externalVariablesTSV(p).split(/\r?\n/);assert.equal(x.length,4);assert.equal(x[0],'Machine_Running\tBOOL');assert.ok(x.some(line=>line==='Process_Setpoint\tREAL'));const o=C.exportPackage(p);assert.ok(o.files['WebHMI_ExternalVariables.tsv']);});
