@@ -94,7 +94,8 @@ test('size metadata is authorized and matches the exact optimized output without
  }finally{ctx.NXST.optimizeHTML=original}
 });
 test('online size action never counts as an audited compilation',()=>{
- const source=fs.readFileSync(path.join(base,'supabase/functions/webhmi-compile/index.ts'),'utf8');
- assert.match(source,/body\?\.action === 'compile' \|\| body\?\.action === 'compile-lite'/);
- assert.doesNotMatch(source,/isCompile\s*=\s*[^;]*\bsize\b/);
+  const source=fs.readFileSync(path.join(base,'supabase/functions/webhmi-compile/audit.mjs'),'utf8');
+  assert.match(source,/const exporting = action === 'compile' \|\| action === 'compile-lite'/);
+  assert.match(source,/if \(!access && !exporting\) return handler\(request\)/);
+  assert.doesNotMatch(source,/const exporting =[^;]*\bsize\b/);
 });
