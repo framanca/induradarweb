@@ -20,7 +20,7 @@ const runtimeCompiler=(globalThis as any).NXST;
 runtimeCompiler.optimizeHTML=optimizeEmbeddedHTML;
 const baseHandler = createHandler({authenticate, compiler:runtimeCompiler, origins});
 const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-const version = '23';
+const version = '24';
 Deno.serve(createAuditedHandler({
   handler:baseHandler,
   authenticate,
