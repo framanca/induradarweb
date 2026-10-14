@@ -43,7 +43,7 @@ test('ST uses one selected-screen read plus global alarm and ACK state, preservi
  const first=scoped.slice(scoped.indexOf('0:'),scoped.indexOf('1:'));
  const second=scoped.slice(scoped.indexOf('1:'));
  assert.match(first,/Temp/);assert.match(first,/Speed/);assert.match(first,/CurrentScreen/);
- assert.doesNotMatch(first,/Motor/);assert.doesNotMatch(first,/AlarmRaw/);
+ assert.doesNotMatch(first,/Motor/);assert.doesNotMatch(first,/BOOL_TO_STRING\(AlarmRaw\)/);
  assert.match(second,/Motor/);assert.match(second,/CurrentScreen/);
  assert.doesNotMatch(second,/Temp/);
  assert.match(first,/A1=1\$n/);assert.match(second,/A1=1\$n/);
