@@ -1243,8 +1243,44 @@ with sync_playwright() as pw:
         assert metrics["buttonLeft"] >= metrics["x"] and metrics["buttonRight"] <= metrics["x"]+metrics["width"],metrics
         login_page.locator("#onlineGuestBtn").scroll_into_view_if_needed()
         assert login_page.locator("#onlineGuestBtn").is_visible()
+    # The Online Project panel must use authenticated remote size metadata,
+    # not a downloadable browser copy of the compiler. Mock the network reply
+    # so the acceptance remains deterministic and never consumes user quotas.
+    login_page.evaluate("""() => {
+      document.querySelector('#onlineLogin').close();
+      window.__remoteSizeCalls=[];
+      window.NXOnline={
+        hasSession:()=>true,
+        request:async(action,project)=>{
+          if(action!=='size')throw Error('unexpected API: '+action);
+          window.__remoteSizeCalls.push(project.name);
+          return {
+            htmlBytes:project.name.startsWith('Proyecto segunda medida')?40960:24576,
+            originalHtmlBytes:65536,
+            limitBytes:524288,overLimit:false,optimized:true
+          };
+        }
+      };
+      window.dispatchEvent(new Event('webhmi-online-session'));
+    }""")
+    login_page.wait_for_function(
+        "() => document.querySelector('#projectResourceSummary')?.textContent.includes('24.0 / 512 KB')",
+        timeout=15000)
+    assert login_page.locator("#projectResourceSummary").inner_text().startswith("HTML optimizado (Supabase):")
+    assert login_page.evaluate("window.__remoteSizeCalls.length") == 1
+    login_page.locator("#projectName").fill("Proyecto segunda medida")
+    login_page.locator("#projectName").press("Tab")
+    login_page.wait_for_function(
+        "() => document.querySelector('#projectResourceSummary')?.textContent.includes('Calculando en Supabase')",
+        timeout=5000)
+    # Distinct projects never reuse stale numbers; updates are throttled.
+    login_page.wait_for_function(
+        "() => document.querySelector('#projectResourceSummary')?.textContent.includes('40.0 / 512 KB')",
+        timeout=26000)
+    assert login_page.evaluate("window.__remoteSizeCalls.length") == 2
     login_page.close()
     checks.append("online_login_guest_button_unclipped_mobile_and_desktop")
+    checks.append("online_project_remote_optimized_size_debounced_and_not_stale")
 
     assert not errors, "Browser JavaScript errors: " + repr(errors)
     report = {
