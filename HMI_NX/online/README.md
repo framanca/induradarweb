@@ -59,3 +59,36 @@ Las pruebas comprueban autorización, revocación, acceso anónimo controlado, o
 ## Modo invitado
 
 El botón **Entrar como invitado** crea una sesión anónima de Supabase Auth. No solicita correo ni contraseña, no expone el compilador y continúa usando la Edge Function con `verify_jwt=true`. Cada invitado recibe un `user_id` propio; las compilaciones se registran en `webhmi_compilation_audit.user_id`, lo que permite separar actividad invitada de cuentas permanentes. Si el uso público crece, conviene añadir CAPTCHA/Turnstile para mitigar abuso.
+
+## Auditoría de sesiones y exportación a Sysmac
+
+La petición autenticada **access**, que ejecutan tanto **Entrar** como **Entrar como invitado**, registra un evento en **public.webhmi_access_audit** cuando se concede acceso; no es necesario descargar ningún proyecto. Queda registrado un evento por entrada correcta (no por cada clic dentro del editor ni por cada refresco de token).
+
+La petición de exportación **compile** / **compile-lite** registra un evento en **public.webhmi_compilation_audit**, con:
+- Fecha y hora UTC, IP observada por el servidor (si está disponible), ID del usuario, tipo invitado/registrado, éxito/error, código HTTP y versión.
+- Nombre, huella SHA-256 del proyecto enviado, tamaño JSON, número de pantallas, número de variables, y modalidad normal / Extra Light.
+- El registro se produce **al solicitar Exportar Sysmac**, no al usar Vista previa o al consultar el tamaño.
+
+Solo se guardan **metadatos**. No se guarda el contenido del proyecto, el ST, las imágenes ni el ZIP generado en la base de datos; la huella permite saber si dos exportaciones corresponden al mismo JSON. El servidor no puede confirmar que el navegador haya terminado de guardar el archivo. Si la auditoría falla, la función devuelve un error antes de entregar una exportación o confirmar un acceso exitoso.
+
+Las dos tablas mantienen RLS activado y no están disponibles al navegador (ni para invitados ni para usuarios autenticados). Solo el servidor escribe con su clave privada. No se ponen credenciales ni tokens en la auditoría.
+
+Consultas orientativas para el propietario desde SQL Editor de Supabase (zona horaria Madrid):
+
+```sql
+select a.created_at at time zone 'Europe/Madrid' as fecha,
+       a.user_type, u.email, host(a.ip) as ip, a.result
+from public.webhmi_access_audit a
+left join auth.users u on u.id=a.user_id
+order by a.created_at desc limit 100;
+
+select c.created_at at time zone 'Europe/Madrid' as fecha,
+       c.project_name, c.project_sha256, c.export_variant,
+       c.project_screen_count, c.project_variable_count, c.project_bytes,
+       c.user_type, u.email, host(c.ip) as ip, c.result, c.version
+from public.webhmi_compilation_audit c
+left join auth.users u on u.id=c.user_id
+order by c.created_at desc limit 100;
+```
+
+**Privacidad:** una IP es un dato personal. Es necesario informar de la finalidad, base jurídica y periodo de conservación en la política de privacidad; sugerencia operativa: anonimizar IPs después de 90 días, conservando estadísticas agregadas. Las IPs pueden ser nulas y no prueban la identidad física de la persona (VPN, NAT o proxies).
