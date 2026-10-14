@@ -10,9 +10,10 @@ test('frontend ships no compiler sources or calls',()=>{
  assert.ok(html.includes('id="previewFrame" sandbox="allow-scripts"'));
  assert.ok(!app.includes('exportPackage'));assert.ok(!app.includes('buildRuntimeHTML'));
 });
-test('missing identity, anonymous and unapproved accounts are denied',async()=>{
+test('missing identity is denied, guests are allowed, and unapproved permanent accounts are denied',async()=>{
  assert.equal((await (await handler(null))(request({action:'access'},''))).status,401);
- assert.equal((await (await handler({id:'a',is_anonymous:true,app_metadata:{webhmi_compile:true}}))(request({action:'access'}))).status,401);
+ const guestResult=await (await handler({id:'guest-a',is_anonymous:true,app_metadata:{}}))(request({action:'access'}));
+ assert.equal(guestResult.status,200);assert.equal((await guestResult.json()).guest,true);
  assert.equal((await (await handler({id:'a',user_metadata:{webhmi_compile:true}}))(request({action:'access'}))).status,403);
 });
 test('revocation is checked on each operation, not stale JWT claims',async()=>{
@@ -43,6 +44,9 @@ test('invalid input, unknown action, oversized stream and quota are rejected',as
  assert.equal((await h(request({action:'compile',project:{}}))).status,400);
  assert.equal((await h(request({action:'compile',project:{screens:[],variables:[]},padding:'x'.repeat(2*1024*1024)}))).status,413);
  let result;for(let i=0;i<21;i++)result=await h(request({action:'access'}));assert.equal(result.status,429);
+ const guest=await handler({id:'guest-q',is_anonymous:true,app_metadata:{}});
+ for(let i=0;i<11;i++)result=await guest(request({action:'access'}));
+ assert.equal(result.status,429);
 });
 
 test('server refuses an image that injects HTML attributes',async()=>{
@@ -50,4 +54,12 @@ test('server refuses an image that injects HTML attributes',async()=>{
  project.assets=[{id:'unsafe',name:'unsafe.png',data:'data:image/png;base64,AAAA" onerror="alert(1)'}];
  const h=await handler({id:'a',app_metadata:{webhmi_compile:true}});
  assert.equal((await h(request({action:'compile',project}))).status,422);
+});
+
+
+test('frontend offers anonymous guest access without shipping compiler code',()=>{
+ const client=fs.readFileSync(path.join(base,'client/online.js'),'utf8');
+ assert.ok(client.includes('Entrar como invitado'));
+ assert.ok(client.includes("/auth/v1/signup"));
+ assert.ok(!client.includes('compiler.js'));
 });
