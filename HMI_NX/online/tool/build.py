@@ -32,19 +32,68 @@ def build(dest):
             text=text.replace("'hmi-nx-st:p0:","'hmi-nx-online:p0:")
             text=replace(text, "async function liteCompile(snapshot){return C.exportLitePackage(snapshot)}", "async function liteCompile(snapshot){const zip=await NXOnline.request('compile-lite',snapshot);return {zip}}")
             text=replace(text, "async function litePreview(snapshot){return C.buildLiteRuntimeHTML(snapshot,{preview:true})}", "async function litePreview(snapshot){const result=await NXOnline.request('preview-lite',snapshot);return result.html}")
-            start=text.index('function renderDiag()'); end=text.index('\nfunction ',start+10)
-            text=text[:start]+'''function renderDiag(){
+            start=text.index('function renderProjectSummary('); end=text.index('\nfunction openExportDiagnostics(',start)
+            text=text[:start]+'''// The editor can check resources without carrying the server-side compiler.
+const onlineSize={
+ measured:null,errorKey:null,error:'',running:false,timer:null,lastRequestAt:0,
+ signature(){return JSON.stringify(C.normalize(p));},
+ schedule(key){
+  clearTimeout(this.timer);
+  this.timer=null;
+  if(this.measured?.key===key||this.errorKey===key||this.running)return;
+  if(!NXOnline.hasSession()||$('#sidebar-panel-project').hidden||C.validate(p).length)return;
+  // A 2.5s idle debounce and 15s minimum interval leave room for other
+  // operations under the guest tier (10 requests/minute per Edge instance).
+  const delay=Math.max(2500,15000-(Date.now()-this.lastRequestAt));
+  this.timer=setTimeout(()=>this.refresh(key),delay);
+ },
+ async refresh(expectedKey){
+  this.timer=null;
+  if(this.running||!NXOnline.hasSession()||$('#sidebar-panel-project').hidden)return;
+  const snapshot=C.copy(p),key=JSON.stringify(C.normalize(snapshot));
+  if(key!==expectedKey){renderDiag();return}
+  if(C.validate(snapshot).length)return;
+  this.running=true;this.lastRequestAt=Date.now();
+  renderProjectSummary(null,'Calculando en Supabase…');
+  try{
+   const data=await NXOnline.request('size',snapshot);
+   if(!Number.isSafeInteger(data.htmlBytes)||data.htmlBytes<0||data.limitBytes!==C.HTML_MAX_BYTES||data.optimized!==true)
+    throw Error('Respuesta de tamaño incorrecta');
+   this.measured={key,bytes:data.htmlBytes,rawBytes:data.originalHtmlBytes,overLimit:data.overLimit===true};
+   this.errorKey=null;this.error='';
+  }catch(error){this.errorKey=key;this.error=error.message;}
+  finally{this.running=false;renderDiag();}
+ }
+};
+function renderProjectSummary(htmlBytes=null,detail=''){
+ const assetBytes=p.assets.reduce((n,a)=>n+C.dataUrlBytes(a.data),0);
+ const htmlUsage=Number.isFinite(htmlBytes)?(htmlBytes/1024).toFixed(1)+' / 512 KB':'— / 512 KB';
+ const text='HTML optimizado (Supabase): '+htmlUsage+(detail?' · '+detail:'')+' · imágenes: '+(assetBytes/1024).toFixed(1)+' / 256 KB · '+p.screens.length+' pantallas · '+p.variables.length+' variables · '+p.alarms.length+' alarmas · '+(p.recipeEnabled?p.recipes.length:0)+' recetas.';
+ const summary=$('#projectResourceSummary');summary.textContent=text;
+ summary.parentElement.classList.toggle('over-limit',assetBytes>C.IMAGE_TOTAL_MAX_BYTES||Number.isFinite(htmlBytes)&&htmlBytes>C.HTML_MAX_BYTES);
+ return text;
+}
+function renderDiag(){
  syncProjectInputs();
- // HTML is generated in Supabase, so do not invent a local byte count.
- renderProjectSummary();
- const errors=C.validate(p),ok=!errors.length;
- const button=$('#exportBtn');
+ const key=onlineSize.signature(),errors=C.validate(p),baseErrorCount=errors.length;
+ const report=NXOnline.hasSession()&&onlineSize.measured?.key===key?onlineSize.measured:null;
+ if(report?.overLimit)errors.push('HTML optimizado supera 512 KB: exportación bloqueada.');
+ const detail=report?'Tamaño final verificado':!NXOnline.hasSession()?'Inicia sesión para calcular':baseErrorCount?'Corrige el proyecto para calcular':onlineSize.errorKey===key?'Error: '+onlineSize.error:'Calculando en Supabase…';
+ const projectSummary=renderProjectSummary(report?.bytes??null,detail);
+ const ok=errors.length===0,button=$('#exportBtn');
  button.dataset.exportable=String(ok);
  button.title=ok?'Proyecto correcto: exportar Sysmac':'Pulsa para ver los problemas de validación';
  $('#exportWarningIcon').hidden=ok;
- $('#diagnostics').innerHTML='<div class="diagnostic '+(ok?'ok':'error')+'">'+(ok?'Validación local correcta':'Bloqueos: '+errors.length)+'</div>'+errors.map(e=>'<div class="diagnostic error">'+C.esc(e)+'</div>').join('')+'<div class="diagnostic">Compilación y tamaño HTML se verifican en Supabase al previsualizar o exportar.</div>';
+ $('#diagnostics').innerHTML='<div class="diagnostic '+(ok?'ok':'error')+'">'+(ok?'Validación local correcta':'Bloqueos: '+errors.length)+'</div>'+errors.map(e=>'<div class="diagnostic error">'+C.esc(e)+'</div>').join('')+'<div class="diagnostic">'+C.esc(projectSummary)+'</div>';
+ onlineSize.schedule(key);
  return ok;
 }'''+text[end:]
+            text=replace(text,
+              " $('.left-panels').scrollTop=0;if(focus)current.focus();",
+              " $('.left-panels').scrollTop=0;if(focus)current.focus();if(name==='project')renderDiag();")
+            text=replace(text,
+              'p0Boot();\n})();',
+              "window.addEventListener('webhmi-online-session',()=>{onlineSize.errorKey=null;clearTimeout(onlineSize.timer);renderDiag();});\np0Boot();\n})();")
             start=text.index('function preview(){'); end=text.index('\n}',start)+2
             text=text[:start]+'''async function preview(){syncProjectInputs();try{const result=await NXOnline.request('preview',C.copy(p));$('#previewFrame').srcdoc=result.html;$('#previewDialog').showModal();clampPreviewDialog()}catch(error){toast(error.message)}}'''+text[end:]
             start=text.index("$('#exportBtn').onclick=")
