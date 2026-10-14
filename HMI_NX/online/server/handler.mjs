@@ -38,7 +38,7 @@ export function createHandler({authenticate, compiler, origins, now = Date.now})
       const bytes = new Uint8Array(size); let offset=0;
       for (const chunk of chunks) {bytes.set(chunk,offset);offset+=chunk.length;}
       const {action,project} = JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
-      if (!['access','preview','compile','preview-lite','compile-lite'].includes(action)) return json(400, {error:'Operación no válida'});
+      if (!['access','size','preview','compile','preview-lite','compile-lite'].includes(action)) return json(400, {error:'Operación no válida'});
       if (action === 'access') return json(200, {authorized:true, guest});
       if (!project || typeof project !== 'object' || Array.isArray(project) ||
           !Array.isArray(project.screens) || !Array.isArray(project.variables) ||
@@ -47,6 +47,21 @@ export function createHandler({authenticate, compiler, origins, now = Date.now})
         return json(400, {error:'Estructura o tamaño de proyecto no admitidos'});
       const normalized = compiler.normalize(project), errors = compiler.validate(normalized);
       if (errors.length) return json(422, {error:'Corrige los bloqueos del proyecto', errors});
+      if (action === 'size') {
+        // Identical source and optimizer to production compilation. Return only
+        // byte counts: never send HTML, ST or generated resources to the editor.
+        const rawHTML = compiler.buildRuntimeHTML(normalized, {modular:true});
+        const finalHTML = compiler.optimizeHTML ? await compiler.optimizeHTML(rawHTML, normalized) : rawHTML;
+        const encoder = new TextEncoder();
+        const htmlBytes = encoder.encode(finalHTML).length;
+        return json(200, {
+          htmlBytes,
+          originalHtmlBytes: encoder.encode(rawHTML).length,
+          limitBytes: compiler.HTML_MAX_BYTES,
+          overLimit: htmlBytes > compiler.HTML_MAX_BYTES,
+          optimized: Boolean(compiler.optimizeHTML)
+        });
+      }
       if (action === 'preview-lite' || action === 'compile-lite') {
         const report = compiler.liteAnalysis(normalized);
         if (report.issues.length) return json(422, {error:'Extra Light incompatible', errors:report.issues});

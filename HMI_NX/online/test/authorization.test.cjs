@@ -63,3 +63,38 @@ test('frontend offers anonymous guest access without shipping compiler code',()=
  assert.ok(client.includes("/auth/v1/signup"));
  assert.ok(!client.includes('compiler.js'));
 });
+
+
+test('size metadata is authorized and matches the exact optimized output without exporting HTML or ST',async()=>{
+ const project=ctx.NXST.demoProject(),original=ctx.NXST.optimizeHTML;
+ const raw=ctx.NXST.buildRuntimeHTML(ctx.NXST.normalize(project),{modular:true});
+ const expected=raw.replace('<title>','<title data-optimized="1">');
+ ctx.NXST.optimizeHTML=async text=>text.replace('<title>','<title data-optimized="1">');
+ try{
+  const user={id:'size-user',app_metadata:{webhmi_compile:true}},h=await handler(user);
+  const res=await h(request({action:'size',project}));
+  assert.equal(res.status,200);
+  const data=await res.json();
+  assert.equal(data.htmlBytes,new TextEncoder().encode(expected).length);
+  assert.equal(data.originalHtmlBytes,new TextEncoder().encode(raw).length);
+  assert.equal(data.limitBytes,ctx.NXST.HTML_MAX_BYTES);
+  assert.equal(data.optimized,true);
+  assert.equal(data.overLimit,false);
+  assert.deepEqual(Object.keys(data).sort(),['htmlBytes','limitBytes','optimized','originalHtmlBytes','overLimit'].sort());
+  assert.equal((await (await handler(null))(request({action:'size',project}))).status,401);
+  assert.equal((await (await handler({id:'unapproved',app_metadata:{}}))(request({action:'size',project}))).status,403);
+  const guest=await handler({id:'guest-size',is_anonymous:true,app_metadata:{}});
+  assert.equal((await guest(request({action:'size',project}))).status,200);
+  ctx.NXST.optimizeHTML=async()=> 'x'.repeat(ctx.NXST.HTML_MAX_BYTES+1);
+  const limit=await (await handler({id:'size-over',app_metadata:{webhmi_compile:true}}))(request({action:'size',project}));
+  assert.equal(limit.status,200);
+  const over=await limit.json();
+  assert.equal(over.htmlBytes,ctx.NXST.HTML_MAX_BYTES+1);
+  assert.equal(over.overLimit,true);
+ }finally{ctx.NXST.optimizeHTML=original}
+});
+test('online size action never counts as an audited compilation',()=>{
+ const source=fs.readFileSync(path.join(base,'supabase/functions/webhmi-compile/index.ts'),'utf8');
+ assert.match(source,/body\?\.action === 'compile' \|\| body\?\.action === 'compile-lite'/);
+ assert.doesNotMatch(source,/isCompile\s*=\s*[^;]*\bsize\b/);
+});
