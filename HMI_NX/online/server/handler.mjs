@@ -16,13 +16,16 @@ export function createHandler({authenticate, compiler, origins, now = Date.now})
     if (!token) return json(401, {error:'Debes iniciar sesión'});
     let user;
     try { user = await authenticate(token); } catch { return json(503, {error:'No se pudo verificar la sesión'}); }
-    if (!user || user.is_anonymous) return json(401, {error:'Sesión no válida'});
-    // Fresh server-owned metadata, never user_metadata or claims from an unverified JWT.
-    if (user.app_metadata?.webhmi_compile !== true) return json(403, {error:'Esta cuenta no tiene tu autorización para compilar'});
+    if (!user) return json(401, {error:'Sesión no válida'});
+    const guest = user.is_anonymous === true;
+    // Permanent accounts still require fresh server-owned authorization. Anonymous
+    // sessions are the explicit guest tier and never gain account privileges.
+    if (!guest && user.app_metadata?.webhmi_compile !== true) return json(403, {error:'Esta cuenta no tiene tu autorización para compilar'});
     const time = now();
     let quota = usage.get(user.id);
     if (!quota || time - quota.start >= 60000) quota = {start:time, count:0};
-    if (++quota.count > 20) return json(429, {error:'Espera un minuto antes de volver a compilar'});
+    const limit = guest ? 10 : 20;
+    if (++quota.count > limit) return json(429, {error:guest?'El modo invitado admite hasta 10 operaciones por minuto':'Espera un minuto antes de volver a compilar'});
     usage.set(user.id, quota);
     if (usage.size > 10000) for (const [key, value] of usage) if (time-value.start >= 60000) usage.delete(key);
     try {
@@ -36,7 +39,7 @@ export function createHandler({authenticate, compiler, origins, now = Date.now})
       for (const chunk of chunks) {bytes.set(chunk,offset);offset+=chunk.length;}
       const {action,project} = JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
       if (!['access','preview','compile','preview-lite','compile-lite'].includes(action)) return json(400, {error:'Operación no válida'});
-      if (action === 'access') return json(200, {authorized:true});
+      if (action === 'access') return json(200, {authorized:true, guest});
       if (!project || typeof project !== 'object' || Array.isArray(project) ||
           !Array.isArray(project.screens) || !Array.isArray(project.variables) ||
           project.screens.length > 100 || project.variables.length > 3000 ||
@@ -45,24 +48,23 @@ export function createHandler({authenticate, compiler, origins, now = Date.now})
       const normalized = compiler.normalize(project), errors = compiler.validate(normalized);
       if (errors.length) return json(422, {error:'Corrige los bloqueos del proyecto', errors});
       if (action === 'preview-lite' || action === 'compile-lite') {
-        const light = compiler.liteAnalysis(normalized);
-        if (light.issues.length) return json(422, {error:'Extra Light incompatible', errors:light.issues});
+        const report = compiler.liteAnalysis(normalized);
+        if (report.issues.length) return json(422, {error:'Extra Light incompatible', errors:report.issues});
         const html = compiler.buildLiteRuntimeHTML(normalized, {preview:action==='preview-lite'});
         const htmlBytes = new TextEncoder().encode(html).length;
-        if (htmlBytes > compiler.LITE_HTML_LIMIT) return json(422, {error:'Extra Light supera el limite de 128 KB'});
-        if (action === 'preview-lite') return json(200, {html, htmlBytes});
+        if (htmlBytes > compiler.LITE_HTML_LIMIT) return json(422, {error:'Extra Light supera 128 KB'});
+        if (action === 'preview-lite') return json(200, {html,htmlBytes});
         const out = compiler.exportLitePackage(normalized);
         const name=(normalized.name||'WebHMI').replace(/[^A-Za-z0-9_-]+/g,'_')+'_ExtraLight_Sysmac.zip';
         return new Response(out.zip, {status:200,headers:{...headers,'Content-Type':'application/zip','Content-Disposition':'attachment; filename="'+name+'"'}});
       }
-      let html = compiler.buildRuntimeHTML(normalized);
-      const htmlBytes = new TextEncoder().encode(html).length;
-      if (htmlBytes > compiler.HTML_MAX_BYTES) return json(422, {error:'HTML supera 512 KB'});
       if (action === 'preview') {
+        let html = compiler.buildRuntimeHTML(normalized);
+        const htmlBytes = new TextEncoder().encode(html).length;
         html=html.replace('startComm();','for(const v of P.vars)vals[v.name]=v.type==="BOOL"?false:v.type==="STRING"?"DEMO":55;document.getElementById("status").textContent="PREVIEW online";comm.state="ONLINE";comm.lastGoodAt=Date.now();showScreen(0);fitStage();paint();');
         return json(200, {html,htmlBytes});
       }
-      const out = compiler.exportPackage(normalized);
+      const out = await compiler.exportPackage(normalized);
       const name=(normalized.name||'WebHMI_ST').replace(/[^A-Za-z0-9_-]+/g,'_')+'_Sysmac.zip';
       return new Response(out.zip, {status:200,headers:{...headers,'Content-Type':'application/zip','Content-Disposition':`attachment; filename="${name}"`}});
     } catch { return json(400, {error:'Proyecto no válido o compilación fallida'}); }
