@@ -36,8 +36,12 @@ function stTyped(v,value){
 function alarmExpr(v,a){const op={eq:'=',ne:'<>',gt:'>',ge:'>=',lt:'<',le:'<='}[a.operator]||'=';const lhs=v.enumType?'EnumToNum('+v.name+')':v.type==='TIME'?'TimeToNanoSec('+v.name+')':v.name;const rhs=v.type==='TIME'?'LINT#'+(C.sysmacTypes?C.sysmacTypes.canonicalWrite('TIME',a.value):String(a.value)):stTyped(v,a.value);return '('+lhs+' '+op+' '+rhs+')';}
 function buildST(input){
  const p=C.normalize(input),html=C.buildRuntimeHTML(p),parts=chunks(html),exposed=p.variables.filter(v=>v.expose&&v.live),rw=exposed.filter(v=>v.access==='RW'&&v.writeSupported),vm=new Map(p.variables.map(v=>[v.name,v]));
- const read=[];for(const v of exposed){if(v.type==='BOOL'){read.push(`IF ${v.name} THEN\n    Web_ApiBody := CONCAT(Web_ApiBody, '${v.id}=1$n');\nELSE\n    Web_ApiBody := CONCAT(Web_ApiBody, '${v.id}=0$n');\nEND_IF;`);}else{read.push(`Web_ApiBody := CONCAT(Web_ApiBody, '${v.id}=', ${toStringExpr(v)}, '$n');`);}}
+ const read=[],readByName=new Map();for(const v of exposed){if(v.type==='BOOL'){read.push(`IF ${v.name} THEN\n    Web_ApiBody := CONCAT(Web_ApiBody, '${v.id}=1$n');\nELSE\n    Web_ApiBody := CONCAT(Web_ApiBody, '${v.id}=0$n');\nEND_IF;`);}else{read.push(`Web_ApiBody := CONCAT(Web_ApiBody, '${v.id}=', ${toStringExpr(v)}, '$n');`);}readByName.set(v.name,read[read.length-1]);}
  for(const [i,a] of p.alarms.entries()){const v=vm.get(a.binding);if(!v)continue;read.push(`IF ${alarmExpr(v,a)} THEN\n    Web_ApiBody := CONCAT(Web_ApiBody, 'A${i+1}=1$n');\nELSE\n    Web_ApiBody := CONCAT(Web_ApiBody, 'A${i+1}=0$n');\nEND_IF;\nIF Web_AlarmAck[${i+1}] THEN\n    Web_ApiBody := CONCAT(Web_ApiBody, 'K${i+1}=1$n');\nELSE\n    Web_ApiBody := CONCAT(Web_ApiBody, 'K${i+1}=0$n');\nEND_IF;`);}
+ // Alarms are global: always append every PLC alarm and ACK, whatever the screen.
+ const alarmRead=read.slice(exposed.length);
+ const screenReadCases=p.screens.map((screen,i)=>`${i}:
+        ${[...C.screenReadNames(p,screen).map(name=>readByName.get(name)),...alarmRead].join('\n        ')}`).join('\n        ');
  const writes=rw.map(v=>{
  if(v.type==='BOOL')return `${v.id}:\n                ${v.name} := (Web_ValueText = '1') OR (Web_ValueText = 'TRUE') OR (Web_ValueText = 'true');\n                Web_Found := TRUE;`;
  const statement=v.enumType?'NumToEnum(STRING_TO_DINT(Web_ValueText), '+v.name+')':v.name+' := '+fromStringExpr(v);
@@ -110,7 +114,7 @@ CASE Web_State OF
         Web_Request := UINT#0;
         IF (FIND(Web_RxText, 'GET / ') = 1) OR (FIND(Web_RxText, 'GET /index.html ') = 1) THEN
             Web_Request := UINT#1;
-        ELSIF FIND(Web_RxText, 'GET /api/read ') = 1 THEN
+        ELSIF (FIND(Web_RxText, 'GET /api/read ') = 1) OR (FIND(Web_RxText, 'GET /api/read?screen=') = 1) THEN
             Web_Request := UINT#2;
         ELSIF FIND(Web_RxText, 'POST /api/write?') = 1 THEN
             Web_Request := UINT#3;
@@ -143,7 +147,24 @@ CASE Web_State OF
         Web_Seq := Web_Seq + UDINT#1;
         IF Web_Seq = UDINT#0 THEN Web_Seq := UDINT#1; END_IF;
         Web_ApiBody := CONCAT('SEQ=', UDINT_TO_STRING(Web_Seq), '$n');
-        ${read.join('\n        ')}
+        IF FIND(Web_RxText, 'GET /api/read?screen=') = 1 THEN
+            Web_PosId := FIND(Web_RxText, '?screen=');
+            Web_PosEnd := FIND(Web_RxText, ' HTTP/');
+            IF (Web_PosId > 0) AND (Web_PosEnd > Web_PosId + UINT#8) THEN
+                Web_IdText := MID(In:=Web_RxText, L:=Web_PosEnd-(Web_PosId+UINT#8), P:=Web_PosId+UINT#8);
+                Web_WriteId := STRING_TO_UINT(Web_IdText);
+                CASE Web_WriteId OF
+                ${screenReadCases}
+                ELSE
+                    Web_ApiBody := CONCAT(Web_ApiBody, 'BAD SCREEN$n');
+                END_CASE;
+            ELSE
+                Web_ApiBody := CONCAT(Web_ApiBody, 'BAD SCREEN$n');
+            END_IF;
+        ELSE
+            (* Legacy/full snapshot: also needed while editing or applying recipes. *)
+            ${read.join('\n            ')}
+        END_IF;
         Web_ApiBody := CONCAT(Web_ApiBody, 'END=', UDINT_TO_STRING(Web_Seq), '$n');
         Web_TxText := 'HTTP/1.0 200 OK$r$nContent-Type: text/plain; charset=utf-8$r$nCache-Control: no-store$r$nConnection: close$r$n$r$n';
 
