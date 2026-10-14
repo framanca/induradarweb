@@ -16,19 +16,28 @@ async function request(action,project){
  await refresh();
  const response=await fetch(endpoint+'/functions/v1/'+config.functionName,{method:'POST',headers:headers(),body:JSON.stringify({action,project}),signal:AbortSignal.timeout(30000)});
  if(!response.ok){if(response.status===401||response.status===403)lock('Acceso no autorizado.');await parse(response);}
- return action==='compile'?await response.blob():await parse(response);
+ return (action==='compile'||action==='compile-lite')?await response.blob():await parse(response);
 }
 window.NXOnline=Object.freeze({request});
 document.addEventListener('DOMContentLoaded',()=>{
  loginDialog=document.createElement('dialog');loginDialog.id='onlineLogin';
- loginDialog.innerHTML='<form id="onlineLoginForm"><h2>WebHMI Online</h2><p>Accede con una cuenta autorizada para compilar.</p><label>Correo<input name="email" type="email" autocomplete="username" required></label><label>Contraseña<input name="password" type="password" autocomplete="current-password" required></label><p id="onlineLoginStatus" role="status"></p><button type="submit" class="primary">Entrar</button><p class="hint">Las cuentas las autoriza el propietario. Tu proyecto se conserva en este navegador; se envía a Supabase al previsualizar o exportar.</p></form>';
+ loginDialog.innerHTML='<form id="onlineLoginForm"><h2>WebHMI Online</h2><p>Accede con tu cuenta o continúa como invitado.</p><label>Correo<input name="email" type="email" autocomplete="username" required></label><label>Contraseña<input name="password" type="password" autocomplete="current-password" required></label><p id="onlineLoginStatus" role="status"></p><button type="submit" class="primary">Entrar</button><div class="online-separator"><span>o</span></div><button id="onlineGuestBtn" type="button">Entrar como invitado</button><p class="hint">Las cuentas registradas las autoriza el propietario. Como invitado no necesitas correo ni contraseña; la compilación sigue realizándose en Supabase y queda auditada. Tu proyecto se conserva en este navegador.</p></form>';
  document.body.append(loginDialog);status=document.querySelector('#onlineLoginStatus');
  loginDialog.addEventListener('cancel',e=>e.preventDefault());
- const form=loginDialog.querySelector('form');
+ const form=loginDialog.querySelector('form'),guestButton=loginDialog.querySelector('#onlineGuestBtn');
  form.addEventListener('submit',async e=>{
   e.preventDefault();const button=form.querySelector('button');button.disabled=true;status.textContent='Comprobando acceso…';
   try{session=await parse(await fetch(endpoint+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:config.publishableKey,'Content-Type':'application/json'},body:JSON.stringify({email:form.elements.email.value,password:form.elements.password.value}),signal:AbortSignal.timeout(30000)}));await request('access');form.elements.password.value='';status.textContent='';loginDialog.close();}
   catch(error){lock(error.message)}finally{button.disabled=false}
+ });
+ guestButton.addEventListener('click',async()=>{
+  const submit=form.querySelector('button[type="submit"]');guestButton.disabled=true;submit.disabled=true;status.textContent='Creando sesión de invitado…';
+  try{
+   session=await parse(await fetch(endpoint+'/auth/v1/signup',{method:'POST',headers:{apikey:config.publishableKey,'Content-Type':'application/json'},body:JSON.stringify({data:{webhmi_guest:true}}),signal:AbortSignal.timeout(30000)}));
+   const access=await request('access');
+   if(!access.guest)throw new Error('Supabase no devolvió una sesión de invitado');
+   status.textContent='';loginDialog.close();
+  }catch(error){lock(error.message)}finally{guestButton.disabled=false;submit.disabled=false}
  });
  const logout=document.createElement('button');logout.textContent='Salir';
  logout.onclick=async()=>{const old=session;lock('Sesión cerrada');if(old)try{await fetch(endpoint+'/auth/v1/logout?scope=local',{method:'POST',headers:{apikey:config.publishableKey,Authorization:'Bearer '+old.access_token},signal:AbortSignal.timeout(10000)})}catch{}};
