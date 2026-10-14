@@ -1204,7 +1204,8 @@ with sync_playwright() as pw:
     assert page.locator("#recipeEnabled").is_checked()  # Original remains complete.
     page.locator("#liteClose").click()
     page.locator("#projectFile").set_input_files(str(adapted_path))
-    assert page.locator("#projectName").input_value().endswith("Extra Light")
+    # File.text() and project restoration are asynchronous. Wait for completion.
+    page.wait_for_function("document.querySelector('#projectName').value.endsWith('Extra Light')")
     page.locator("#liteExportBtn").click()
     assert page.locator("#liteGenerate").is_enabled()
     with page.expect_download() as dl:
