@@ -1212,6 +1212,39 @@ with sync_playwright() as pw:
     assert dl.value.suggested_filename.endswith("_ExtraLight_Sysmac.zip")
     checks.append("extra_light_small_html_st_preview_incompatibility_and_non_destructive_copy")
 
+    # Login stays fully within the viewport even with the editor's global
+    # "dialog form" width rule, which previously clipped the guest button.
+    login_page=context.new_page()
+    login_page.on("pageerror", lambda err: errors.append(str(err)))
+    response=login_page.goto(ORIGIN.replace("/HMI_NX_ST/", "/HMI_NX_Online/"), wait_until="load")
+    assert response is not None and response.status == 200
+    assert login_page.locator("#onlineLogin").is_visible()
+    assert login_page.locator("#onlineGuestBtn").is_visible()
+    login_page.locator("#onlineLoginStatus").evaluate(
+        "(el) => {el.textContent='Database error creating anonymous user'}"
+    )
+    for w,h in [(552,625),(375,667),(320,480),(768,550),(1280,760)]:
+        login_page.set_viewport_size({"width":w,"height":h})
+        metrics=login_page.evaluate("""() => {
+            const d=document.querySelector('#onlineLogin');
+            const f=d.querySelector('form'),b=document.querySelector('#onlineGuestBtn');
+            const rect=d.getBoundingClientRect(),button=b.getBoundingClientRect();
+            return {x:rect.x,y:rect.y,width:rect.width,height:rect.height,
+                viewportWidth:innerWidth,viewportHeight:innerHeight,
+                scrollWidth:d.scrollWidth,clientWidth:d.clientWidth,
+                buttonLeft:button.x,buttonRight:button.right,
+                formWidth:f.getBoundingClientRect().width};
+        }""")
+        assert metrics["x"] >= -1 and metrics["x"]+metrics["width"] <= w+1,metrics
+        assert metrics["y"] >= -1 and metrics["y"]+metrics["height"] <= h+1,metrics
+        assert metrics["scrollWidth"] <= metrics["clientWidth"]+1,metrics
+        assert metrics["formWidth"] <= metrics["clientWidth"]+1,metrics
+        assert metrics["buttonLeft"] >= metrics["x"] and metrics["buttonRight"] <= metrics["x"]+metrics["width"],metrics
+        login_page.locator("#onlineGuestBtn").scroll_into_view_if_needed()
+        assert login_page.locator("#onlineGuestBtn").is_visible()
+    login_page.close()
+    checks.append("online_login_guest_button_unclipped_mobile_and_desktop")
+
     assert not errors, "Browser JavaScript errors: " + repr(errors)
     report = {
         "status": "PASS",
