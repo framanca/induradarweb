@@ -41,6 +41,7 @@ function buildST(input){
  // Alarms are global: always append every PLC alarm and ACK, whatever the screen.
  const alarmRead=read.slice(exposed.length);
  const screenReadCases=p.screens.map((screen,i)=>`${i}:
+        Web_Found := TRUE;
         ${[...C.screenReadNames(p,screen).map(name=>readByName.get(name)),...alarmRead].join('\n        ')}`).join('\n        ');
  const writes=rw.map(v=>{
  if(v.type==='BOOL')return `${v.id}:\n                ${v.name} := (Web_ValueText = '1') OR (Web_ValueText = 'TRUE') OR (Web_ValueText = 'true');\n                Web_Found := TRUE;`;
