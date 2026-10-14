@@ -1,2 +1,41 @@
-#onlineLogin{max-width:440px;width:calc(100% - 40px);border:1px solid #cbd5e1;border-radius:14px;padding:24px;color:#0f172a}#onlineLogin::backdrop{background:#0f172ae6}#onlineLogin form{display:grid;gap:14px}#onlineLogin h2,#onlineLogin p{margin:0}#onlineLogin label{display:grid;gap:6px}#onlineLogin input{width:100%;padding:10px}#onlineLoginStatus{color:#b91c1c}#onlineLogin .hint{line-height:1.5}
-#onlineLogin .online-separator{display:flex;align-items:center;gap:10px;color:#64748b;font-size:12px}#onlineLogin .online-separator:before,#onlineLogin .online-separator:after{content:"";height:1px;background:#e2e8f0;flex:1}
+/* The editor's global "dialog form" is 90vw/760px; never let it stretch
+   a smaller authentication dialog beyond its own padding box. */
+#onlineLogin{
+  box-sizing:border-box;
+  width:min(440px,calc(100vw - 32px));
+  max-width:calc(100vw - 32px);
+  max-height:calc(100dvh - 32px);
+  min-width:0;
+  margin:auto;
+  padding:clamp(14px,4vw,24px);
+  border:1px solid #cbd5e1;
+  border-radius:14px;
+  color:#0f172a;
+  overflow-x:hidden;
+  overflow-y:auto;
+}
+#onlineLogin::backdrop{background:#0f172ae6}
+#onlineLogin form{
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  margin:0;
+  padding:0;
+  gap:14px;
+}
+#onlineLogin form>*{min-width:0;max-width:100%}
+#onlineLogin h2,#onlineLogin p{margin:0;overflow-wrap:anywhere}
+#onlineLogin h2{font-size:18px}
+#onlineLogin label{display:grid;width:100%;min-width:0;gap:6px;margin:0}
+#onlineLogin input{box-sizing:border-box;width:100%;max-width:100%;min-width:0;padding:10px}
+#onlineLogin button{display:block;width:100%;max-width:100%;min-height:44px;white-space:normal;overflow-wrap:anywhere}
+#onlineLoginStatus{color:#b91c1c;white-space:normal;overflow-wrap:anywhere}
+#onlineLoginStatus:empty{display:none}
+#onlineLogin .hint{line-height:1.5}
+#onlineLogin .online-separator{display:flex;align-items:center;gap:10px;color:#64748b;font-size:12px;min-width:0}
+#onlineLogin .online-separator:before,#onlineLogin .online-separator:after{
+  content:"";height:1px;background:#e2e8f0;flex:1;min-width:0
+}
+@media(max-height:500px){#onlineLogin{padding:12px}#onlineLogin form{gap:9px}}

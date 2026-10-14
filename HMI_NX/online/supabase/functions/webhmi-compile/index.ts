@@ -30,7 +30,7 @@ Deno.serve(async (req: Request) => {
   }
   let auditUser: any = null;
   if (isCompile) {
-    const token = /^Bearer (\\S+)$/i.exec(req.headers.get('authorization') || '')?.[1];
+    const token = /^Bearer (\S+)$/i.exec(req.headers.get('authorization') || '')?.[1];
     if (token) try { auditUser = await authenticate(token); } catch { /* Audit may continue without identity. */ }
   }
   let response: Response;
@@ -41,7 +41,7 @@ Deno.serve(async (req: Request) => {
   if (isCompile && serviceKey) {
     const ip = req.headers.get('cf-connecting-ip') || req.headers.get('x-real-ip') ||
       req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
-    const validIp = ip && (/^(?:\\d{1,3}\\.){3}\\d{1,3}$/.test(ip) || /^[0-9a-f:]+$/i.test(ip)) ? ip : null;
+    const validIp = ip && (/^(?:\d{1,3}\.){3}\d{1,3}$/.test(ip) || /^[0-9a-f:]+$/i.test(ip)) ? ip : null;
     try {
       const saved = await fetch(`${url}/rest/v1/webhmi_compilation_audit`, {
         method:'POST',
