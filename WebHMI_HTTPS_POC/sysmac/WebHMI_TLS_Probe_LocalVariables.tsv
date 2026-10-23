@@ -14,7 +14,7 @@ WebTLS_Index	UINT	0				Índice de bucle
 WebTLS_RecordLength	UINT	0				Longitud declarada TLS
 WebTLS_IsTLS	BOOL	FALSE				Posible record TLS ClientHello
 WebTLS_Connections	UDINT	0				Clientes TCP
-WebTLS_ClientHellos	UDINT	0				Cabeceras TLS detectadas, NO sesiones seguras
+WebTLS_RecordCandidates	UDINT	0				Registros TLS candidatos, NO ClientHello validado
 WebTLS_Rejected	UDINT	0				Cabeceras rechazadas
 WebTLS_AcceptErrors	UDINT	0				Errores accept
 WebTLS_RecvErrors	UDINT	0				Errores receive
