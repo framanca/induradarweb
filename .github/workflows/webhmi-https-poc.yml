@@ -23,3 +23,15 @@ jobs:
 
       - name: Check Sysmac POU splitting and variable tables
         run: python3 -m unittest discover -s WebHMI_HTTPS_POC/tests -p '*_test.py' -v
+
+      - name: Generate NX102 Sysmac crypto laboratory package
+        run: |
+          python3 WebHMI_HTTPS_POC/tools/prepare_sysmac_fb.py --output WebHMI_HTTPS_POC/sysmac_ready
+          cp WebHMI_HTTPS_POC/sysmac/WebHMI_CryptoSelfTest.st WebHMI_HTTPS_POC/sysmac_ready/
+          cp WebHMI_HTTPS_POC/sysmac/WebHMI_CryptoSelfTest_LocalVariables.tsv WebHMI_HTTPS_POC/sysmac_ready/
+      - name: Publish Sysmac lab package (not HTTPS)
+        uses: actions/upload-artifact@v4
+        with:
+          name: WebHMI-NX102-Crypto-Sysmac-Lab-NOT-HTTPS
+          path: WebHMI_HTTPS_POC/sysmac_ready/
+          retention-days: 14
