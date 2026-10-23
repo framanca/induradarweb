@@ -19,7 +19,7 @@
 - Desde un PC con OpenSSL (solo herramienta de prueba, no se instala ni ejecuta en el PLC):
   `openssl s_client -connect 192.168.250.1:8443 -tls1_2 -brief`
 - También puedes abrir `https://192.168.250.1:8443/` en un navegador, pero **debe dar error de negociación TLS**.
-- Supervisa `WebTLS_Connections` y `WebTLS_ClientHellos`. Si llega a detectar los cinco bytes de la cabecera TLS, el segundo contador debe aumentar.
+- Supervisa `WebTLS_Connections` y `WebTLS_RecordCandidates`. Si llega a detectar los cinco bytes de la cabecera TLS, el segundo contador debe aumentar (todavía no se comprueba que el mensaje completo sea un ClientHello).
 - Prueba además `http://192.168.250.1:8443/`: debe rechazarse, sin ejecutar ninguna API ni mostrar página.
 - Comprueba `WebTLS_State` regresa a 10 tras cada intento y que el ciclo de la máquina no se ve afectado.
 
@@ -31,6 +31,6 @@ Demuestra, **si se confirma en hardware**, que el programa puede recibir una con
 
 ## Resultados necesarios
 
-Indica modelo y firmware exactos del PLC, versión de Sysmac Studio, errores de compilación si existen, valor de `WebTLS_Connections`, `WebTLS_ClientHellos`, `WebTLS_Rejected`, `WebTLS_AcceptErrors`, tarea/ciclo, y comportamiento del navegador.
+Indica modelo y firmware exactos del PLC, versión de Sysmac Studio, errores de compilación si existen, valor de `WebTLS_Connections`, `WebTLS_RecordCandidates`, `WebTLS_Rejected`, `WebTLS_AcceptErrors`, tarea/ciclo, y comportamiento del navegador.
 
 No adjuntes claves privadas, contraseñas ni certificados con clave privada.
