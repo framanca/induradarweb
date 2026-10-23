@@ -1,6 +1,6 @@
 # WebHMI HTTPS para Omron NX — investigación ST/FB
 
-Estado: **FASE 0 — prueba de sockets con detección de un encabezado TLS**. No existe todavía un servidor HTTPS funcional y **no puede usarse como sustituto seguro de la WebHMI HTTP**.
+Estado: **investigación criptográfica / transporte TLS 1.2 post-handshake**. Implementados en ST los bloques SHA-256, AES-128, AES-GCM y la capa de registros TLS 1.2. FALTAN handshake, ECDHE, certificados, CSPRNG y enlace a WebHMI. **No existe todavía un servidor HTTPS funcional y no puede usarse como sustituto seguro de la WebHMI HTTP.**
 
 ## Objetivo final
 
@@ -17,6 +17,11 @@ El exportador actual `HMI_NX_ST/st.js` genera HTTP, no HTTPS. Se basa en los FB 
 - `tests/tls_record_header.test.cjs`: pruebas de modelo JS para clasificación básica de cabeceras TLS. No ejecuta ni compila ST.
 - `docs/PASOS_PRUEBA.md`: guía de laboratorio.
 - `docs/CRITERIOS_SEGURIDAD.md`: hitos obligatorios para poder habilitar el servidor HTTPS y exportar una HMI real.
+- `crypto/FB_WebSHA256.st`: compresión SHA-256 fraccionada en ciclos.
+- `crypto/FB_WebAES128.st`: cifrado de bloques AES-128.
+- `crypto/FB_WebAESGCM.st`: autenticación/cifrado AES-GCM con AAD; descifrado rechaza etiquetas inválidas.
+- `crypto/FB_WebTLS12Record.st`: registros TLS 1.2 application_data **únicamente después del handshake**. No implementa handshake ni claves.
+- `tests/crypto_primitives.test.cjs`: modelos de referencia JS alimentados con constantes del ST; casos NIST y comparación con `node:crypto`. Estas pruebas **NO ejecutan ST ni lo compilan en Sysmac**.
 
 ## Estado y condiciones para la fase HTTPS real
 
@@ -25,13 +30,27 @@ El exportador actual `HMI_NX_ST/st.js` genera HTTP, no HTTPS. Se basa en los FB 
 | TCP ST para un cliente en 8443 | Prototipo **sin verificar en Sysmac/hardware** |
 | Detección de encabezado TLS | Código ST creado, no validado en hardware |
 | TLS handshake, certificados, ECDHE, CSPRNG | **NO IMPLEMENTADO** |
-| Encriptación TLS AEAD, lectura/escritura | **NO IMPLEMENTADO** |
+| SHA-256, AES-128 y AES-GCM ST | **Código creado, pruebas de modelos, SIN validar en Sysmac** |
+| TLS 1.2 application_data AEAD | **FB ST creado para claves de sesión ya derivadas, SIN handshake** |
+| Lectura/escritura WebHMI por canal TLS | **NO IMPLEMENTADO** |
 | Enlace a exportador existente | **NO IMPLEMENTADO** |
 | HTTPS en Chrome/Firefox | **NO FUNCIONA TODAVÍA** |
 
 No insertar secretos reales, claves privadas ni certificados en este repositorio. No exponer el equipo a redes de planta o Internet.
 
 El repositorio de origen `framanca/induradarweb` **no ha sido modificado en `main`**. El contenido está preparado en una rama de investigación. El repositorio independiente definitivo requiere crearse en GitHub desde la cuenta propietaria porque el conector actual no dispone de acción "Crear repositorio".
+
+## Firmware y Sysmac Studio: NX102-9000
+
+- **Mínimo de plataforma TCP:** NX102 firmware/Unit Ver. 1.30 y Sysmac Studio Ver. 1.23 para la CPU NX102, según documentación de soporte original. No constituye un mínimo demostrado para HTTPS.
+- **Base de desarrollo reproducible recomendada:** NX102-9000 firmware/Unit Ver. **1.64** y Sysmac Studio **1.62**, combinación utilizada en un proyecto independiente de cliente TLS ST. Esto **NO confirma** compatibilidad del nuevo servidor.
+- Omron documenta TLS nativo como **cliente** desde firmware Ver. 1.46 y Sysmac Studio 1.46, pero esto no permite HTTPS de navegador servido desde ST.
+- Puerto propuesto para HTTPS WebHMI: **8443**. Puerto 443 reservado en la CPU.
+- **Versión mínima HTTPS real:** por determinar después de compilar, negociar un handshake completo y medir el runtime en hardware.
+
+### Restricciones funcionales pendientes
+
+No hay interfaz ST documentada para TLS de servidor en NX102. El servidor real requiere intercambio ECDHE, autenticación X.509, firma efímera del handshake, números aleatorios criptográficamente seguros y almacenamiento de claves/estado sin reutilización al reiniciar. Ninguna de esas piezas puede sustituirse por un puerto distinto o una clave AES fija. Los FB criptográficos actuales no están auditados contra canales laterales y pueden resultar demasiado lentos en HMI grandes.
 
 ## Referencias
 
