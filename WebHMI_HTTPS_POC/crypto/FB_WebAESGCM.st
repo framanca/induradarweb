@@ -124,6 +124,7 @@ CASE State OF
         END_IF;
     21:
         (* GHASH for padded associated-data block; common worker below. *)
+        ;
 
     30:
         IF BlockOffset < DataLen THEN
@@ -179,9 +180,11 @@ CASE State OF
         END_IF;
     32:
         (* GHASH ciphertext block. *)
+        ;
 
     41:
         (* GHASH length block. *)
+        ;
 
     42:
         Diff := BYTE#0;
