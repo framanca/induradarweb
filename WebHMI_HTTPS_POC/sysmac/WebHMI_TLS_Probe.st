@@ -1,5 +1,5 @@
 (*
- WebHMI HTTPS / PHASE 0: TLS CLIENTHELLO PROBE
+ WebHMI HTTPS / PHASE 0: TLS RECORD PROBE
  LAB ONLY. NOT AN HTTPS SERVER. DOES NOT DECRYPT OR SERVE HTTP.
  Source: independent research branch; no writes to machine variables.
  Port 8443. Do not run alongside WebHMI_Server HTTP.
@@ -67,7 +67,7 @@ CASE WebTLS_State OF
                     AND (WebTLS_RecordLength > UINT#0)
                     AND (WebTLS_RecordLength <= UINT#16384);
                 IF WebTLS_IsTLS THEN
-                    WebTLS_ClientHellos := WebTLS_ClientHellos + UDINT#1;
+                    WebTLS_RecordCandidates := WebTLS_RecordCandidates + UDINT#1;
                     WebTLS_State := UINT#30;
                 ELSE
                     WebTLS_Rejected := WebTLS_Rejected + UDINT#1;
