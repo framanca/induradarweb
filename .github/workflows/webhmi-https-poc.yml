@@ -17,6 +17,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Verify TLS record detector model and fail-closed ST source
-        run: node --test WebHMI_HTTPS_POC/tests/tls_record_header.test.cjs
+        run: node --test WebHMI_HTTPS_POC/tests/*.test.cjs
       - name: Verify packaging script syntax
         run: python3 -m py_compile WebHMI_HTTPS_POC/tools/package_probe.py
