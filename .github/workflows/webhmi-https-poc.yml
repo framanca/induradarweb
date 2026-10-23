@@ -20,3 +20,6 @@ jobs:
         run: node --test WebHMI_HTTPS_POC/tests/*.test.cjs
       - name: Verify packaging script syntax
         run: python3 -m py_compile WebHMI_HTTPS_POC/tools/package_probe.py
+
+      - name: Check Sysmac POU splitting and variable tables
+        run: python3 -m unittest discover -s WebHMI_HTTPS_POC/tests -p '*_test.py' -v
