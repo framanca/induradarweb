@@ -221,3 +221,60 @@ test('TLS 1.2 AES-128-GCM application-data record roundtrip under fixed session 
   assert.match(st,/Gcm.Error\) AND Gcm.Valid/);
   assert.match(st,/IF GcmDataLen > UINT#0 THEN/);
 });
+
+
+function hmacMirror(key,msg){
+  assert.ok(key.length<=64);
+  const padded=Buffer.alloc(64);key.copy(padded);
+  const ipad=Buffer.from(padded.map(x=>x^0x36));
+  const opad=Buffer.from(padded.map(x=>x^0x5c));
+  return sha256Mirror(Buffer.concat([opad,sha256Mirror(Buffer.concat([ipad,msg]))]));
+}
+function prfMirror(secret,seed,n){
+  let a=hmacMirror(secret,seed);
+  const parts=[];
+  while(Buffer.concat(parts).length<n){
+    parts.push(hmacMirror(secret,Buffer.concat([a,seed])));
+    a=hmacMirror(secret,a);
+  }
+  return Buffer.concat(parts).subarray(0,n);
+}
+test('HMAC-SHA256 pure mirror interoperates with native crypto',()=>{
+  const secret=Buffer.from('0123456789abcdef0123456789abcdef','utf8');
+  for(const n of [0,1,13,64,77,128,1919]){
+    const message=Buffer.alloc(n);message.fill(0x61);
+    const expect=crypto.createHmac('sha256',secret).update(message).digest('hex');
+    assert.equal(hmacMirror(secret,message).toString('hex'),expect);
+  }
+  const st=fs.readFileSync(path.join(folder,'FB_WebHMACSHA256.st'),'utf8');
+  assert.match(st,/Sha\s*:\s*FB_WebSHA256/);
+  assert.match(st,/B XOR BYTE#16#36/);
+  assert.match(st,/B XOR BYTE#16#5c/);
+});
+test('TLS1.2 PRF SHA256 produces reproducible master/key expansion',()=>{
+  const premaster=Buffer.from(Array.from({length:48}, (_,i)=>i));
+  const clientRandom=Buffer.alloc(32,0x55);
+  const serverRandom=Buffer.alloc(32,0xaa);
+  const seed=Buffer.concat([Buffer.from('master secret'),clientRandom,serverRandom]);
+  const master=prfMirror(premaster,seed,48);
+  assert.equal(master.length,48);
+  const expansion=prfMirror(master,Buffer.concat([
+    Buffer.from('key expansion'),serverRandom,clientRandom]),40);
+  assert.equal(expansion.length,40);
+  assert.notEqual(expansion.toString('hex'),Buffer.alloc(40).toString('hex'));
+  const nativePrf=(key,data,n)=>{
+    let a=crypto.createHmac('sha256',key).update(data).digest(),result=Buffer.alloc(0);
+    while(result.length<n){
+      result=Buffer.concat([result,crypto.createHmac('sha256',key).update(Buffer.concat([a,data])).digest()]);
+      a=crypto.createHmac('sha256',key).update(a).digest();
+    }
+    return result.subarray(0,n);
+  };
+  assert.equal(master.toString('hex'),nativePrf(premaster,seed,48).toString('hex'));
+  assert.equal(expansion.toString('hex'),nativePrf(master,Buffer.concat([
+    Buffer.from('key expansion'),serverRandom,clientRandom]),40).toString('hex'));
+  const st=fs.readFileSync(path.join(folder,'FB_WebTLS12PRF.st'),'utf8');
+  assert.match(st,/Hmac\s*:\s*FB_WebHMACSHA256/);
+  assert.match(st,/Requested > UINT#128/);
+  assert.match(st,/HmacInputLen := UINT#32 \+ SeedLen/);
+});
