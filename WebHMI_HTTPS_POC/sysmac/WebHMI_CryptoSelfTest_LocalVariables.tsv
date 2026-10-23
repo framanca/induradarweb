@@ -1,0 +1,22 @@
+WebTest_State	UINT	0				WebHMI HTTPS crypto lab only
+WebTest_Reset	BOOL	FALSE				WebHMI HTTPS crypto lab only
+WebTest_Done	BOOL	FALSE				WebHMI HTTPS crypto lab only
+WebTest_Passed	BOOL	FALSE				WebHMI HTTPS crypto lab only
+WebTest_SHAStart	BOOL	FALSE				WebHMI HTTPS crypto lab only
+WebTest_AESStart	BOOL	FALSE				WebHMI HTTPS crypto lab only
+WebTest_GCMStart	BOOL	FALSE				WebHMI HTTPS crypto lab only
+WebTest_CyclesSHA	UDINT	0				WebHMI HTTPS crypto lab only
+WebTest_CyclesAES	UDINT	0				WebHMI HTTPS crypto lab only
+WebTest_CyclesGCM	UDINT	0				WebHMI HTTPS crypto lab only
+WebTest_I	UINT	0				WebHMI HTTPS crypto lab only
+WebTest_SHA	FB_WebSHA256					WebHMI HTTPS crypto lab only
+WebTest_AES	FB_WebAES128					WebHMI HTTPS crypto lab only
+WebTest_GCM	FB_WebAESGCM					WebHMI HTTPS crypto lab only
+WebTest_SHAInput	ARRAY[0..2047] OF BYTE					WebHMI HTTPS crypto lab only
+WebTest_AESKey	ARRAY[0..15] OF BYTE					WebHMI HTTPS crypto lab only
+WebTest_AESInput	ARRAY[0..15] OF BYTE					WebHMI HTTPS crypto lab only
+WebTest_GCMKey	ARRAY[0..15] OF BYTE					WebHMI HTTPS crypto lab only
+WebTest_GCMNonce	ARRAY[0..11] OF BYTE					WebHMI HTTPS crypto lab only
+WebTest_GCMAAD	ARRAY[0..31] OF BYTE					WebHMI HTTPS crypto lab only
+WebTest_GCMData	ARRAY[0..2047] OF BYTE					WebHMI HTTPS crypto lab only
+WebTest_GCMTagIn	ARRAY[0..15] OF BYTE					WebHMI HTTPS crypto lab only
