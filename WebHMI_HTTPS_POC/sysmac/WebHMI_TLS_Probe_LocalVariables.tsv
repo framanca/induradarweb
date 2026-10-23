@@ -1,0 +1,21 @@
+WebTLS_State	UINT	0				Estado máquina TCP/TLS (0/10/20/30/90)
+WebTLS_PrevState	UINT	0				Estado anterior
+WebTLS_StateTicks	UDINT	0				Contador por ciclo
+WebTLS_Socket	_sSOCKET					Socket
+WebTLS_Accept	SktTCPAccept					Escucha en 8443
+WebTLS_Recv	SktTCPRcv					Recepción binaria
+WebTLS_Send	SktTCPSend					Envío alerta fatal
+WebTLS_Close	SktClose					Cierre
+WebTLS_Rx	ARRAY[0..511] OF BYTE					Buffer TCP
+WebTLS_Tx	ARRAY[0..6] OF BYTE					Alert TLS
+WebTLS_Hdr	ARRAY[0..4] OF BYTE					Cabecera TLS
+WebTLS_HeaderCount	UINT	0				Bytes de cabecera recibidos
+WebTLS_Index	UINT	0				Índice de bucle
+WebTLS_RecordLength	UINT	0				Longitud declarada TLS
+WebTLS_IsTLS	BOOL	FALSE				Posible record TLS ClientHello
+WebTLS_Connections	UDINT	0				Clientes TCP
+WebTLS_ClientHellos	UDINT	0				Cabeceras TLS detectadas, NO sesiones seguras
+WebTLS_Rejected	UDINT	0				Cabeceras rechazadas
+WebTLS_AcceptErrors	UDINT	0				Errores accept
+WebTLS_RecvErrors	UDINT	0				Errores receive
+WebTLS_Timeouts	UDINT	0				Time-out conexión
