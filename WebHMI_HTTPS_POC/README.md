@@ -1,6 +1,6 @@
 # WebHMI HTTPS para Omron NX — investigación ST/FB
 
-Estado: **investigación criptográfica / transporte TLS 1.2 post-handshake**. Implementados en ST los bloques SHA-256, AES-128, AES-GCM y la capa de registros TLS 1.2. FALTAN handshake, ECDHE, certificados, CSPRNG y enlace a WebHMI. **No existe todavía un servidor HTTPS funcional y no puede usarse como sustituto seguro de la WebHMI HTTP.**
+Estado: **investigación criptográfica / transporte TLS 1.2 post-handshake**. Implementados en ST los bloques SHA-256, AES-128, AES-GCM, HMAC-SHA256, TLS 1.2 PRF y la capa de registros TLS 1.2. FALTAN handshake, ECDHE, certificados, CSPRNG y enlace a WebHMI. **No existe todavía un servidor HTTPS funcional y no puede usarse como sustituto seguro de la WebHMI HTTP.**
 
 ## Objetivo final
 
@@ -20,6 +20,8 @@ El exportador actual `HMI_NX_ST/st.js` genera HTTP, no HTTPS. Se basa en los FB 
 - `crypto/FB_WebSHA256.st`: compresión SHA-256 fraccionada en ciclos.
 - `crypto/FB_WebAES128.st`: cifrado de bloques AES-128.
 - `crypto/FB_WebAESGCM.st`: autenticación/cifrado AES-GCM con AAD; descifrado rechaza etiquetas inválidas.
+- `crypto/FB_WebHMACSHA256.st`: HMAC-SHA256 para TLS PRF.
+- `crypto/FB_WebTLS12PRF.st`: derivación `P_SHA256` para master secret/key expansion con secreto recibido por parámetro.
 - `crypto/FB_WebTLS12Record.st`: registros TLS 1.2 application_data **únicamente después del handshake**. No implementa handshake ni claves.
 - `tests/crypto_primitives.test.cjs`: modelos de referencia JS alimentados con constantes del ST; casos NIST y comparación con `node:crypto`. Estas pruebas **NO ejecutan ST ni lo compilan en Sysmac**.
 
@@ -30,7 +32,7 @@ El exportador actual `HMI_NX_ST/st.js` genera HTTP, no HTTPS. Se basa en los FB 
 | TCP ST para un cliente en 8443 | Prototipo **sin verificar en Sysmac/hardware** |
 | Detección de encabezado TLS | Código ST creado, no validado en hardware |
 | TLS handshake, certificados, ECDHE, CSPRNG | **NO IMPLEMENTADO** |
-| SHA-256, AES-128 y AES-GCM ST | **Código creado, pruebas de modelos, SIN validar en Sysmac** |
+| SHA-256, AES-128, AES-GCM, HMAC y PRF ST | **Código creado, pruebas de modelos, SIN validar en Sysmac** |
 | TLS 1.2 application_data AEAD | **FB ST creado para claves de sesión ya derivadas, SIN handshake** |
 | Lectura/escritura WebHMI por canal TLS | **NO IMPLEMENTADO** |
 | Enlace a exportador existente | **NO IMPLEMENTADO** |
