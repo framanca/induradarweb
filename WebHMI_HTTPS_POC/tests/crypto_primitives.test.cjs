@@ -118,3 +118,79 @@ test('ST uses bounded SHA scanning and AES encryption only',()=>{
   assert.match(aesST,/Round < UINT#10/);
   assert.match(aesST,/ExpandedKey\[I\+J\]/);
 });
+
+
+function ghash(h, aad, cipher) {
+  let y=Buffer.alloc(16);
+  const hashBlock=(block)=>{
+    for(let i=0;i<16;i++)y[i]^=block[i];
+    let z=Buffer.alloc(16),v=Buffer.from(h);
+    for(let bit=0;bit<128;bit++){
+      if(y[Math.floor(bit/8)] & (0x80 >>> (bit%8)))
+        for(let j=0;j<16;j++)z[j]^=v[j];
+      const lsb=v[15]&1,old=Buffer.from(v);
+      for(let j=0;j<16;j++)v[j]=(old[j]>>>1)|(j>0?((old[j-1]&1)<<7):0);
+      if(lsb)v[0]^=0xe1;
+    }
+    y=z;
+  };
+  const blocks=(buffer)=>{
+    for(let i=0;i<buffer.length;i+=16){
+      const block=Buffer.alloc(16);
+      buffer.copy(block,0,i,Math.min(i+16,buffer.length));hashBlock(block);
+    }
+  };
+  blocks(aad);blocks(cipher);
+  const lengths=Buffer.alloc(16);
+  lengths.writeUInt32BE(aad.length*8,4);lengths.writeUInt32BE(cipher.length*8,12);
+  hashBlock(lengths);
+  return y;
+}
+function aesgcmMirror(key,iv,aad,input,encrypt,tagIn){
+  const h=aes128Mirror(key,Buffer.alloc(16));
+  const j0=Buffer.concat([iv,Buffer.from([0,0,0,1])]);
+  const mask=aes128Mirror(key,j0);
+  const output=Buffer.alloc(input.length);
+  for(let pos=0;pos<input.length;pos+=16){
+    const ctr=Buffer.from(j0);ctr.writeUInt32BE(2+Math.floor(pos/16),12);
+    const stream=aes128Mirror(key,ctr);
+    for(let j=0;j<Math.min(16,input.length-pos);j++)output[pos+j]=input[pos+j]^stream[j];
+  }
+  const ciphertext=encrypt?output:input;
+  const auth=ghash(h,aad,ciphertext);
+  const tag=Buffer.from(auth.map((x,i)=>x^mask[i]));
+  const valid=encrypt||crypto.timingSafeEqual(tag,tagIn);
+  return {output:valid?output:Buffer.alloc(output.length),tag,valid};
+}
+test('AES-128-GCM NIST zero-key known-answer test',()=>{
+  const result=aesgcmMirror(Buffer.alloc(16),Buffer.alloc(12),Buffer.alloc(0),Buffer.alloc(16),true);
+  assert.equal(result.output.toString('hex'),'0388dace60b6a392f328c2b971b2fe78');
+  assert.equal(result.tag.toString('hex'),'ab6e47d42cec13bdf53a67b21257bddf');
+});
+test('AES-128-GCM native Node compatibility with AAD/partial blocks',()=>{
+  for(let n of [0,1,15,16,17,127,2048]){
+    const key=crypto.createHash('sha256').update('key'+n).digest().subarray(0,16);
+    const nonce=crypto.createHash('sha256').update('iv'+n).digest().subarray(0,12);
+    const aad=Buffer.from('webhmi-test-aad');
+    const input=Buffer.alloc(n);for(let i=0;i<n;i++)input[i]=(i*17)%256;
+    const c=crypto.createCipheriv('aes-128-gcm',key,nonce);
+    c.setAAD(aad);
+    const expected=Buffer.concat([c.update(input),c.final()]);
+    const expectedTag=c.getAuthTag();
+    const encrypted=aesgcmMirror(key,nonce,aad,input,true);
+    assert.equal(encrypted.output.toString('hex'),expected.toString('hex'));
+    assert.equal(encrypted.tag.toString('hex'),expectedTag.toString('hex'));
+    const decrypted=aesgcmMirror(key,nonce,aad,expected,false,expectedTag);
+    assert.equal(decrypted.valid,true);assert.equal(decrypted.output.toString('hex'),input.toString('hex'));
+    const bad=Buffer.from(expectedTag);bad[0]^=1;
+    const tampered=aesgcmMirror(key,nonce,aad,expected,false,bad);
+    assert.equal(tampered.valid,false);assert.ok(tampered.output.every(x=>x===0));
+  }
+});
+test('ST GCM FB requires authentication tag before plaintext use',()=>{
+  const st=fs.readFileSync(path.join(folder,'FB_WebAESGCM.st'),'utf8');
+  assert.match(st,/AES\s*:\s*FB_WebAES128/);
+  assert.match(st,/Y\[BitIndex \/ UINT#8\] AND Mask/);
+  assert.match(st,/Tag\[I\] := TagMask\[I\] XOR Y\[I\]/);
+  assert.match(st,/FOR I := UINT#0 TO UINT#2047 DO Result\[I\] := BYTE#0/);
+});
