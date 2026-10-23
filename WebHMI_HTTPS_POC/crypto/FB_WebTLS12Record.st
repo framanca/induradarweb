@@ -71,9 +71,11 @@ CASE State OF
                     GcmDataLen := PlainLen;
                     FOR I := UINT#0 TO UINT#7 DO Nonce[UINT#4+I] := Sequence[I]; END_FOR;
                     FOR I := UINT#0 TO UINT#3 DO Nonce[I] := FixedIV[I]; END_FOR;
-                    FOR I := UINT#0 TO GcmDataLen - UINT#1 DO
-                        GcmData[I] := Plain[I];
-                    END_FOR;
+                    IF GcmDataLen > UINT#0 THEN
+                        FOR I := UINT#0 TO GcmDataLen - UINT#1 DO
+                            GcmData[I] := Plain[I];
+                        END_FOR;
+                    END_IF;
                     State := UINT#10;
                 END_IF;
             ELSE
@@ -97,9 +99,11 @@ CASE State OF
                         GcmDataLen := RecordLen - UINT#24;
                         FOR I := UINT#0 TO UINT#3 DO Nonce[I] := FixedIV[I]; END_FOR;
                         FOR I := UINT#0 TO UINT#7 DO Nonce[UINT#4+I] := Input[UINT#5+I]; END_FOR;
-                        FOR I := UINT#0 TO GcmDataLen-UINT#1 DO
-                            GcmData[I] := Input[UINT#13+I];
-                        END_FOR;
+                        IF GcmDataLen > UINT#0 THEN
+                            FOR I := UINT#0 TO GcmDataLen-UINT#1 DO
+                                GcmData[I] := Input[UINT#13+I];
+                            END_FOR;
+                        END_IF;
                         FOR I := UINT#0 TO UINT#15 DO
                             GcmTag[I] := Input[UINT#13+GcmDataLen+I];
                         END_FOR;
@@ -131,15 +135,19 @@ CASE State OF
                     Output[3] := UINT_TO_BYTE(SHR(RecordLen,UINT#8));
                     Output[4] := UINT_TO_BYTE(RecordLen);
                     FOR I := UINT#0 TO UINT#7 DO Output[UINT#5+I] := Sequence[I]; END_FOR;
-                    FOR I := UINT#0 TO GcmDataLen-UINT#1 DO
-                        Output[UINT#13+I] := Gcm.Result[I];
-                    END_FOR;
+                    IF GcmDataLen > UINT#0 THEN
+                        FOR I := UINT#0 TO GcmDataLen-UINT#1 DO
+                            Output[UINT#13+I] := Gcm.Result[I];
+                        END_FOR;
+                    END_IF;
                     FOR I := UINT#0 TO UINT#15 DO Output[UINT#13+GcmDataLen+I] := Gcm.Tag[I]; END_FOR;
                     OutputLen := RecordLen + UINT#5;
                 ELSE
-                    FOR I := UINT#0 TO GcmDataLen-UINT#1 DO
-                        Output[I] := Gcm.Result[I];
-                    END_FOR;
+                    IF GcmDataLen > UINT#0 THEN
+                        FOR I := UINT#0 TO GcmDataLen-UINT#1 DO
+                            Output[I] := Gcm.Result[I];
+                        END_FOR;
+                    END_IF;
                     OutputLen := GcmDataLen;
                 END_IF;
             ELSE
