@@ -12,6 +12,7 @@ from zipfile import ZipFile, ZIP_DEFLATED, is_zipfile
 ROOT = Path(__file__).resolve().parents[1]
 POC_ST = ROOT / "sysmac" / "WebHMI_TLS_Probe.st"
 POC_VARS = ROOT / "sysmac" / "WebHMI_TLS_Probe_LocalVariables.tsv"
+CRYPTO = ("FB_WebSHA256.st", "FB_WebAES128.st", "FB_WebAESGCM.st", "FB_WebTLS12Record.st")
 
 def package(source: Path, target: Path) -> None:
     if not source.is_file() or not is_zipfile(source):
@@ -37,6 +38,8 @@ def package(source: Path, target: Path) -> None:
                 raise ValueError("Archivo duplicado: " + dest)
             seen.add(dest)
             out.writestr(dest, data)
+        for name in CRYPTO:
+            out.write(ROOT / "crypto" / name, "CRYPTO_RESEARCH_NOT_DEPLOYABLE/" + name)
         out.write(POC_ST, "WebHMI_TLS_Probe.st")
         out.write(POC_VARS, "WebHMI_TLS_Probe_LocalVariables.tsv")
         out.writestr("README_HTTPS_POC.txt",
@@ -44,6 +47,8 @@ def package(source: Path, target: Path) -> None:
             "Importar WebHMI_TLS_Probe.st + WebHMI_TLS_Probe_LocalVariables.tsv\n"
             "como Program ST + Internals para pruebas aisladas.\n"
             "El proyecto editable y HTML original se conservan en el ZIP.\n"
+            "CRYPTO_RESEARCH_NOT_DEPLOYABLE contiene SHA256, AES128, AESGCM y TLS12Record en ST.\n"
+            "No hay handshake, certificados ni generador seguro de aleatoriedad. NO ES HTTPS.\n"
             "NO importar el servidor HTTP de HTTP_REFERENCE_DO_NOT_IMPORT\n"
             "pretendiendo que sea HTTPS. No se modifica el proyecto original.\n")
     print("Paquete de laboratorio generado:", target)
