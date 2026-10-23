@@ -194,3 +194,30 @@ test('ST GCM FB requires authentication tag before plaintext use',()=>{
   assert.match(st,/Tag\[I\] := TagMask\[I\] XOR Y\[I\]/);
   assert.match(st,/FOR I := UINT#0 TO UINT#2047 DO Result\[I\] := BYTE#0/);
 });
+
+
+test('TLS 1.2 AES-128-GCM application-data record roundtrip under fixed session keys',()=>{
+  const key=Buffer.from('000102030405060708090a0b0c0d0e0f','hex');
+  const salt=Buffer.from('11223344','hex');
+  const seq=Buffer.from('0000000000000001','hex');
+  const plaintext=Buffer.from('GET / HTTP/1.0\r\n\r\n');
+  const nonce=Buffer.concat([salt,seq]);
+  const aad=Buffer.concat([seq,Buffer.from('170303','hex'),Buffer.from([(plaintext.length>>8)&255, plaintext.length&255])]);
+  const result=aesgcmMirror(key,nonce,aad,plaintext,true);
+  const n=result.output.length+24;
+  const record=Buffer.concat([Buffer.from([0x17,0x03,0x03,n>>>8,n&0xff]),seq,result.output,result.tag]);
+  assert.equal(record.length,5+8+plaintext.length+16);
+  assert.equal(record.readUInt16BE(3),plaintext.length+24);
+  const dec=aesgcmMirror(key,nonce,aad,record.subarray(13,-16),false,record.subarray(-16));
+  assert.equal(dec.valid,true);
+  assert.equal(dec.output.toString(),plaintext.toString());
+  const bad=Buffer.from(record);bad[bad.length-1]^=1;
+  const tampered=aesgcmMirror(key,nonce,aad,bad.subarray(13,-16),false,bad.subarray(-16));
+  assert.equal(tampered.valid,false);
+  const st=fs.readFileSync(path.join(folder,'FB_WebTLS12Record.st'),'utf8');
+  assert.match(st,/Gcm\s*:\s*FB_WebAESGCM/);
+  assert.match(st,/InputLen <> RecordLen\+UINT#5/);
+  assert.match(st,/RecordLen := GcmDataLen \+ UINT#24/);
+  assert.match(st,/Gcm.Error\) AND Gcm.Valid/);
+  assert.match(st,/IF GcmDataLen > UINT#0 THEN/);
+});
