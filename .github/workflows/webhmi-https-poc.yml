@@ -1,0 +1,22 @@
+name: WebHMI HTTPS ST research checks
+on:
+  push:
+    branches:
+      - research/webhmi-https-st
+    paths:
+      - 'WebHMI_HTTPS_POC/**'
+      - '.github/workflows/webhmi-https-poc.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe-static-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify TLS record detector model and fail-closed ST source
+        run: node --test WebHMI_HTTPS_POC/tests/tls_record_header.test.cjs
+      - name: Verify packaging script syntax
+        run: python3 -m py_compile WebHMI_HTTPS_POC/tools/package_probe.py
