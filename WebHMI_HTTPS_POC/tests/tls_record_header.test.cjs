@@ -38,9 +38,12 @@ test('incomplete 5-byte header never accepted', () => {
 });
 test('fail-closed ST does not expose original HMI routes', () => {
   const st = fs.readFileSync(path.join(__dirname,'..','sysmac','WebHMI_TLS_Probe.st'),'utf8');
-  assert.match(st, /SktTCPAccept/);
-  assert.match(st, /SktTCPRcv/);
-  assert.match(st, /SktTCPSend/);
+  const vars = fs.readFileSync(path.join(__dirname,'..','sysmac','WebHMI_TLS_Probe_LocalVariables.tsv'),'utf8');
+  assert.match(vars, /SktTCPAccept/);
+  assert.match(vars, /SktTCPRcv/);
+  assert.match(vars, /SktTCPSend/);
+  assert.match(st, /WebTLS_Accept\(Execute:=TRUE/);
+  assert.match(st, /WebTLS_Recv\(Execute:=TRUE/);
   assert.match(st, /handshake_failure/);
   assert.doesNotMatch(st, /\/api\/write|\/api\/read|GET \/ |HTTP\/1\.0 200/);
 });
