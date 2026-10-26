@@ -1,5 +1,6 @@
 import { getSupabaseClient, currentSession } from '../auth-client.js';
 import { renderSelection, validReference } from './renderer.js';
+import { loadSelection } from './access.js';
 
 const root = document.querySelector('#selection-root');
 const status = document.querySelector('#selection-status');
@@ -9,14 +10,14 @@ const form = document.querySelector('#selection-login');
 const jsonButton = document.querySelector('#selection-json');
 const lightButton = document.querySelector('#selection-light');
 const reference = (new URLSearchParams(location.search).get('ref') || '').trim().toUpperCase();
-let generation = 0, lightPayload = null, userId = null, downloaded = false, printState = [];
+let generation = 0, lightPayload = null, userId = null, downloaded = false, printState = [], publicView = false;
 
 function setStatus(message, kind = 'info') {
   status.textContent = message;
   status.dataset.kind = kind;
   status.hidden = !message;
 }
-function clearReport() { lightPayload = null; root.replaceChildren(); tools.hidden = true; }
+function clearReport() { lightPayload = null; publicView = false; root.replaceChildren(); tools.hidden = true; }
 function download(payload, filename) {
   const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' }));
   const a = document.createElement('a'); a.href = url; a.download = filename; document.body.append(a); a.click(); a.remove();
@@ -31,6 +32,7 @@ async function getPayload(format) {
   return data.payload;
 }
 async function downloadFull() {
+  if (publicView || !userId) return;
   jsonButton.disabled = true;
   const ticket = generation;
   try {
@@ -52,14 +54,25 @@ async function start() {
     const session = await currentSession();
     if (ticket !== generation) return;
     userId = session?.user?.id || null;
-    if (!userId) { auth.hidden = false; setStatus('Inicia sesión para consultar esta selección.'); return; }
-    const payload = await getPayload('light');
+    const selection = await loadSelection(getSupabaseClient(), reference, Boolean(userId));
     if (ticket !== generation) return;
-    const result = renderSelection(root, payload, reference);
+    if (!selection) {
+      auth.hidden = Boolean(userId);
+      setStatus(userId ? 'La selección no está disponible para esta cuenta.' : 'Inicia sesión para consultar esta selección.');
+      return;
+    }
+    const { payload } = selection;
+    publicView = selection.publicView;
+    const result = renderSelection(root, payload, reference, { publicView });
     if (result.renderedCount !== Number(payload.selection_method?.selected)) throw new Error('selection_count_mismatch');
-    lightPayload = payload; tools.hidden = false; setStatus('');
+    lightPayload = payload; tools.hidden = false;
+    jsonButton.hidden = lightButton.hidden = publicView;
+    document.querySelector('.footer').textContent = publicView
+      ? 'InduRadar · Informe compartido públicamente'
+      : 'InduRadar · Documento de uso comercial de la cuenta destinataria';
+    setStatus(publicView ? 'Informe público · Puedes compartir este enlace para consultarlo sin iniciar sesión.' : '');
     if (!downloaded && new URLSearchParams(location.search).get('download') === 'json') {
-      downloaded = true; await downloadFull();
+      downloaded = true; if (!publicView) await downloadFull();
       const params = new URLSearchParams(location.search); params.delete('download');
       history.replaceState(null, '', `${location.pathname}?${params}`);
     }
@@ -83,14 +96,14 @@ form.addEventListener('submit', async event => {
   finally { button.disabled = false; }
 });
 jsonButton.addEventListener('click', downloadFull);
-lightButton.addEventListener('click', () => { if (lightPayload) download(lightPayload, `InduRadar_Light_Report_${reference}.json`); });
+lightButton.addEventListener('click', () => { if (lightPayload && !publicView) download(lightPayload, `InduRadar_Light_Report_${reference}.json`); });
 document.querySelector('#selection-print').addEventListener('click', () => window.print());
 window.addEventListener('beforeprint', () => { printState = [...root.querySelectorAll('details')].map(n => [n, n.open]); printState.forEach(([n]) => { n.open = true; }); });
 window.addEventListener('afterprint', () => { printState.forEach(([n, open]) => { n.open = open; }); printState = []; });
 const client = getSupabaseClient();
 client?.auth.onAuthStateChange((event, session) => {
   const nextId = session?.user?.id || null;
-  if (event === 'SIGNED_OUT') { ++generation; userId = null; clearReport(); auth.hidden = false; setStatus('La sesión se ha cerrado. Inicia sesión para ver el informe.'); }
+  if (event === 'SIGNED_OUT') { ++generation; userId = null; clearReport(); setTimeout(() => void start(), 0); }
   else if (nextId && nextId !== userId) setTimeout(() => void start(), 0);
 });
 void start();
