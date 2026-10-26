@@ -161,6 +161,22 @@ literatura. Si el histórico creciera hasta justificarlo, las versiones antiguas
 podrían archivarse en Object Storage manteniendo metadata, hashes e inventario
 en PostgreSQL sin cambiar el contrato del renderer.
 
+## Selecciones compartidas públicamente
+
+El visor `/selection/?ref=…` conserva el RPC privado para miembros de la cuenta.
+Sin sesión, solo consulta `curated_report_publications_v1`: copias Light revisadas
+y publicadas expresamente por un operador. Esta tabla no contiene cuentas,
+contactos personales, el Report JSON completo ni el inventario privado del informe
+de origen. RLS permite únicamente leer las copias con `is_public=true`; los roles
+`anon` y `authenticated` no pueden insertar, modificar o eliminar publicaciones.
+
+La publicación es una copia independiente del informe inmutable. Para retirar el
+acceso público, un operador establece `is_public=false` en esa referencia. El
+informe original sigue disponible para su cuenta. La vista pública conserva todas
+las oportunidades y fuentes de la copia publicada y oculta las descargas privadas
+y el enlace al informe completo de origen. Se mantiene `noindex` para compartir
+por enlace sin incorporarlo al índice de buscadores.
+
 ## Créditos de alcance
 
 La configuración editable está en
