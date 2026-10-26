@@ -17,7 +17,7 @@ export function validateSelection(p, reference) {
 }
 const normalized = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
 export function dateLabel(value) { const m = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : 'Fecha no precisada'; }
-export function renderSelection(root, p, reference) {
+export function renderSelection(root, p, reference, { publicView = false } = {}) {
   const rows = validateSelection(p, reference), d = root.ownerDocument;
   function node(tag, text, cls) { const n = d.createElement(tag); if (text != null) n.textContent = String(text); if (cls) n.className = cls; return n; }
   function link(url, text) { const href = safeUrl(url); if (!href) return node('span', text || url); const a = node('a', text || href); a.href = href; a.target = '_blank'; a.rel = 'noopener noreferrer'; return a; }
@@ -66,7 +66,7 @@ export function renderSelection(root, p, reference) {
   const method = node('section', null, 'method-panel'); method.id = 'metodo'; method.append(node('h2', 'Criterio de selección y límites'), node('p', 'Primero: producto o equipo propio y aplicación mecánica. Después: paquete abordable, repetición y momento de entrada. Se penalizan la compra indirecta no resuelta, la ventana pasada, la duplicación de un caso y las barreras técnicas sin acreditar.'));
   const limits = node('ul'); for (const text of p.limitations || []) limits.append(node('li', text)); method.append(limits);
   const source = p.metadata?.source_report_reference;
-  if (validReference(source)) { const a = node('a', `Consultar informe completo ${source}`, 'source-report-link'); a.href = `/report/?ref=${encodeURIComponent(source)}`; method.append(a); }
+  if (!publicView && validReference(source)) { const a = node('a', `Consultar informe completo ${source}`, 'source-report-link'); a.href = `/report/?ref=${encodeURIComponent(source)}`; method.append(a); }
   root.append(method);
   function applyFilter() { let n = 0; for (const item of filtered) { const show = (!search.value.trim() || item.text.includes(normalized(search.value.trim()))) && (!group.value || item.group === group.value); item.row.hidden = item.card.hidden = !show; if (show) n++; } count.textContent = `${n} de ${rows.length} oportunidades visibles`; }
   search.addEventListener('input', applyFilter); group.addEventListener('change', applyFilter); applyFilter();

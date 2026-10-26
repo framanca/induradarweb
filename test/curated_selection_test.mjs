@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { validReference, safeUrl, validateSelection, renderSelection, dateLabel } from '../site/selection/renderer.js';
+import { loadSelection } from '../site/selection/access.js';
 
 const REF = 'IR-20260926-ABC123';
 function fixture() {
@@ -66,11 +67,67 @@ test('source text is never interpreted as HTML', () => {
   const source = fs.readFileSync(new URL('../site/selection/renderer.js', import.meta.url), 'utf8');
   assert.equal(/innerHTML|insertAdjacentHTML|document\.write|\beval\(/.test(source), false);
 });
-test('viewer requires session, uses authorized RPC and clears on sign out', () => {
+test('private downloads retain authorized RPC and sign-out clears rendered data', () => {
   const source = fs.readFileSync(new URL('../site/selection/selection.js', import.meta.url), 'utf8');
   assert.match(source, /currentSession/); assert.match(source, /get_curated_report_v1/); assert.match(source, /SIGNED_OUT/); assert.match(source, /clearReport\(\)/);
   assert.doesNotMatch(source, /SUPABASE_SERVICE_ROLE_KEY|sb_secret_|eyJhbGci/);
   const portal = fs.readFileSync(new URL('../site/portal/curated-links.js', import.meta.url), 'utf8');
   assert.match(portal, /curated_ready/); assert.match(portal, /\/selection\/\?ref=/);
   assert.doesNotMatch(portal, /\.from\(/);
+});
+
+function accessClient({ privateData, privateError, publicData, publicError } = {}) {
+  const calls = [];
+  return {
+    calls,
+    async rpc(name, params) { calls.push(['rpc', name, params]); return { data: privateData, error: privateError }; },
+    from(name) {
+      calls.push(['from', name]);
+      return { select(columns) {
+        calls.push(['select', columns]);
+        return { eq(column, value) {
+          calls.push(['eq', column, value]);
+          return { async maybeSingle() { return { data: publicData, error: publicError }; } };
+        } };
+      } };
+    },
+  };
+}
+function publicDocument() {
+  return { found: true, report_reference: REF, report_kind: 'curated_selection', payload: fixture() };
+}
+test('anonymous access reads only the exact public snapshot and never calls private RPC', async () => {
+  const client = accessClient({ publicData: { document: publicDocument() } });
+  const result = await loadSelection(client, REF);
+  assert.equal(result.publicView, true);
+  assert.deepEqual(client.calls, [['from', 'curated_report_publications_v1'], ['select', 'document'], ['eq', 'report_reference', REF]]);
+});
+test('unpublished or revoked public references do not return a report', async () => {
+  const client = accessClient({ publicData: null });
+  assert.equal(await loadSelection(client, REF), null);
+  assert.equal(client.calls.some(c => c[0] === 'rpc'), false);
+});
+test('account members retain private access and another account can use only a released copy', async () => {
+  const member = accessClient({ privateData: publicDocument() });
+  assert.equal((await loadSelection(member, REF, true)).publicView, false);
+  assert.equal(member.calls.some(c => c[0] === 'from'), false);
+  const outsider = accessClient({ privateData: { found: false }, publicData: { document: publicDocument() } });
+  assert.equal((await loadSelection(outsider, REF, true)).publicView, true);
+  const privateOnly = accessClient({ privateError: { code: '42501' }, publicData: null });
+  assert.equal(await loadSelection(privateOnly, REF, true), null);
+});
+test('public transport errors and mismatched payloads fail closed', async () => {
+  const error = new Error('unavailable');
+  await assert.rejects(loadSelection(accessClient({ publicError: error }), REF), error);
+  const document = publicDocument(); document.payload.report_reference = 'IR-20260926-XYZ123';
+  await assert.rejects(loadSelection(accessClient({ publicData: { document } }), REF));
+  await assert.rejects(loadSelection(accessClient(), '../private'));
+});
+test('public rendering keeps every card and source but hides the private source-report link', () => {
+  const root = new Node(new Document(), 'main');
+  renderSelection(root, fixture(), REF, { publicView: true });
+  const nodes = all(root);
+  assert.equal(nodes.filter(n => n.tagName === 'article').length, 30);
+  assert.equal(nodes.filter(n => n.className === 'signal').length, 30);
+  assert.equal(nodes.filter(n => n.className === 'source-report-link').length, 0);
 });
