@@ -5,13 +5,13 @@
   const OBJECTIVES = [
     {
       value: 'signal_discovery',
-      title: 'Descubrir oportunidades',
+      title: 'Detectar oportunidades',
       description:
         'Buscar señales, proyectos e inversiones y centrar la investigación en convertir los mejores hallazgos en oportunidades comerciales.',
     },
     {
       value: 'universe_discovery',
-      title: 'Descubrir empresas',
+      title: 'Ampliar empresas',
       description:
         'Construir un universo de empresas objetivo y priorizar identidad, encaje, deduplicación y cobertura.',
     },

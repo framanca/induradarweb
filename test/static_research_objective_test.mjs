@@ -15,8 +15,8 @@ test('research objective selector exposes only opportunity and company discovery
   for (const value of ['signal_discovery', 'universe_discovery']) {
     assert.match(selectorSource, new RegExp(`value: '${value}'`));
   }
-  assert.match(selectorSource, /Descubrir oportunidades/);
-  assert.match(selectorSource, /Descubrir empresas/);
+  assert.match(selectorSource, /Detectar oportunidades/);
+  assert.match(selectorSource, /Ampliar empresas/);
   assert.match(selectorSource, /convertir los mejores hallazgos en oportunidades comerciales/);
   assert.match(selectorSource, /priorizar identidad, encaje, deduplicación y cobertura/);
   assert.doesNotMatch(selectorSource, /value: 'balanced'/);

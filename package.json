@@ -1,0 +1,7 @@
+{
+  "name": "induradar-static-contract-tests",
+  "private": true,
+  "scripts": { "test:engine": "node --test test/research_engine_test.mjs" },
+  "dependencies": { "xlsx": "0.18.5" },
+  "devDependencies": { "linkedom": "0.18.12" }
+}
