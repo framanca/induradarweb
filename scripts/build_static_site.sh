@@ -88,7 +88,7 @@ const fs = require('node:fs');
 
 const indexPath = process.env.INDEX_HTML;
 const marker = '  <script type="module" src="app.js"></script>';
-const bootstrap = '  <script src="research-objective.js"></script>\n';
+const bootstrap = '  <script src="research-objective.js"></script>\n  <script type="module" src="research-engine.js"></script>\n';
 const html = fs.readFileSync(indexPath, 'utf8');
 
 if (!html.includes(marker)) {

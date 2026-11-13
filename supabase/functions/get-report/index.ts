@@ -1,5 +1,6 @@
 import * as XLSX from "npm:xlsx@0.18.5";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { workbookFromApprovedJson } from "../../../site/report/engine-report.mjs";
 
 const origins = new Set((Deno.env.get("REPORT_ALLOWED_ORIGINS") || "https://induradar.com,https://www.induradar.com").split(",").map((x)=>x.trim()).filter(Boolean));
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -42,6 +43,13 @@ function addSheet(wb:any,name:string,rows:any[],widths:number[]){
 }
 function workbook(envelope:any){
   const p=obj(envelope.payload), ref=txt(envelope.report_reference), asOf=txt(envelope.as_of);
+  if(obj(obj(p.metadata).research_engine).extension_version==="RE1.0.0") {
+    const approval=obj(obj(obj(p.metadata).research_engine).approval);
+    if(approval.native_release_accepted!==true||approval.production_publication_authorized!==true)
+      throw new Error("native_research_engine_acceptance_required");
+    const bytes=workbookFromApprovedJson(XLSX,p);
+    return bytes instanceof Uint8Array?bytes:new Uint8Array(bytes);
+  }
   const opps=arr(get(p,["portfolio_summary","client_layers","signal_opportunities"]));
   const profiles=arr(get(p,["section_narratives","company_profiles_v1","items"]));
   const universe=arr(get(p,["portfolio_summary","client_layers","company_universe"]));

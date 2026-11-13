@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { normalizeEngineRequest, contractFromLead } from "../../../site/engine-contract.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -103,6 +104,40 @@ Deno.serve(async (req) => {
     if (!supabaseUrl || !serviceRoleKey || !leadsAccountId) return json({ success: false, error: "Configuración incompleta del servidor" }, 500);
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
+    let engineContract = null;
+    if (raw?.engine_contract) {
+      if (Deno.env.get("RESEARCH_ENGINE_ENABLED") !== "true") {
+        return json({success:false,error:"research_engine_not_activated"},503);
+      }
+      const token=(req.headers.get("Authorization")||"").replace(/^Bearer\s+/i,"");
+      const {data:identity,error:identityError}=await supabase.auth.getUser(token);
+      if(identityError || !identity.user) return json({success:false,error:"operator_authentication_required"},401);
+      const {data:policy,error:policyError}=await supabase.rpc("get_research_engine_intake_policy_v1");
+      if(policyError || policy?.ready !== true || policy?.version !== "RE1.0.0") {
+        return json({success:false,error:"accepted_research_engine_policy_required"},503);
+      }
+      if(!Array.isArray(policy.operator_user_ids) || !policy.operator_user_ids.includes(identity.user.id)) {
+        return json({success:false,error:"research_engine_operator_required"},403);
+      }
+      engineContract=normalizeEngineRequest(raw.engine_contract,{
+        account_id:leadsAccountId,submission_id:submissionId,as_of:now.slice(0,10),
+      });
+      if(engineContract.mode !== requestedObjective) return json({success:false,error:"engine_objective_conflict"},400);
+      const formContract=normalizeEngineRequest({
+        ...contractFromLead(payload,{
+          scope:engineContract.scope,signal_sweep:engineContract.signal_sweep,
+          preferences:engineContract.preferences,
+        }),portfolio:engineContract.portfolio,
+      },{account_id:leadsAccountId,submission_id:submissionId,as_of:now.slice(0,10)});
+      for(const field of ['offer','target_company_types','signal_types','territories','must_have','exclusions']) {
+        if(JSON.stringify(engineContract[field])!==JSON.stringify(formContract[field]))
+          return json({success:false,error:"engine_form_scope_conflict",field},400);
+      }
+      payload.engine_contract=engineContract;
+      payload.stack_configuration.expected_versions=policy.expected_versions;
+      payload.contract_version=policy.expected_versions.contract_version;
+      payload.execution_contract_version=policy.expected_versions.execution_contract_version;
+    }
     const r = payload?.request ?? {};
     const s = payload?.seller_profile ?? {};
     const normalizedScope = {
@@ -124,7 +159,8 @@ Deno.serve(async (req) => {
       frequency: r.frequency ?? "one_off",
       neutral_output: r.neutral_output !== false,
       research_objective: requestedObjective,
-      normalization_version: CONTRACT_VERSION,
+      normalization_version: payload.contract_version,
+      ...(engineContract ? {engine_contract:engineContract} : {}),
     };
 
     const { error: insertError } = await supabase.from("service_requests").insert({
@@ -134,7 +170,7 @@ Deno.serve(async (req) => {
       channel: payload.channel,
       title: requestTitle,
       status: "received",
-      contract_version: CONTRACT_VERSION,
+      contract_version: payload.contract_version,
       form_payload: payload,
       normalized_scope: normalizedScope,
       cutoff_date: r.cutoff_date ?? null,
@@ -149,7 +185,7 @@ Deno.serve(async (req) => {
       success: true,
       submission_id: submissionId,
       submitted_at: payload.submitted_at,
-      contract_version: CONTRACT_VERSION,
+      contract_version: payload.contract_version,
       workflow_version: WORKFLOW_VERSION,
       research_objective: requestedObjective,
       email_sent: false,
@@ -169,6 +205,8 @@ function escapeHtml(value: unknown) { return String(value ?? "").replaceAll("&",
 function normalizeResearchObjective(value: unknown) {
   const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
   if (["universe_discovery", "company_discovery", "companies", "new_companies", "map_companies", "universe_mapping"].includes(normalized)) return "universe_discovery";
-  if (["balanced", "both", "companies_and_opportunities", "universe_and_signals"].includes(normalized)) return "balanced";
+  if (["balanced", "both", "companies_and_opportunities", "universe_and_signals"].includes(normalized)) {
+    throw new Error("balanced is historical-only; new requests require an explicit supported objective");
+  }
   return "signal_discovery";
 }
