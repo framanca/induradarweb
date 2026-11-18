@@ -1,0 +1,114 @@
+{
+  "kind": "approved_report_portal_delivery_repair",
+  "base_commit": "31654bb424e75a65eea05e463e9377fc04504398",
+  "supabase_project": "gwmwkxvrgctglyjmlqnb",
+  "designated_account": "framanca@outlook.com",
+  "existing_platform_administrator": true,
+  "administrator_registration_changed": false,
+  "role_memberships_or_rls_policies_changed": false,
+  "root_causes": [
+    "STABLE outer RPC caused PostgREST read-only transaction and SQLSTATE 25006 on cold HTML cache",
+    "STABLE inner reader could not see the derived cache created during the same call"
+  ],
+  "changes": {
+    "html_reader_and_two_entrypoints": "VOLATILE",
+    "html_delivery_statement_timeout": "45s",
+    "function_bodies_acl_owners_and_security_checks_preserved": true,
+    "global_role_timeouts_changed": false
+  },
+  "release": {
+    "q0_before_and_after_pass": true,
+    "workflow": "3.14.0",
+    "configuration": "permanent-v3.14.0",
+    "manifest": "1.12.3",
+    "exact_documents": 14,
+    "current_and_accepted_fingerprint": "8feaf83abc57244d8c670deab5501d7f2d11b3a5936bac765578d1651a478b7c",
+    "executable_policy": "documentary-v1",
+    "general_daemon_started": false
+  },
+  "native_verification": {
+    "kernel_fingerprint": "8feaf83abc57244d8c670deab5501d7f2d11b3a5936bac765578d1651a478b7c",
+    "functions": [
+      {
+        "name": "get_web_report_html_v1(uuid)",
+        "volatile": "v",
+        "anon_execute": false,
+        "configuration": [
+          "search_path=pg_catalog, private, public, auth, pg_temp"
+        ],
+        "authenticated_execute": true
+      },
+      {
+        "name": "get_web_report_html_by_reference_v1(text)",
+        "volatile": "v",
+        "anon_execute": false,
+        "configuration": [
+          "search_path=pg_catalog, private, public, auth, pg_temp"
+        ],
+        "authenticated_execute": true
+      },
+      {
+        "name": "get_web_report_html_delivery_by_reference_v1(text)",
+        "volatile": "v",
+        "anon_execute": false,
+        "configuration": [
+          "search_path=pg_catalog, private, public, auth, pg_temp",
+          "statement_timeout=45s"
+        ],
+        "authenticated_execute": true
+      }
+    ],
+    "report": {
+      "inventory_hash": "8e307cd16f785f8392328552d2ee498e3e91ce3590e4fe1238549cd1fe6051ac",
+      "html_characters": 138281,
+      "light_report_hash": "52cde1b0ca042bc4368229417e17eeae4413f9554a11b6900168dd366e60deb3",
+      "finalization_status": "finalized",
+      "report_payload_hash": "f5c0ca4250547135422d133bc56c0647fc178648055f87f4e6362663a289b522",
+      "html_renderer_version": "2.0.0",
+      "canonical_payload_unchanged": true
+    },
+    "regression": {
+      "pass": true,
+      "cold_cache_pass": true,
+      "warm_cache_reused": true,
+      "master_report_count": 41,
+      "other_tenant_denied": true,
+      "fingerprint_preserved": true,
+      "immutable_hashes_preserved": true,
+      "user_metadata_cannot_elevate": true,
+      "regular_user_listing_isolated": true
+    },
+    "regression_transaction_rolled_back": true
+  },
+  "browser_e2e": {
+    "signed_in_identity": "framanca@outlook.com",
+    "report_url": "https://induradar.com/report/?ref=IR-20261110-9D3D01",
+    "canonical_report_visible": true,
+    "opportunities": 9,
+    "companies": 27,
+    "conserved_signals": 35,
+    "http_status": 200,
+    "edge_function_version_unchanged": 8
+  },
+  "tests": {
+    "node_portal_tests_passed": 39,
+    "flutter_tests_passed": 32,
+    "scoped_flutter_analyze": "lib test: no issues",
+    "repository_flutter_analyze": "26 pre-existing HMI_NX/flutter dependency errors; no Dart files changed",
+    "local_migration_transaction_and_rollback_pass": true
+  },
+  "advisors": {
+    "existing_lint_groups": 30,
+    "current_lint_groups": 30,
+    "new_findings": 0,
+    "removed_findings": 0,
+    "health_findings": 0
+  },
+  "counted_searches_before_and_after": 182,
+  "new_provider_calls": 0,
+  "migration_files_sha256": {
+    "supabase/migrations/20261111200229_report_html_cold_cache_visibility.sql": "6cd927df92f3801e6ac9f451755cddd8fdb91ef0fd363bef852b5ca37adb2fc0",
+    "supabase/migrations/20261111200401_report_html_delivery_writable_rpc.sql": "ced21f02641f6ad1dc7f88064c95f8d59cc56d0278e740d6210cd77fa7bab457"
+  },
+  "native_regression_sql_sha256": "d7817167a9dd3237448d3b55a9e33bc668dd481dc6b20f2afa1d80902f0725af"
+}

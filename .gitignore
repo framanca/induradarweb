@@ -1,4 +1,6 @@
 # Miscellaneous
+node_modules/
+outputs/
 *.class
 *.log
 *.pyc
