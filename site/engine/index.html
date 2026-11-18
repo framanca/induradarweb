@@ -1,0 +1,40 @@
+<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>InduRadar · Operación de prueba</title><style>
+body{max-width:1050px;margin:32px auto;padding:0 24px;font:16px system-ui;color:#15334a;background:#f7fafb}
+h1{margin-bottom:8px}label{display:block;margin:16px 0 5px}input,select,textarea,button{font:inherit;padding:10px;border:1px solid #abc1d0;border-radius:6px}
+textarea{width:95%}button{background:#075a8f;color:white;margin:12px 10px 12px 0;cursor:pointer}.notice{background:#fff3ce;padding:14px}
+pre{background:white;padding:16px;overflow:auto;white-space:pre-wrap}a{color:#075a8f}.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+</style><h1>InduRadar</h1><p class="notice">Prueba aislada con evidencia sintética. No crea solicitudes productivas ni realiza búsquedas comerciales.</p>
+<form id="request"><div class="grid"><label>Modalidad <select name="mode"><option value="signal_discovery">Detectar oportunidades</option><option value="universe_discovery">Ampliar empresas</option></select></label>
+<label>Alcance <select name="scope"><option value="open_market">Mercado abierto</option><option value="exclusive_portfolio">Cartera exclusiva</option></select></label></div>
+<label>Oferta de productos o servicios <textarea name="offer" required>Automatización industrial</textarea></label>
+<label>Tipos de empresa (códigos separados por coma) <input name="types" value="machine_builder_oem" required></label>
+<label>Señales buscadas <input name="signals" value="new_production_line"></label>
+<div class="grid"><label>País <select name="country"><option>España</option><option>Portugal</option></select></label><label>Provincia <input name="province" value="Albacete"></label></div>
+<label>Requisitos imprescindibles (uno por línea) <textarea name="must_have">automatización</textarea></label>
+<label>Preferencias <textarea name="preferences"></textarea></label><label>Exclusiones <textarea name="exclusions"></textarea></label>
+<label>Web y empresas de la cartera (nombre | dominio opcional | identificador conocido opcional) <textarea name="portfolio_text" rows="4"></textarea></label>
+<label>Importar lista <input id="import" type="file" accept=".txt,.csv"></label>
+<label><input name="signal_sweep" type="checkbox"> Buscar novedades también en el modo ampliar empresas</label>
+<button>Crear solicitud de prueba</button></form><hr>
+<button id="resume">Continuar / reanudar</button><button id="status">Consultar progreso</button><button id="update">Actualizar edición bajo demanda</button>
+<nav><a href="/report.html" target="_blank">Abrir informe aprobado</a> · <a href="/report.json" download>Descargar JSON</a> · <a href="/report.xlsx" download>Descargar Excel</a></nav>
+<p id="message" role="status"></p><pre id="progress"></pre>
+<script type="module">
+const form=document.querySelector('#request'),out=document.querySelector('#progress'),message=document.querySelector('#message');
+const lines=value=>value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+async function api(path,body){const response=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});
+const result=await response.json();if(!response.ok)throw new Error(result.error);return result;}
+function requestBody(){const f=new FormData(form);return {policy_version:'RE1.0.0',mode:f.get('mode'),scope:f.get('scope'),offer:f.get('offer'),
+target_company_types:f.get('types').split(',').map(x=>x.trim()).filter(Boolean),signal_types:f.get('signals').split(',').map(x=>x.trim()).filter(Boolean),
+territories:[{country:f.get('country'),province:f.get('province')||null}],must_have:lines(f.get('must_have')),preferences:lines(f.get('preferences')),
+exclusions:lines(f.get('exclusions')),portfolio_text:f.get('portfolio_text'),signal_sweep:f.get('mode')==='signal_discovery'||f.has('signal_sweep')};}
+async function show(){out.textContent=JSON.stringify(await api('/api/engine/status'),null,2);}
+async function act(fn){try{message.textContent='Procesando…';await fn();await show();message.textContent='Estado actualizado con resultados persistidos.';}catch(e){message.textContent=e.message;}}
+form.addEventListener('submit',e=>{e.preventDefault();act(()=>api('/api/engine/request',requestBody()));});
+document.querySelector('#resume').onclick=()=>act(()=>api('/api/engine/resume',{steps:64}));
+document.querySelector('#status').onclick=()=>act(show);
+document.querySelector('#update').onclick=()=>act(()=>api('/api/engine/update',requestBody()));
+document.querySelector('#import').onchange=async e=>{const file=e.target.files[0];if(file&&file.size<=2_000_000)form.elements.portfolio_text.value=await file.text();};
+show().catch(e=>message.textContent=e.message);
+</script></html>

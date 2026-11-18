@@ -1,0 +1,27 @@
+name: Research engine contracts and exports
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  engine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Static contracts and deterministic complete exports
+        run: node --test test/*.mjs
+      - name: Parse browser adapters
+        run: |
+          node --check site/engine-contract.mjs
+          node --check site/research-engine.js
+          node --check site/report/engine-report.mjs
+          node --check site/report/report.js
+      - name: Build existing static application without publication
+        run: bash scripts/build_static_site.sh /tmp/induradar-engine-static
