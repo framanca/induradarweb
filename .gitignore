@@ -84,6 +84,11 @@ supabase/
 supabase/*
 !supabase/functions/
 supabase/functions/*
+!supabase/functions/_shared/
+supabase/functions/_shared/*
+!supabase/functions/_shared/xlsx-0.20.3.mjs
+!supabase/functions/_shared/xlsx-0.20.3.LICENSE
+!supabase/functions/_shared/xlsx-0.20.3.source.json
 !supabase/functions/submit-contact/
 !supabase/functions/submit-contact/index.ts
 AGENTS.md
