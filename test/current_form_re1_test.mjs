@@ -1,16 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
 import {contractFromLead, normalizeEngineRequest} from '../site/engine-contract.mjs';
 import * as XLSX from 'xlsx';
 import * as EdgeXLSX from '../supabase/functions/_shared/xlsx-0.20.3.mjs';
 import {workbookFromApprovedJson} from '../site/report/engine-report.mjs';
 
 test('RE1 integration preserves the deployed form, payload builder and authenticated submission path', () => {
-  for (const path of ['site/app.js', 'site/index.html', 'site/research-objective.js', 'scripts/build_static_site.sh']) {
-    const deployed = execFileSync('git', ['show', '31654bb424e75a65eea05e463e9377fc04504398:' + path]);
-    assert.deepEqual(fs.readFileSync(new URL('../' + path, import.meta.url)), deployed, path);
+  const original = JSON.parse(fs.readFileSync(new URL('./fixtures/current-form-20261118.json', import.meta.url)));
+  for (const [path, expected] of Object.entries(original.files_sha256)) {
+    const current = fs.readFileSync(new URL('../' + path, import.meta.url));
+    assert.equal(createHash('sha256').update(current).digest('hex'), expected, path);
   }
   const optional = fs.readFileSync(new URL('../site/research-engine.js', import.meta.url), 'utf8');
   assert.doesNotMatch(optional, /window\.fetch\s*=|createElement|DOMContentLoaded/);

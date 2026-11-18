@@ -1,0 +1,10 @@
+{
+  "reference_commit": "31654bb424e75a65eea05e463e9377fc04504398",
+  "purpose": "Keep the current public form unchanged when integrating RE1 on the server",
+  "files_sha256": {
+    "site/app.js": "3c054fd8fd5be11bb17b1cf3bab09f43f14533caa7b99fbb6f26c76381a487d5",
+    "site/index.html": "102d79e28a6ad911ede267f945f15946822c92d9ce396337c208fea532b22d44",
+    "site/research-objective.js": "6df139daa73b72f5a54b883ba22975a49d78eb2064d4223795225cf7f95fe64c",
+    "scripts/build_static_site.sh": "2ea0eae08003cfa753390e55bfd1ad4eb18bf18da0e9fa89607a618777223000"
+  }
+}
