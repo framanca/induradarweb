@@ -103,6 +103,12 @@ function mapSignalOpportunity(item) {
     probableNeeds: asArray(item.probable_needs).filter((value) => typeof value === 'string' && value.trim()),
     risks: asArray(item.risks).filter((value) => typeof value === 'string' && value.trim()),
     classification: firstNonEmpty(item.classification, 'signal_opportunity'),
+    opportunityRank: item.opportunity_rank_score ?? null,
+    signalStrength: item.signal_strength ?? null,
+    earliness: item.earliness ?? null,
+    temperature: item.temperature ?? null,
+    phase: item.phase ?? null,
+    priorityReason: item.ranking_reason ?? null,
   };
 }
 
@@ -256,10 +262,21 @@ function renderOpportunity(opportunity) {
   const chips = element('div', 'chips');
   chips.append(element('span', '', `${opportunity.signalCount} señal${opportunity.signalCount === 1 ? '' : 'es'}`));
   if (opportunity.location) chips.append(element('span', '', opportunity.location));
+  if (opportunity.opportunityRank !== undefined && opportunity.opportunityRank !== null) {
+    chips.append(element('span', '', `Opportunity Rank ${opportunity.opportunityRank}`));
+    if (opportunity.signals[0]) chips.append(element('span', '', opportunity.signals[0].title));
+    if (opportunity.phase) chips.append(element('span', '', opportunity.phase));
+  }
   summary.append(heading, chips);
   details.append(summary);
 
   const body = element('div', 'opportunity-body');
+  if (opportunity.opportunityRank !== undefined && opportunity.opportunityRank !== null) {
+    addLabeledText(body, 'Prioridad', opportunity.priorityReason);
+    addLabeledText(body, 'Signal Strength', opportunity.signalStrength);
+    addLabeledText(body, 'Earliness', opportunity.earliness);
+    addLabeledText(body, 'Temperature', opportunity.temperature);
+  }
   if (opportunity.title && opportunity.title !== opportunity.company) body.append(element('h3', '', opportunity.title));
   const hasEditorial = addEditorial(body, opportunity);
   if (!hasEditorial) {

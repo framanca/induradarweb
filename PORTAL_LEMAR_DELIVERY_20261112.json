@@ -1,0 +1,88 @@
+{
+  "kind": "reviewed_finalized_report_web_projection",
+  "project": "gwmwkxvrgctglyjmlqnb",
+  "report_reference": "IR-20261106-E4D4SQ",
+  "report_url": "https://induradar.com/report/?ref=IR-20261106-E4D4SQ",
+  "canonical_and_light_report_unchanged": true,
+  "canonical_hash_scope": "7f70e3c9a54f40d0379cc58a2a48f5202cf5cc84cc6690e64595d195c3d58bb4",
+  "neutralized_prior_client_caution_spans": 4,
+  "public_technology_brand_spans": 3,
+  "primary_brand_source": "https://rivasrobotics.com/programacion-plc-hmi/",
+  "exception_scope": "existing API; one immutable report only",
+  "roles_memberships_global_terms_unchanged": true,
+  "native_regression": {
+    "pass": true,
+    "cold_cache_pass": true,
+    "warm_cache_reused": true,
+    "master_report_count": 42,
+    "other_tenant_denied": true,
+    "other_terms_blocked": true,
+    "fingerprint_preserved": true,
+    "missing_span_rejected": true,
+    "reviewed_projection_scope": true,
+    "immutable_hashes_preserved": true,
+    "other_report_alias_blocked": true,
+    "user_metadata_cannot_elevate": true,
+    "regular_user_listing_isolated": true
+  },
+  "native_cache": {
+    "report": {
+      "gate_pass": true,
+      "html_hash": "ba6ed4d0f79612238bc898fadf95804c42e96694881f215fc468709a5efba7a9",
+      "inventory_hash": "f456e7fa4c2ecef4aec3f7ce31930a26263702e41afd6f793a91b415ed5f978e",
+      "html_characters": 766918,
+      "report_reference": "IR-20261106-E4D4SQ",
+      "cache_source_hash": "7f70e3c9a54f40d0379cc58a2a48f5202cf5cc84cc6690e64595d195c3d58bb4",
+      "light_report_hash": "0363e8d72953740b6b60ef151efa196cab173fe4e00f628f07c5b97231785ea7",
+      "finalization_status": "finalized",
+      "report_payload_hash": "7f70e3c9a54f40d0379cc58a2a48f5202cf5cc84cc6690e64595d195c3d58bb4",
+      "html_renderer_version": "2.0.0",
+      "report_payload_status": "ready",
+      "neutralized_caution_visible": true,
+      "prior_client_caution_absent": true
+    },
+    "migration": [
+      {
+        "name": "reviewed_lemar_web_text_projection",
+        "version": "20261112003513"
+      }
+    ],
+    "current_fingerprint": "6ffceb1c99b2151c7f79e8d259cb0e7d2dc12b212a69b9d2b5bdb9aaedbcdff4"
+  },
+  "review": {
+    "pass": true,
+    "report_reference": "IR-20261106-E4D4SQ",
+    "exception_receipt": {
+      "ok": true,
+      "scope": "sanitized_approved_payload_human_review",
+      "normalized_term": "omron",
+      "report_version_id": "81a48eb1-fb17-461b-95e8-735508d2340a",
+      "approved_report_payload_unchanged": true
+    },
+    "neutralized_cautions": 4,
+    "global_terms_unchanged": true,
+    "verified_public_brand_spans": 3,
+    "immutable_report_hashes_unchanged": true,
+    "other_report_exceptions_unchanged": true,
+    "publication_requires_separate_web_gate": true
+  },
+  "local_migration_version": "20261112003434",
+  "native_migration_version": "20261112003513",
+  "node_tests_passed": 39,
+  "fresh_browser_e2e_available": false,
+  "local_docker_retest_available": false,
+  "validation": "SQL parsed; actual atomic body/ACL/owner/fingerprint guards passed; native authenticated-claims privacy/access/cold/warm tests passed. Operator variant committed only derived HTML cache; test file defaults to rollback.",
+  "advisors": {
+    "security_groups": 30,
+    "performance_groups": 3,
+    "health_groups": 0,
+    "group_counts_unchanged": true
+  },
+  "new_provider_calls": 0,
+  "general_daemon_started": false,
+  "files_sha256": {
+    "supabase/migrations/20261112003434_reviewed_lemar_web_text_projection.sql": "0a74b2d875a620a90ba01105e29dcd34a2a34a4a969be99f471a6b47b12d7fbb",
+    "scripts/review_lemar_web_brand.sql": "155a0999613227740a116f23d5caf08063c2d90d87843964a9183b0ccbcac163",
+    "test/lemar_report_delivery_regression.sql": "61a239370d18fb9e7ca5076f7ec700dcc519d109f97a01d106f397f15d7e85ba"
+  }
+}

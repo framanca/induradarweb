@@ -1,4 +1,5 @@
 import { buildReportViewModel, renderReport } from './renderer.js';
+import { renderEngineDetails } from './engine-report.mjs';
 import { currentSession, getSupabaseClient } from '../auth-client.js';
 
 const statusNode = document.querySelector('#report-status');
@@ -697,6 +698,24 @@ async function start() {
   }
 
   try {
+    if (window.INDURADAR_RESEARCH_ENGINE_POLICY === 'RE1.0.0') {
+      const data = await fetchLegacyReport(reference);
+      const payload = data.payload || data;
+      const engine = payload.metadata?.research_engine;
+      if (engine?.extension_version === 'RE1.0.0') {
+        if (engine.approval?.status !== 'approved' || engine.approval?.native_release_accepted !== true) {
+          throw new Error('native_research_engine_acceptance_required');
+        }
+        renderReport(reportNode, buildReportViewModel(data));
+        const complete = document.createElement('section');
+        renderEngineDetails(complete, payload); reportNode.append(complete);
+        referenceNode.textContent = payload.report_reference;
+        dateNode.textContent = `Fecha de corte: ${payload.metadata.as_of}`;
+        if (excelButton) excelButton.hidden = false;
+        setStatus('');
+        return;
+      }
+    }
     // Future reports: the exact persisted canonical HTML becomes the document
     // shown in the browser. There is no second client-side rendering path.
     const html = await fetchCanonicalHtml(reference);
@@ -732,6 +751,12 @@ async function start() {
     referenceNode.textContent = model.reference || reference;
     dateNode.textContent = model.asOf ? `Fecha de corte: ${model.asOf}` : '';
     renderReport(reportNode, model);
+    const canonicalPayload = data.payload || data;
+    if (canonicalPayload.metadata?.research_engine?.extension_version === 'RE1.0.0') {
+      const complete = document.createElement('section');
+      renderEngineDetails(complete, canonicalPayload);
+      reportNode.append(complete);
+    }
     try {
       interactionData = await loadInteractions(reference);
     } catch (interactionError) {
