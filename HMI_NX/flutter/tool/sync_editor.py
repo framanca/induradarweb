@@ -38,17 +38,17 @@ def bundle():
             text = text[:start] + "function download(name,data,type='application/octet-stream'){return NXOffline.download(name,data,type);}" + text[end:]
             start = text.index("$('#saveBtn').onclick=")
             end = text.index(";$('#loadBtn').onclick=", start)
-            text = text[:start] + """$('#saveBtn').onclick=async()=>{syncProjectInputs();try{p0Snapshot('antes-guardado',true);const expected=p0JSON(),data=JSON.stringify(C.normalize(p),null,2);const saved=await download((p.name||'project').replace(/[^A-Za-z0-9_-]+/g,'_')+'.nxst',data,'application/json');if(saved){if(p0JSON()===expected)p0Checkpoint();p0Snapshot('guardado-manual',true);toast('Proyecto guardado')}}catch(error){toast('No se pudo guardar: '+error.message)}}""" + text[end:]
+            text = text[:start] + """$('#saveBtn').onclick=async()=>{syncProjectInputs();try{p0Snapshot('antes-guardado',true);const expected=p0JSON(),data=JSON.stringify(C.normalize(p),null,2);const saved=await download((p.name||'project').replace(/[^A-Za-z0-9_-]+/g,'_')+'.nxst',data,'application/json');if(saved){if(p0JSON()===expected)p0Checkpoint();p0Snapshot('guardado-manual',true);toast('Project saved')}}catch(error){toast('Could not save: '+error.message)}}""" + text[end:]
             start = text.index("$('#exportBtn').onclick=")
             end = text.index(";\n$('#undoBtn').onclick=", start)
-            text = text[:start] + """$('#exportBtn').onclick=async()=>{syncProjectInputs();try{const expected=p0JSON(),out=C.exportPackage(p),name=(p.name||'WebHMI_ST').replace(/[^A-Za-z0-9_-]+/g,'_')+'_Sysmac.zip';p0Snapshot('antes-exportar',true);const saved=await download(name,out.zip,'application/zip');if(saved){if(p0JSON()===expected)p0Checkpoint();p0Snapshot('exportado-sysmac',true);toast('Paquete Sysmac guardado')}}catch(error){toast(error.message)}}""" + text[end:]
+            text = text[:start] + """$('#exportBtn').onclick=async()=>{syncProjectInputs();try{const expected=p0JSON(),out=C.exportPackage(p),name=(p.name||'WebHMI_ST').replace(/[^A-Za-z0-9_-]+/g,'_')+'_Sysmac.zip';p0Snapshot('antes-exportar',true);const saved=await download(name,out.zip,'application/zip');if(saved){if(p0JSON()===expected)p0Checkpoint();p0Snapshot('exportado-sysmac',true);toast('Sysmac package saved')}}catch(error){toast(error.message)}}""" + text[end:]
             # Preserve the full multiline preview and its resize helpers.
             # The native adapter only replaces download/storage operations.
-            text = once(text, "p0Snapshot('antes-abrir-archivo',true);if(p0Dirty()", "if(!p0Snapshot('antes-abrir-archivo',true)){toast('No se puede respaldar el proyecto actual. Guarda una copia antes de abrir otro.');e.target.value='';return}if(p0Dirty()")
-            text = once(text, "p0Snapshot('antes-recuperar',true);p=C.normalize", "if(!p0Snapshot('antes-recuperar',true)){toast('No se puede respaldar el proyecto actual. Recuperación cancelada.');return}p=C.normalize")
-            text = text.replace("Guardado local", "Guardado en disco")
+            text = once(text, "p0Snapshot('antes-abrir-archivo',true);if(p0Dirty()", "if(!p0Snapshot('antes-abrir-archivo',true)){toast('Could not back up the current project. Save a copy before opening another.');e.target.value='';return}if(p0Dirty()")
+            text = once(text, "p0Snapshot('antes-recuperar',true);p=C.normalize", "if(!p0Snapshot('antes-recuperar',true)){toast('Could not back up the current project. Recovery canceled.');return}p=C.normalize")
+            text = text.replace("Saved locally", "Saved to disk")
             # A native recovery enters through the same model/history paths as a normal open.
-            api = """window.NXOfflineEditor={copyWidget,pasteWidget,flush:()=>p0Snapshot('app-oculta',false),getProject:()=>C.copy(p),openProject:q=>{if(!p0Snapshot('antes-recuperar-disco',true))return false;if(!confirm('¿Recuperar esta versión? El proyecto actual se conserva en las copias.'))return false;p=C.normalize(q);screenId=p.screens[0].id;selected=null;editReset();render();p0Checkpoint();p0Snapshot('recuperado-disco',true);return true}};
+            api = """window.NXOfflineEditor={copyWidget,pasteWidget,flush:()=>p0Snapshot('app-oculta',false),getProject:()=>C.copy(p),openProject:q=>{if(!p0Snapshot('antes-recuperar-disco',true))return false;if(!confirm('Restore this version? The current project is kept in the backups.'))return false;p=C.normalize(q);screenId=p.screens[0].id;selected=null;editReset();render();p0Checkpoint();p0Snapshot('recuperado-disco',true);return true}};
 """
             text = once(text, "\np0Boot();", "\n" + api + "p0Boot();")
         (DEST / name).write_text(text, encoding="utf-8")

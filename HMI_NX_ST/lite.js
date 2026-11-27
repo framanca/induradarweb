@@ -85,7 +85,7 @@ function liteBrowser(){
   finally{schedule(online?Math.max(150,Number(L.poll)||500):Math.min(5000,500*Math.pow(2,Math.min(failures,3))))}
  }
  function validate(id,raw,element){
-  const tag=tags[id];if(!tag||!tag.write)throw Error('Variable no escribible');
+  const tag=tags[id];if(!tag||!tag.write)throw Error('Variable is read-only');
   const txt=String(raw).trim();
   if(tag.type==='BOOL'){if(txt!=='1'&&txt!=='0')throw Error('Solo 0 o 1');return txt}
   if(tag.type==='INT'){
@@ -142,7 +142,7 @@ function buildLiteRuntimeHTML(input,options){
  const p=liteProjection(input),view=p.screens[0],vm=new Map(p.variables.map(v=>[v.name,v]));
  const widgets=view.objects.map(o=>widgetHTML(o,vm)).join('');
  const withKeyboard=p.keyboardMode==='webhmi'&&view.objects.some(o=>o.kind==='input');
- const keypad=withKeyboard?'<div id="keyboard" hidden role="dialog" aria-modal="true" aria-label="Teclado numerico"><div class="kbd"><input id="kbValue" inputmode="none" aria-label="Valor"><div class="keys">'+['7','8','9','4','5','6','1','2','3','sign','0','dot','back','clear'].map(key=>'<button type="button" data-key="'+key+'">'+({sign:'±',dot:'.',back:'Borrar',clear:'Limpiar'}[key]||key)+'</button>').join('')+'</div><div id="kbError" role="alert"></div><div class="kbd-actions"><button id="kbCancel" type="button">Cancelar</button><button id="kbAccept" type="button">Aceptar</button></div></div></div>':'';
+ const keypad=withKeyboard?'<div id="keyboard" hidden role="dialog" aria-modal="true" aria-label="Numeric keypad"><div class="kbd"><input id="kbValue" inputmode="none" aria-label="Value"><div class="keys">'+['7','8','9','4','5','6','1','2','3','sign','0','dot','back','clear'].map(key=>'<button type="button" data-key="'+key+'">'+({sign:'±',dot:'.',back:'Backspace',clear:'Clear'}[key]||key)+'</button>').join('')+'</div><div id="kbError" role="alert"></div><div class="kbd-actions"><button id="kbCancel" type="button">Cancel</button><button id="kbAccept" type="button">OK</button></div></div></div>':'';
  const config={w:p.width,h:p.height,poll:p.pollMs,preview:Boolean(options&&options.preview),keyboard:withKeyboard,v:p.variables.map(v=>[Number(v.id),v.type,v.access==='RW'?1:0])};
  const html='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+htmlText(p.name)+'</title><style>'+liteCSS+'</style></head><body><header><span>'+htmlText(p.name)+'</span><span id="state">Conectando</span></header><main id="viewport"><div id="fit"><div id="stage" style="background:'+htmlText(view.background)+'">'+widgets+'</div></div></main><div id="shield">Sin conexion con PLC</div>'+keypad+'<script>const L='+jsJSON(config)+';('+liteBrowser.toString()+')();</script></body></html>';
  // The Omron ST source embeds HTML in STRING chunks; keep it 7-bit ASCII.

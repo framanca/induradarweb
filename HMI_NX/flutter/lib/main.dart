@@ -60,7 +60,7 @@ class _EditorHostState extends State<EditorHost> with WidgetsBindingObserver {
       store.open();
       _store = store;
       final assets = <String, Uint8List>{};
-      for (final file in ['index.html', 'style.css', 'model.js', 'runtime.js', 'st.js', 'zip.js', 'history.js', 'app.js', 'offline.js', 'offline.css']) {
+      for (final file in ['index.html', 'style.css', 'expressions.js', 'model.js', 'sysmac-types.js', 'runtime.js', 'st.js', 'zip.js', 'history.js', 'app.js', 'offline.js', 'offline.css']) {
         final data = await rootBundle.load('assets/editor/$file');
         assets[file] = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
       }
@@ -89,7 +89,7 @@ class _EditorHostState extends State<EditorHost> with WidgetsBindingObserver {
     final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: extensions, withData: true);
     if (result == null || result.files.isEmpty) return null;
     final file = result.files.single;
-    if (file.size > 32 * 1024 * 1024) throw const FormatException('El archivo supera 32 MB');
+    if (file.size > 32 * 1024 * 1024) throw const FormatException('The file exceeds 32 MB');
     final bytes = file.bytes ?? await File(file.path!).readAsBytes();
     final mime = switch (file.extension?.toLowerCase()) {
       'png' => 'image/png',
@@ -103,7 +103,7 @@ class _EditorHostState extends State<EditorHost> with WidgetsBindingObserver {
   }
 
   Future<bool> _save(String name, Uint8List bytes) async {
-    final selected = await FilePicker.platform.saveFile(dialogTitle: 'Guardar $name', fileName: name, bytes: bytes);
+    final selected = await FilePicker.platform.saveFile(dialogTitle: 'Save $name', fileName: name, bytes: bytes);
     return selected != null;
   }
 
@@ -166,9 +166,9 @@ class _EditorHostState extends State<EditorHost> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     if (_error != null) {
       return Scaffold(appBar: AppBar(title: const Text('WebHMI Offline')), body: Padding(padding: const EdgeInsets.all(24), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        SelectableText('No se pudo abrir el editor.\n\n$_error\n\nLos proyectos guardados se conservan. En Windows, comprueba que WebView2 Runtime está instalado.'),
+        SelectableText('Could not open the editor.\n\n$_error\n\nSaved projects are preserved. On Windows, check that WebView2 Runtime is installed.'),
         const SizedBox(height: 20),
-        FilledButton(onPressed: _restoreExternal, child: const Text('Recuperar desde una copia .nxst')),
+        FilledButton(onPressed: _restoreExternal, child: const Text('Restore from an .nxst backup')),
       ])));
     }
     if (!_ready) return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -178,11 +178,11 @@ class _EditorHostState extends State<EditorHost> with WidgetsBindingObserver {
         body: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
           const Icon(Icons.precision_manufacturing, size: 64),
           const SizedBox(height: 16),
-          const Text('Editor local · Proyectos guardados en disco'),
+          const Text('Local editor · Projects saved to disk'),
           const SizedBox(height: 16),
-          FilledButton(onPressed: _openLinuxEditor, child: Text(_linuxView == null ? 'Abrir editor' : 'Mostrar editor')),
+          FilledButton(onPressed: _openLinuxEditor, child: Text(_linuxView == null ? 'Open editor' : 'Show editor')),
           const SizedBox(height: 16),
-          const Text('Mantén esta ventana abierta mientras editas.'),
+          const Text('Keep this window open while editing.'),
         ])),
       );
     }
@@ -194,8 +194,8 @@ class _EditorHostState extends State<EditorHost> with WidgetsBindingObserver {
       shouldOverrideUrlLoading: (controller, action) async => _server!.allowsNavigation(action.request.url.toString()) ? NavigationActionPolicy.ALLOW : NavigationActionPolicy.CANCEL,
       onJsConfirm: (controller, request) async {
         final accepted = await showDialog<bool>(context: context, builder: (context) => AlertDialog(content: Text(request.message ?? ''), actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Continuar')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Continue')),
         ]));
         return JsConfirmResponse(handledByClient: true, action: accepted == true ? JsConfirmResponseAction.CONFIRM : JsConfirmResponseAction.CANCEL);
       },

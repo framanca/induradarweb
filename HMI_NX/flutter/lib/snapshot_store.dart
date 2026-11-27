@@ -37,7 +37,7 @@ class SnapshotStore {
           _values = data.$1;
           revision = data.$2;
           if (file.path != _primary.path) {
-            recoveryNotice = 'Se ha recuperado la última copia válida. El archivo dañado se conserva.';
+            recoveryNotice = 'The latest valid backup was restored. The damaged file is preserved.';
             if (_primary.existsSync()) {
               _primary.copySync('${directory.path}/damaged-${DateTime.now().microsecondsSinceEpoch}.json');
             }
@@ -49,7 +49,7 @@ class SnapshotStore {
         }
       }
       if (foundExisting) {
-        throw const FormatException('No hay una copia válida. Los archivos se han conservado; restaura una copia externa .nxst.');
+        throw const FormatException('No valid backup was found. The files are preserved; restore an external .nxst backup.');
       }
     } catch (_) {
       close();
@@ -60,17 +60,17 @@ class SnapshotStore {
   (Map<String, String>, int) _decode(String text) {
     final data = jsonDecode(text);
     if (data is! Map || data['schema'] != 1 || data['revision'] is! int || data['values'] is! Map) {
-      throw const FormatException('Formato de almacenamiento no válido');
+      throw const FormatException('Invalid storage format');
     }
     final result = <String, String>{};
     for (final entry in (data['values'] as Map).entries) {
       if (!storageKeys.contains(entry.key) || entry.value is! String) {
-        throw const FormatException('Clave de almacenamiento no válida');
+        throw const FormatException('Invalid storage key');
       }
       final value = jsonDecode(entry.value as String);
       if (entry.key == latestKey) _checkSnapshot(value);
       if (entry.key == historyKey) {
-        if (value is! List) throw const FormatException('Historial no válido');
+        if (value is! List) throw const FormatException('Invalid history');
         for (final snapshot in value) {
           _checkSnapshot(snapshot);
         }
@@ -82,11 +82,11 @@ class SnapshotStore {
 
   void _checkSnapshot(dynamic snapshot) {
     if (snapshot is! Map || snapshot['project'] is! Map || snapshot['savedAt'] is! num) {
-      throw const FormatException('Copia de proyecto no válida');
+      throw const FormatException('Invalid project backup');
     }
     final project = snapshot['project'] as Map;
     if (project['name'] is! String || project['screens'] is! List || (project['screens'] as List).isEmpty || project['variables'] is! List) {
-      throw const FormatException('Proyecto no válido');
+      throw const FormatException('Invalid project');
     }
   }
 
@@ -104,9 +104,9 @@ class SnapshotStore {
   }
 
   int setValue(String key, String? value, int expectedRevision) {
-    if (_lock == null) throw StateError('Almacenamiento cerrado');
-    if (revision != expectedRevision) throw StateError('Otra ventana ha cambiado el proyecto. Vuelve a abrir el editor.');
-    if (!storageKeys.contains(key)) throw const FormatException('Clave no permitida');
+    if (_lock == null) throw StateError('Storage is closed');
+    if (revision != expectedRevision) throw StateError('Another window changed the project. Reopen the editor.');
+    if (!storageKeys.contains(key)) throw const FormatException('Key not allowed');
     final next = Map<String, String>.from(_values);
     if (value == null) {
       next.remove(key);
@@ -165,11 +165,11 @@ class SnapshotStore {
 
   Map<String, dynamic> readVersion(String id) {
     if (!RegExp(r'^\d+-\d+\.json$').hasMatch(id)) {
-      throw const FormatException('Versión no válida');
+      throw const FormatException('Invalid version');
     }
     final values = _decode(File('${_history.path}/$id').readAsStringSync()).$1;
     final raw = values[latestKey];
-    if (raw == null) throw const FormatException('Versión sin proyecto');
+    if (raw == null) throw const FormatException('Version has no project');
     return Map<String, dynamic>.from((jsonDecode(raw) as Map)['project'] as Map);
   }
 
