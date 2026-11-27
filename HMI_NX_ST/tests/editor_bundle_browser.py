@@ -15,7 +15,7 @@ checks = []
 errors = []
 
 with sync_playwright() as pw:
-    browser = pw.chromium.launch(headless=True, args=["--no-sandbox"])
+    browser = pw.chromium.launch(headless=True, args=["--no-sandbox"], executable_path=os.environ.get("HMI_ST_CHROMIUM") or None)
     context = browser.new_context(viewport={"width": 1440, "height": 900}, accept_downloads=True)
     page = context.new_page()
     page.set_default_timeout(10000)
@@ -23,7 +23,7 @@ with sync_playwright() as pw:
     page.on("dialog", lambda dialog: dialog.accept())
     response = page.goto(ORIGIN, wait_until="load")
     assert response is not None and response.status == 200
-    page.wait_for_function("document.querySelector('#saveStatus').textContent.includes('Guardado local')")
+    page.wait_for_function("document.querySelector('#saveStatus').textContent.includes('Saved locally')")
     checks.append("startup_scripts_loaded_and_autosave_ready")
 
     # First opening without a saved project must not load the recipe-enabled demo.
@@ -44,8 +44,8 @@ with sync_playwright() as pw:
     assert page.locator("#sidebar-panel-project #projectResourceSummary").count() == 1
     text = summary.text_content()
     assert "HTML: " in text and " / 512 KB" in text
-    assert "imágenes: 0.0 / 256 KB" in text
-    assert "1 pantallas · 1 alarmas · 1 recetas." in text
+    assert "images: 0.0 / 256 KB" in text
+    assert "1 screens · 1 alarms · 1 recipes." in text
     checks.append("project_summary_visible_only_in_project_tab")
 
     def select_sidebar(tab):
@@ -67,7 +67,7 @@ with sync_playwright() as pw:
         assert all(box is not None for box in bars)
         assert max(box["y"] for box in bars) - min(box["y"] for box in bars) <= 1
         assert max(box["height"] for box in bars) <= 46
-        for idx, label in enumerate(("Proyecto", "Variables", "Elementos", "Alarmas", "Recetas")):
+        for idx, label in enumerate(("Project", "Variables", "Elements", "Alarms", "Recipes")):
             tab = tabs.nth(idx)
             assert tab.get_attribute("aria-label") == label
             assert tab.get_attribute("title") == label
@@ -105,7 +105,7 @@ with sync_playwright() as pw:
     page.locator("#newBtn").click()
     assert page.locator("#projectName").input_value() == "WebHMI ST"
     assert page.locator("#canvas .widget").count() == 0
-    assert "1 pantallas · 0 alarmas · 0 recetas." in summary.text_content()
+    assert "1 screens · 0 alarms · 0 recipes." in summary.text_content()
     checks.append("new_button_creates_empty_project")
 
     # Export becomes a diagnostic trigger when the project is invalid.
@@ -115,7 +115,7 @@ with sync_playwright() as pw:
     assert page.locator("#exportWarningIcon").is_visible()
     page.locator("#exportBtn").click()
     assert page.locator("#diagnosticsDialog").is_visible()
-    assert "selecciona variable" in page.locator("#diagnostics").inner_text()
+    assert "select a variable" in page.locator("#diagnostics").inner_text()
     assert page.locator("#exportBtn").get_attribute("aria-expanded") == "true"
     page.locator("#closeDiagnostics").click()
     assert page.locator("#exportBtn").get_attribute("aria-expanded") == "false"
@@ -139,8 +139,8 @@ with sync_playwright() as pw:
 
     page.locator("#copyScreen").click()
     assert page.locator("#screenSelect option").count() == 2
-    assert "2 pantallas · 0 alarmas · 0 recetas." in summary.text_content()
-    assert "1 · Principal personalizada (copia)" in page.locator("#screenSelect option").last.inner_text()
+    assert "2 screens · 0 alarms · 0 recipes." in summary.text_content()
+    assert "1 · Principal personalizada (copy)" in page.locator("#screenSelect option").last.inner_text()
     assert page.locator("#canvas").evaluate("(e) => getComputedStyle(e).backgroundColor") == "rgb(204, 238, 255)"
     page.locator("#screenSelect").select_option(first_id)
     checks.append("copy_screen_preserves_background_and_assigns_unique_number")
@@ -379,28 +379,28 @@ with sync_playwright() as pw:
     alarm_count = page.locator("#alarmEditor .editor-card").count()
     page.locator("#addAlarm").click()
     assert page.locator("#alarmEditor .editor-card").count() == alarm_count + 1
-    assert "1 alarmas" in summary.text_content()
+    assert "1 alarms" in summary.text_content()
     page.locator("#undoBtn").click()
     assert page.locator("#alarmEditor .editor-card").count() == alarm_count
-    assert "0 alarmas" in summary.text_content()
+    assert "0 alarms" in summary.text_content()
     select_sidebar("recipes")
     assert page.locator("#addRecipe").is_disabled()
     page.locator("#recipeEnabled").check()
     recipe_count = page.locator("#recipeEditor .editor-card").count()
-    assert "0 recetas." in summary.text_content()
+    assert "0 recipes." in summary.text_content()
     page.locator("#addRecipe").click()
     assert page.locator("#recipeEditor .editor-card").count() == recipe_count + 1
-    assert "1 recetas." in summary.text_content()
+    assert "1 recipes." in summary.text_content()
     page.locator(f'[data-duplicate-recipe="{recipe_count}"]').click()
     assert page.locator("#recipeEditor .editor-card").count() == recipe_count + 2
-    assert "2 recetas." in summary.text_content()
-    assert page.locator(f'[data-recipe-name="{recipe_count + 1}"]').input_value().endswith(" (copia)")
+    assert "2 recipes." in summary.text_content()
+    assert page.locator(f'[data-recipe-name="{recipe_count + 1}"]').input_value().endswith(" (copy)")
     page.locator("#undoBtn").click()  # recipe duplication
     assert page.locator("#recipeEditor .editor-card").count() == recipe_count + 1
-    assert "1 recetas." in summary.text_content()
+    assert "1 recipes." in summary.text_content()
     page.locator("#undoBtn").click()  # recipe creation
     assert page.locator("#recipeEditor .editor-card").count() == recipe_count
-    assert "0 recetas." in summary.text_content()
+    assert "0 recipes." in summary.text_content()
     assert page.locator("#canvas .widget").count() == 1
     select_sidebar("project")
     checks.append("tab_switching_preserves_widgets_and_alarm_recipe_actions")
@@ -418,7 +418,7 @@ with sync_playwright() as pw:
 
     page.locator("#demoBtn").click()
     assert page.locator("#projectName").input_value() == "Demo NX ST"
-    assert "1 alarmas · 1 recetas." in summary.text_content()
+    assert "1 alarms · 1 recipes." in summary.text_content()
     checks.append("demo_button_loads_demo_explicitly")
 
     with page.expect_download() as export_event:
@@ -432,14 +432,14 @@ with sync_playwright() as pw:
     open_event.value.set_files(str(backup))
     page.wait_for_function("document.querySelector('#projectName').value === 'Prueba de recuperación'")
     assert page.locator("#canvas .widget").count() == 1
-    assert "2 pantallas · 0 alarmas · 0 recetas." in summary.text_content()
+    assert "2 screens · 0 alarms · 0 recipes." in summary.text_content()
     checks.append("open_button_imports_nxst_project")
 
     page.reload(wait_until="load")
-    page.wait_for_function("document.querySelector('#saveStatus').textContent.includes('Guardado local')")
+    page.wait_for_function("document.querySelector('#saveStatus').textContent.includes('Saved locally')")
     assert page.locator("#projectName").input_value() == "Prueba de recuperación"
     assert page.locator("#canvas .widget").count() == 1
-    assert "2 pantallas · 0 alarmas · 0 recetas." in page.locator("#projectResourceSummary").text_content()
+    assert "2 screens · 0 alarms · 0 recipes." in page.locator("#projectResourceSummary").text_content()
     checks.append("refresh_restores_last_project_not_demo")
 
     page.locator("#recoveryBtn").click()
@@ -542,7 +542,7 @@ with sync_playwright() as pw:
 
     # One "Figuras" tool; choose all five vector geometries in its properties.
     assert page.locator('.tool-grid [data-kind="shape"]').count() == 1
-    assert page.locator('.tool-grid [data-kind="shape"]').inner_text() == "Figuras"
+    assert page.locator('.tool-grid [data-kind="shape"]').inner_text() == "Shapes"
     for shape in ["rect", "ellipse", "line", "arrow", "triangle"]:
         page.locator('.tool-grid [data-kind="shape"]').click()
         widget = page.locator("#canvas .widget.shape").last
@@ -902,7 +902,7 @@ with sync_playwright() as pw:
     assert page.locator("#recipeCapacitySummary").is_visible()
     page.locator("#addRecipe").click()
     assert page.locator('[data-recipe-scope="0"]').count() == 0
-    assert "Memoria Retain NX" in page.locator("#recipeEditor").inner_text()
+    assert "NX Retain memory" in page.locator("#recipeEditor").inner_text()
     page.locator('[data-recipe-name="0"]').fill("Nivel inicial")
     page.locator('[data-recipe-name="0"]').press("Tab")
     page.locator('[data-recipe-toggle="0"][data-name="Internal_1"]').check()
@@ -1159,7 +1159,7 @@ with sync_playwright() as pw:
     assert page.locator("#liteDialog").is_visible()
     assert page.locator("#liteGenerate").is_enabled()
     assert page.locator("#liteCopy").is_disabled()
-    assert "0 de 0 elementos" in page.locator("#liteSummary").inner_text()
+    assert "0 of 0 compatible elements" in page.locator("#liteSummary").inner_text()
     page.locator("#litePreview").click()
     lite_preview = page.frame_locator("#previewFrame")
     assert lite_preview.locator("#state").inner_text() == "VISTA PREVIA"
@@ -1184,14 +1184,14 @@ with sync_playwright() as pw:
     page.locator("#liteExportBtn").click()
     assert page.locator("#liteGenerate").is_disabled()
     assert page.locator("#liteCopy").is_enabled()
-    assert "recetas" in page.locator("#liteIssues").inner_text()
-    assert "alarmas" in page.locator("#liteIssues").inner_text()
-    assert "Depósito" in page.locator("#liteIssues").inner_text()
+    assert "Recipes" in page.locator("#liteIssues").inner_text()
+    assert "alarms" in page.locator("#liteIssues").inner_text()
+    assert "Tank" in page.locator("#liteIssues").inner_text()
     old_project_name=page.locator("#projectName").input_value()
     with page.expect_download() as dl:
         page.locator("#liteCopy").click()
     adapted=dl.value
-    assert adapted.suggested_filename.endswith("_ExtraLight_copia.nxst")
+    assert adapted.suggested_filename.endswith("_ExtraLight_copy.nxst")
     adapted_path=OUT/"extra_light_adapted.nxst"
     adapted.save_as(str(adapted_path))
     adapted_project=json.loads(adapted_path.read_text(encoding="utf-8"))
@@ -1266,12 +1266,12 @@ with sync_playwright() as pw:
     login_page.wait_for_function(
         "() => document.querySelector('#projectResourceSummary')?.textContent.includes('24.0 / 512 KB')",
         timeout=15000)
-    assert login_page.locator("#projectResourceSummary").inner_text().startswith("HTML optimizado (Supabase):")
+    assert login_page.locator("#projectResourceSummary").inner_text().startswith("Optimized HTML (Supabase):")
     assert login_page.evaluate("window.__remoteSizeCalls.length") == 1
     login_page.locator("#projectName").fill("Proyecto segunda medida")
     login_page.locator("#projectName").press("Tab")
     login_page.wait_for_function(
-        "() => document.querySelector('#projectResourceSummary')?.textContent.includes('Calculando en Supabase')",
+        "() => document.querySelector('#projectResourceSummary')?.textContent.includes('Calculating in Supabase')",
         timeout=5000)
     # Distinct projects never reuse stale numbers; updates are throttled.
     login_page.wait_for_function(

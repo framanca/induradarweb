@@ -33,4 +33,3 @@ const api={create};
 root.NXEditorHistory=api;
 if(typeof module==='object'&&module.exports)module.exports=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
-

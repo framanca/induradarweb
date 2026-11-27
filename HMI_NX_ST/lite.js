@@ -6,17 +6,17 @@ function jsJSON(value){return JSON.stringify(value).replace(/</g,'\\u003c').repl
 function number(value,fallback){const n=Number(value);return Number.isFinite(n)?String(n):String(fallback);}
 function liteProjection(input){
  const original=C.normalize(input),report=C.liteAnalysis(original);
- if(report.issues.length)throw Error('Extra Light no compatible:\n'+report.issues.join('\n'));
+ if(report.issues.length)throw Error('Extra Light is incompatible:\n'+report.issues.join('\n'));
  const screen=original.screens[0],objects=C.screenObjects(original,screen).map(o=>C.copy(o));
  const used=new Set(objects.filter(o=>o.kind!=='text').map(o=>o.binding));
  const p=C.copy(original);
  p.variables=original.variables.filter(v=>used.has(v.name)).map(v=>C.copy(v));
  p.screens=[{...C.copy(screen),objects,useBase:false}];
  p.baseScreen=null;p.assets=[];p.alarms=[];p.recipes=[];p.recipeEnabled=false;p.recipeVariables=[];p.internalVariables=[];p.screenBinding='';
- if(p.variables.some(v=>!Number.isInteger(Number(v.id))||Number(v.id)<1||Number(v.id)>65535))throw Error('Extra Light requiere IDs de variables entre 1 y 65535.');
- if(new Set(p.variables.map(v=>Number(v.id))).size!==p.variables.length)throw Error('Hay IDs de variables PLC duplicados.');
+ if(p.variables.some(v=>!Number.isInteger(Number(v.id))||Number(v.id)<1||Number(v.id)>65535))throw Error('Extra Light requires variable IDs between 1 and 65535.');
+ if(new Set(p.variables.map(v=>Number(v.id))).size!==p.variables.length)throw Error('Duplicate PLC variable IDs.');
  const errors=C.validate(p);
- if(errors.length)throw Error('Error en proyecto Extra Light: '+errors.join('; '));
+ if(errors.length)throw Error('Error in Extra Light project: '+errors.join('; '));
  return p;
 }
 function widgetHTML(o,vars){
@@ -155,7 +155,7 @@ function buildLiteST(input){
  let st=C.buildST(p);
  const head='    CASE Web_Chunk OF\n',tail="\n    ELSE\n        Web_TxText := '';\n    END_CASE;";
  const a=st.indexOf(head),b=st.indexOf(tail,a);
- if(a<0||b<a)throw Error('La estructura ST de fragmentos HTTP ha cambiado.');
+ if(a<0||b<a)throw Error('The ST structure of HTTP fragments has changed.');
  const cases=parts.map((chunk,i)=>'            '+i+": Web_TxText := '"+stEscape(chunk)+"';").join('\n');
  st=st.slice(0,a)+head+cases+st.slice(b);
  st=st.replace(/HTML embebido: \d+ bytes \/ \d+ fragmentos/,'HTML embebido: '+enc.encode(html).length+' bytes / '+parts.length+' fragmentos (Extra Light)');
@@ -166,7 +166,7 @@ function buildLiteST(input){
  st=st.replace(/\n\s*ELSIF FIND\(Web_RxText, 'POST \/api\/recipe\?slot='\)[\s\S]*?(?=\n\s*ELSIF FIND\(Web_RxText, 'POST \/api\/ack\?')/,'');
  st=st.replace(/\n\s*ELSIF FIND\(Web_RxText, 'POST \/api\/ack\?'\) = 1 THEN\s+Web_Request := UINT#5;/,'');
  st=st.replace(/\n    4:[\s\S]*?(?=\n    ELSE\n        Web_ApiBody := 'NOT FOUND';)/,'');
- if(st.includes('Web_Recipe')||st.includes('Web_AlarmAck')||st.includes('/api/ack')||st.includes('/api/recipe'))throw Error('Rutas o variables no permitidas en ST Extra Light');
+ if(st.includes('Web_Recipe')||st.includes('Web_AlarmAck')||st.includes('/api/ack')||st.includes('/api/recipe'))throw Error('Routes or variables not permitted in Extra Light ST');
  return st;
 }
 function liteLocalVariablesTSV(input){
@@ -178,7 +178,7 @@ function liteReadme(input,html,st){
 }
 function exportLitePackage(input){
  const p=liteProjection(input),html=buildLiteRuntimeHTML(p);
- if(enc.encode(html).length>LITE_HTML_LIMIT)throw Error('Extra Light supera 128 KB de HTML; reduce elementos o utiliza la version completa.');
+ if(enc.encode(html).length>LITE_HTML_LIMIT)throw Error('Extra Light exceeds 128 KB of HTML; reduce elements or use the full version.');
  const st=buildLiteST(p),files={
  'WebHMI_Server.st':st,
  'WebHMI_LocalVariables.tsv':liteLocalVariablesTSV(p),

@@ -74,16 +74,16 @@ test('64-bit integers and bitstrings are validated losslessly before browser wri
  a.equal(f('TIME_OF_DAY','08:30:00'),'30600');
  a.equal(f('DATE_AND_TIME','2026-10-10-08:30:00'),'1791621000');
  a.throws(()=>f('DATE','2026-02-29'));
- a.throws(()=>f('DATE_AND_TIME','2026-10-10-08:30:00.123'),/fracciones/);
+ a.throws(()=>f('DATE_AND_TIME','2026-10-10-08:30:00.123'),/fractions/);
  a.throws(()=>f('LINT','9223372036854775808'));
  a.throws(()=>f('ULINT','18446744073709551616'));
  a.throws(()=>f('WORD','12345'));
 });
 test('unsupported schemas fail rather than silently generate bad ST',()=>{
- a.throws(()=>C.importSysmac('VAR_GLOBAL\nM : ST_Unspecified;\nEND_VAR'),/no definido/);
- a.throws(()=>C.importSysmac('Name\tData Type\nA\tARRAY[0..1200] OF INT'),/grande/);
- a.throws(()=>C.importSysmac('Name\tData Type\nA\tARRAY[2..1] OF INT'),/Rango ARRAY invalido/);
- a.throws(()=>C.importSysmac('Name\tData Type\nA\tARRAY[0..1,0..1,0..1,0..1] OF INT'),/3 dimensiones/);
+ a.throws(()=>C.importSysmac('VAR_GLOBAL\nM : ST_Unspecified;\nEND_VAR'),/Undefined/);
+ a.throws(()=>C.importSysmac('Name\tData Type\nA\tARRAY[0..1200] OF INT'),/too large/);
+ a.throws(()=>C.importSysmac('Name\tData Type\nA\tARRAY[2..1] OF INT'),/Invalid ARRAY range/);
+ a.throws(()=>C.importSysmac('Name\tData Type\nA\tARRAY[0..1,0..1,0..1,0..1] OF INT'),/3 dimensions/);
 });
 test('generated runtime retains exact bitstrings, wide integers and date strings',()=>{
  const p=C.newProject();

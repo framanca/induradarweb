@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -18,112 +18,112 @@
 </head>
 <body>
 <header class="topbar">
-  <div><strong>HMI NX ST</strong><span>WebHMI embebida en Structured Text</span></div>
-  <div class="top-actions"><span id="saveStatus" class="save-status" title="Copia automática local">Iniciando autosave…</span><button id="recoveryBtn">Recuperar</button><button id="undoBtn" title="Deshacer (Ctrl+Z)" aria-label="Deshacer" disabled>↶ Deshacer</button><button id="redoBtn" title="Rehacer (Ctrl+Y / Ctrl+Mayús+Z)" aria-label="Rehacer" disabled>↷ Rehacer</button><button id="demoBtn">Demo</button><button id="newBtn">Nuevo</button><button id="saveBtn">Guardar proyecto</button><button id="loadBtn">Abrir</button><button id="exportBtn" class="primary" type="button" aria-haspopup="dialog" aria-controls="diagnosticsDialog" aria-expanded="false">Exportar Sysmac <span id="exportWarningIcon" class="export-warning-icon" role="img" aria-label="Errores de exportación" hidden>⚠</span></button><button id="liteExportBtn" type="button" title="Compilar una única pantalla con widgets básicos y servidor ligero">Extra Light</button></div>
+  <div><strong>HMI NX ST</strong><span>WebHMI embedded in Structured Text</span></div>
+  <div class="top-actions"><span id="saveStatus" class="save-status" title="Local automatic backup">Starting autosave…</span><button id="recoveryBtn">Recover</button><button id="undoBtn" title="Undo (Ctrl+Z)" aria-label="Undo" disabled>↶ Undo</button><button id="redoBtn" title="Redo (Ctrl+Y / Ctrl+Shift+Z)" aria-label="Redo" disabled>↷ Redo</button><button id="demoBtn">Demo</button><button id="newBtn">New</button><button id="saveBtn">Save project</button><button id="loadBtn">Open</button><button id="exportBtn" class="primary" type="button" aria-haspopup="dialog" aria-controls="diagnosticsDialog" aria-expanded="false">Export Sysmac <span id="exportWarningIcon" class="export-warning-icon" role="img" aria-label="Export errors" hidden>⚠</span></button><button id="liteExportBtn" type="button" title="Compile one screen with basic widgets and a lightweight server">Extra Light</button></div>
 </header>
 <main class="layout">
-  <aside class="left" aria-label="Herramientas del editor">
-    <nav class="left-tabs" role="tablist" aria-label="Secciones del editor">
-      <button type="button" id="sidebar-tab-project" class="left-tab is-active" role="tab" data-sidebar-tab="project" aria-label="Proyecto" aria-controls="sidebar-panel-project" aria-selected="true" tabindex="0" title="Proyecto">
+  <aside class="left" aria-label="Editor tools">
+    <nav class="left-tabs" role="tablist" aria-label="Editor sections">
+      <button type="button" id="sidebar-tab-project" class="left-tab is-active" role="tab" data-sidebar-tab="project" aria-label="Project" aria-controls="sidebar-panel-project" aria-selected="true" tabindex="0" title="Project">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10H3z"/><path d="M3 11h18"/></svg>
       </button>
       <button type="button" id="sidebar-tab-variables" class="left-tab" role="tab" data-sidebar-tab="variables" aria-label="Variables" aria-controls="sidebar-panel-variables" aria-selected="false" tabindex="-1" title="Variables">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h12M9 12h12M9 18h12"/><circle cx="4" cy="6" r="1.2"/><circle cx="4" cy="12" r="1.2"/><circle cx="4" cy="18" r="1.2"/></svg>
       </button>
-      <button type="button" id="sidebar-tab-elements" class="left-tab" role="tab" data-sidebar-tab="elements" aria-label="Elementos" aria-controls="sidebar-panel-elements" aria-selected="false" tabindex="-1" title="Elementos">
+      <button type="button" id="sidebar-tab-elements" class="left-tab" role="tab" data-sidebar-tab="elements" aria-label="Elements" aria-controls="sidebar-panel-elements" aria-selected="false" tabindex="-1" title="Elements">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
       </button>
-      <button type="button" id="sidebar-tab-alarms" class="left-tab" role="tab" data-sidebar-tab="alarms" aria-label="Alarmas" aria-controls="sidebar-panel-alarms" aria-selected="false" tabindex="-1" title="Alarmas">
+      <button type="button" id="sidebar-tab-alarms" class="left-tab" role="tab" data-sidebar-tab="alarms" aria-label="Alarms" aria-controls="sidebar-panel-alarms" aria-selected="false" tabindex="-1" title="Alarms">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
       </button>
-      <button type="button" id="sidebar-tab-recipes" class="left-tab" role="tab" data-sidebar-tab="recipes" aria-label="Recetas" aria-controls="sidebar-panel-recipes" aria-selected="false" tabindex="-1" title="Recetas">
+      <button type="button" id="sidebar-tab-recipes" class="left-tab" role="tab" data-sidebar-tab="recipes" aria-label="Recipes" aria-controls="sidebar-panel-recipes" aria-selected="false" tabindex="-1" title="Recipes">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6c-2-1.5-5-2-9-1v15c4-1 7-.5 9 1 2-1.5 5-2 9-1V5c-4-1-7-.5-9 1Z"/><path d="M12 6v15"/></svg>
       </button>
     </nav>
     <div class="left-panels">
     <section id="sidebar-panel-project" role="tabpanel" aria-labelledby="sidebar-tab-project" data-sidebar-panel="project" tabindex="0">
-      <h2>Proyecto</h2>
-      <div class="project-resource-summary" aria-label="Consumo de memoria y recursos del proyecto"><strong>Resumen del proyecto</strong><p id="projectResourceSummary" role="status" aria-live="polite">Calculando…</p></div>
-      <label>Nombre<input id="projectName" value="WebHMI ST"></label>
-      <div class="grid2"><label>Puerto<input id="port" type="number" min="1024" max="65535" value="8080"></label><label>Polling ms<input id="pollMs" type="number" min="100" max="5000" value="500"></label></div>
-      <div class="grid2"><label>Ancho diseño<input id="screenW" type="number" min="320" max="3840" value="1024"></label><label>Alto diseño<input id="screenH" type="number" min="240" max="2160" value="600"></label></div>
-      <div class="grid2"><label>Ancho mín.<input id="minDisplayWidth" type="number" value="480"></label><label>Ancho máx.<input id="maxDisplayWidth" type="number" value="1920"></label></div>
-      <label>Teclado virtual<select id="keyboardMode"><option value="auto">Automático del dispositivo</option><option value="webhmi">Teclado WebHMI (táctil)</option><option value="off">Desactivado (teclado físico)</option></select></label>
-      <label>Control de pantalla desde PLC<select id="screenBinding"><option value="">— Navegación manual —</option></select></label>
-      <p class="hint">Opcional: variable entera del PLC en lectura. Su valor selecciona el número de pantalla; si no existe, se muestra la primera (principal). Con esta opción, la navegación queda bajo control del PLC.</p>
+      <h2>Project</h2>
+      <div class="project-resource-summary" aria-label="Project memory and resource use"><strong>Project overview</strong><p id="projectResourceSummary" role="status" aria-live="polite">Calculating…</p></div>
+      <label>Name<input id="projectName" value="WebHMI ST"></label>
+      <div class="grid2"><label>Port<input id="port" type="number" min="1024" max="65535" value="8080"></label><label>Polling ms<input id="pollMs" type="number" min="100" max="5000" value="500"></label></div>
+      <div class="grid2"><label>Design width<input id="screenW" type="number" min="320" max="3840" value="1024"></label><label>Design height<input id="screenH" type="number" min="240" max="2160" value="600"></label></div>
+      <div class="grid2"><label>Min. width<input id="minDisplayWidth" type="number" value="480"></label><label>Max. width<input id="maxDisplayWidth" type="number" value="1920"></label></div>
+      <label>Virtual keyboard<select id="keyboardMode"><option value="auto">Device default</option><option value="webhmi">WebHMI keyboard (touch)</option><option value="off">Disabled (physical keyboard)</option></select></label>
+      <label>PLC screen control<select id="screenBinding"><option value="">— Manual navigation —</option></select></label>
+      <p class="hint">Optional read-only integer PLC variable. Its value selects the screen number; if there is no match, the first (main) screen is shown. The PLC controls navigation when enabled.</p>
     </section>
     <section id="sidebar-panel-variables" role="tabpanel" aria-labelledby="sidebar-tab-variables" data-sidebar-panel="variables" tabindex="0" hidden>
       <h2>Variables Sysmac</h2>
-      <p class="hint">Importa CSV/TSV/TXT o pega la tabla de variables globales.</p>
-      <div class="row"><button id="importFileBtn">Archivo</button><button id="pasteBtn">Pegar tabla</button></div>
+      <p class="hint">Import CSV/TSV/TXT or paste the global variable table.</p>
+      <div class="row"><button id="importFileBtn">File</button><button id="pasteBtn">Paste table</button></div>
       <input id="varsFile" type="file" accept=".csv,.tsv,.txt,.st" hidden>
       <div id="varSummary" class="summary"></div>
-      <p class="hint">Importa tablas Sysmac o declaraciones ST con TYPE/STRUCT/UNION/ENUM y VAR_GLOBAL. Los ARRAY se expanden por índice (máx. 3 dimensiones). Selecciona hasta 32 miembros para comunicar con el PLC; el ZIP declara sus variables globales raíz.</p>
+      <p class="hint">Import Sysmac tables or ST declarations with TYPE/STRUCT/UNION/ENUM and VAR_GLOBAL. ARRAY members expand by index (up to 3 dimensions). Select up to 32 members for PLC communication; the ZIP declares their root global variables.</p>
       <div id="varList" class="var-list"></div>
-      <div class="section-title"><h2>Variables internas</h2><button id="addInternalVar">+ Interna</button></div>
+      <div class="section-title"><h2>Internal variables</h2><button id="addInternalVar">+ Internal</button></div>
       <div id="internalVarList"></div>
     </section>
     <section id="sidebar-panel-elements" role="tabpanel" aria-labelledby="sidebar-tab-elements" data-sidebar-panel="elements" tabindex="0" hidden>
-      <h2>Elementos</h2>
+      <h2>Elements</h2>
       <div class="tool-grid">
-        <button data-kind="text" title="Texto fijo o dinámico según sus propiedades">Texto</button><button data-kind="status">Estado</button>
-        <button data-kind="value">Valor</button><button data-kind="input">Entrada</button>
-        <button data-kind="button">Botón</button><button data-kind="bar">Barra</button>
-        <button data-kind="slider">Slider</button><button data-kind="switch">Interruptor</button>
-        <button data-kind="multistate">Multestado</button>
-        <button data-kind="gauge">Indicador</button><button data-kind="stepper">Ajuste +/−</button>
-        <button data-kind="counter">Contador</button><button data-kind="dropdown">Desplegable</button>
-        <button id="imageBtn">Imagen</button><button data-kind="tank">Depósito</button>
-        <button data-kind="shape" title="Añadir una figura geométrica: rectángulo, elipse, línea, flecha o triángulo. Elige su tipo en Propiedades.">Figuras</button>
+        <button data-kind="text" title="Static or dynamic text, according to its properties">Text</button><button data-kind="status">Status</button>
+        <button data-kind="value">Value</button><button data-kind="input">Input</button>
+        <button data-kind="button">Button</button><button data-kind="bar">Bar</button>
+        <button data-kind="slider">Slider</button><button data-kind="switch">Switch</button>
+        <button data-kind="multistate">Multistate</button>
+        <button data-kind="gauge">Gauge</button><button data-kind="stepper">Stepper +/−</button>
+        <button data-kind="counter">Counter</button><button data-kind="dropdown">Dropdown</button>
+        <button id="imageBtn">Image</button><button data-kind="tank">Tank</button>
+        <button data-kind="shape" title="Add a rectangle, ellipse, line, arrow, or triangle. Choose its type in Properties.">Shapes</button>
       </div>
       <input id="imageFile" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden>
-      <p class="hint"><strong>Imágenes:</strong> al subirlas se avisa antes de incrustarlas. Si superan el presupuesto, el editor las redimensiona y convierte a WebP automáticamente. Límites duros: 64 KB por imagen · 256 KB total · 512 KB HTML.</p>
+      <p class="hint"><strong>Images:</strong> the editor asks before embedding uploaded images. If they exceed the budget, it resizes and converts them to WebP automatically. Hard limits: 64 KB per image · 256 KB total · 512 KB HTML.</p>
     </section>
     <section id="sidebar-panel-alarms" role="tabpanel" aria-labelledby="sidebar-tab-alarms" data-sidebar-panel="alarms" tabindex="0" hidden>
-      <div class="section-title"><h2>Alarmas</h2><button id="addAlarm">+ Alarma</button></div>
+      <div class="section-title"><h2>Alarms</h2><button id="addAlarm">+ Alarm</button></div>
       <div id="alarmEditor"></div>
-      <p class="hint">Estado actual evaluado en PLC. Histórico/ACK persistente vendrá después.</p>
+      <p class="hint">Current state evaluated by the PLC. Persistent history and acknowledgement are planned.</p>
     </section>
     <section id="sidebar-panel-recipes" role="tabpanel" aria-labelledby="sidebar-tab-recipes" data-sidebar-panel="recipes" tabindex="0" hidden>
-      <div class="section-title"><h2>Recetas</h2><button id="addRecipe" type="button">+ Receta NX</button></div>
-      <label class="recipe-enable-option"><input type="checkbox" id="recipeEnabled"> Habilitar recetas (Retain del PLC)</label>
+      <div class="section-title"><h2>Recipes</h2><button id="addRecipe" type="button">+ NX Recipe</button></div>
+      <label class="recipe-enable-option"><input type="checkbox" id="recipeEnabled"> Enable recipes (PLC Retain memory)</label>
       <div id="recipeSettings" hidden>
         <div class="grid2">
-          <label>Número máximo de recetas (1–32)<input id="recipeSlots" type="number" min="1" max="32" step="1" value="12"></label>
-          <label>Bytes JSON por receta (64–500)<input id="recipeBytes" type="number" min="64" max="500" step="1" value="500"></label>
+          <label>Maximum recipes (1–32)<input id="recipeSlots" type="number" min="1" max="32" step="1" value="12"></label>
+          <label>JSON bytes per recipe (64–500)<input id="recipeBytes" type="number" min="64" max="500" step="1" value="500"></label>
         </div>
-        <p class="hint">Reserva Retain según el número y tamaño elegidos. Cada receta usa una cadena STRING del tamaño configurado más 12 caracteres de margen, una revisión UDINT y un indicador global de inicialización. La capacidad se comprueba al exportar y al guardar desde el navegador.</p>
-        <p class="hint"><strong>Antes de modificar la capacidad en un PLC instalado:</strong> exporta las recetas a JSON desde la HMI. Cambiar dimensiones de variables Retain o transferir otro programa puede reinicializar el banco. Las antiguas recetas guardadas solo en el navegador no se migran automáticamente: expórtalas desde el runtime anterior e impórtalas en el nuevo.</p>
-        <h3 class="sub-title">Recetas iniciales</h3>
+        <p class="hint">Reserve Retain memory according to the selected count and size. Each recipe uses a STRING of the configured size plus 12 spare characters, a UDINT revision, and a global initialization flag. Capacity is checked on export and when saving in the browser.</p>
+        <p class="hint"><strong>Before changing capacity on an installed PLC:</strong> export the recipes to JSON from the HMI. Changing Retain variable dimensions or transferring another program may reset the recipe bank. Older recipes stored only in the browser are not migrated automatically: export them from the previous runtime and import them into the new one.</p>
+        <h3 class="sub-title">Initial recipes</h3>
         <div id="recipeCapacitySummary" class="hint" role="status" aria-live="polite"></div>
         <div id="recipeEditor"></div>
-        <p class="hint">Todas las recetas se guardan en la memoria Retain del NX. El runtime permite crear, editar, aplicar y exportar copias JSON. Guardar una receta no cambia las consignas de máquina; para ello hay que pulsar Aplicar. Al deshabilitar las recetas, el generador no incluye su código ni sus variables.</p>
+        <p class="hint">All recipes are stored in NX Retain memory. The runtime can create, edit, apply, and export JSON copies. Saving a recipe does not change machine setpoints; press Apply to do that. When recipes are disabled, the generator omits their code and variables.</p>
       </div>
     </section>
     </div>
   </aside>
   <section class="center">
     <div class="canvas-head">
-      <strong>Pantalla</strong>
+      <strong>Screen</strong>
       <select id="screenSelect"></select>
-      <button id="editScreen" type="button" class="icon-button" aria-label="Editar pantalla" title="Editar nombre, número, fondo y uso de pantalla base">✎</button>
-      <button id="addScreen" title="Crear pantalla vacía">Nueva pantalla</button><button id="copyScreen" title="Duplicar la pantalla seleccionada con sus elementos y configuración">Copiar pantalla</button><button id="deleteScreen">Eliminar</button>
-      <span id="canvasInfo"></span><button id="previewBtn">Vista previa</button>
+      <button id="editScreen" type="button" class="icon-button" aria-label="Edit screen" title="Edit name, number, background, and base screen use">✎</button>
+      <button id="addScreen" title="Create an empty screen">New screen</button><button id="copyScreen" title="Duplicate the selected screen with its elements and settings">Copy screen</button><button id="deleteScreen">Delete</button>
+      <span id="canvasInfo"></span><button id="previewBtn">Preview</button>
     </div>
     <div class="canvas-wrap"><div id="canvas"></div></div>
   </section>
   <aside class="right">
-    <section><h2>Propiedades</h2><div id="properties" class="properties"><p class="hint">Selecciona un elemento.</p></div></section>
+    <section><h2>Properties</h2><div id="properties" class="properties"><p class="hint">Select an element.</p></div></section>
   </aside>
 </main>
-<dialog id="diagnosticsDialog" aria-label="Diagnóstico de exportación"><div class="diagnostics-panel"><div class="dialog-title"><h2>Diagnóstico de exportación Sysmac</h2><button type="button" id="closeDiagnostics" aria-label="Cerrar diagnóstico">✕</button></div><div id="diagnostics"></div><div class="dialog-actions"><button type="button" id="closeDiagnosticsBottom">Cerrar</button></div></div></dialog>
-<dialog id="liteDialog" aria-label="Exportación Extra Light"><div class="diagnostics-panel"><div class="dialog-title"><h2>WebHMI Extra Light</h2><button type="button" id="liteClose" aria-label="Cerrar">✕</button></div><p class="hint">Una pantalla; texto, valor INT/REAL, lámpara BOOL, pulsador SET/RESET, entrada numérica y barra. Sin recetas ni alarmas. El proyecto original nunca se modifica.</p><label class="lite-screen-label">Pantalla para preparar una copia compatible<select id="liteScreen"></select></label><p id="liteSummary" role="status"></p><div id="liteIssues" role="alert"></div><p class="hint">Si hay incompatibilidades, no se permite exportar directamente. Puedes descargar una <strong>copia adaptada</strong> que omitirá únicamente los elementos indicados; después ábrela, revísala y expórtala.</p><div class="dialog-actions lite-actions"><button type="button" id="liteCopy">Descargar copia adaptada</button><button type="button" id="litePreview">Vista previa Extra Light</button><button type="button" id="liteGenerate" class="primary">Exportar Extra Light</button></div></div></dialog>
-<dialog id="screenSettingsDialog"><form id="screenSettingsForm"><h2>Editar pantalla</h2><label>Nombre<input id="screenSettingsName" type="text" maxlength="80" required autocomplete="off"></label><label id="screenSettingsNumberRow">Número de pantalla<input id="screenSettingsNumber" type="number" min="1" max="65535" step="1" required></label><label>Color de fondo<input id="screenSettingsBackground" type="color" value="#ffffff"></label><div class="screen-mode-options"><label id="screenSettingsIsBaseRow" class="base-setting"><input id="screenSettingsIsBase" type="checkbox"> Convertir en pantalla base</label><label id="screenSettingsUseBaseRow" class="base-setting"><input id="screenSettingsUseBase" type="checkbox"> Utilizar pantalla base</label></div><p id="screenSettingsNote" class="hint">El número es único en el proyecto (1–65535). El PLC usa este número para elegir la pantalla, no su posición en el desplegable.</p><div id="screenSettingsError" class="error" role="alert"></div><div class="dialog-actions"><button id="screenSettingsCancel" type="button">Cancelar</button><button type="submit" class="primary">Guardar cambios</button></div></form></dialog>
-<dialog id="pasteDialog"><form method="dialog"><h2>Importar variables de Sysmac</h2><p class="hint">Acepta Name + Data Type de Sysmac o definiciones ST completas. Para estructuras, incluye TYPE ST_Motor : STRUCT ... END_STRUCT; END_TYPE y VAR_GLOBAL Motor : ST_Motor; END_VAR.</p><textarea id="pasteText" rows="16" placeholder="TYPE ST_Motor : STRUCT&#10;  Marcha : BOOL;&#10;  Consigna : REAL;&#10;END_STRUCT; END_TYPE&#10;VAR_GLOBAL&#10;  Motor1 : ST_Motor;&#10;END_VAR"></textarea><div id="pasteError" class="error"></div><div class="dialog-actions"><button value="cancel">Cancelar</button><button id="pasteImport" type="button" class="primary">Importar</button></div></form></dialog>
-<dialog id="previewDialog" aria-label="Vista previa de WebHMI"><div class="dialog-wide"><div class="dialog-title"><h2>Vista previa</h2><span class="hint">Arrastra la esquina inferior derecha para cambiar el tamaño</span><button id="closePreview" aria-label="Cerrar vista previa">✕</button></div><iframe id="previewFrame" title="Previsualización de la HMI"></iframe></div><div id="previewResizeHandle" role="separator" tabindex="0" aria-label="Redimensionar vista previa" aria-orientation="horizontal" title="Arrastra para redimensionar · Flechas para ajustar"></div></dialog>
-<dialog id="recoveryDialog"><div class="recovery-panel"><div class="dialog-title"><h2>Copias automáticas</h2><button id="closeRecovery">✕</button></div><p class="hint">Las copias se guardan sólo en este navegador. Recuperar sustituye el proyecto abierto, guardándolo antes como copia de seguridad.</p><div id="recoveryList"></div><div class="dialog-actions"><button id="discardDrafts" class="danger">Borrar copias locales</button><button id="closeRecovery2">Cerrar</button></div></div></dialog>
+<dialog id="diagnosticsDialog" aria-label="Export diagnostics"><div class="diagnostics-panel"><div class="dialog-title"><h2>Sysmac export diagnostics</h2><button type="button" id="closeDiagnostics" aria-label="Close diagnostics">✕</button></div><div id="diagnostics"></div><div class="dialog-actions"><button type="button" id="closeDiagnosticsBottom">Close</button></div></div></dialog>
+<dialog id="liteDialog" aria-label="Extra Light export"><div class="diagnostics-panel"><div class="dialog-title"><h2>WebHMI Extra Light</h2><button type="button" id="liteClose" aria-label="Close">✕</button></div><p class="hint">One screen; text, INT/REAL value, BOOL lamp, SET/RESET button, numeric input, and bar. No recipes or alarms. The original project is never changed.</p><label class="lite-screen-label">Screen for preparing a compatible copy<select id="liteScreen"></select></label><p id="liteSummary" role="status"></p><div id="liteIssues" role="alert"></div><p class="hint">If there are incompatibilities, direct export is blocked. Download an <strong>adapted copy</strong> that omits only the listed elements; then open, review, and export it.</p><div class="dialog-actions lite-actions"><button type="button" id="liteCopy">Download adapted copy</button><button type="button" id="litePreview">Preview Extra Light</button><button type="button" id="liteGenerate" class="primary">Export Extra Light</button></div></div></dialog>
+<dialog id="screenSettingsDialog"><form id="screenSettingsForm"><h2>Edit screen</h2><label>Name<input id="screenSettingsName" type="text" maxlength="80" required autocomplete="off"></label><label id="screenSettingsNumberRow">Screen number<input id="screenSettingsNumber" type="number" min="1" max="65535" step="1" required></label><label>Background color<input id="screenSettingsBackground" type="color" value="#ffffff"></label><div class="screen-mode-options"><label id="screenSettingsIsBaseRow" class="base-setting"><input id="screenSettingsIsBase" type="checkbox"> Make this the base screen</label><label id="screenSettingsUseBaseRow" class="base-setting"><input id="screenSettingsUseBase" type="checkbox"> Use the base screen</label></div><p id="screenSettingsNote" class="hint">The number must be unique in the project (1–65535). The PLC uses it to select the screen, regardless of its position in the dropdown.</p><div id="screenSettingsError" class="error" role="alert"></div><div class="dialog-actions"><button id="screenSettingsCancel" type="button">Cancel</button><button type="submit" class="primary">Save changes</button></div></form></dialog>
+<dialog id="pasteDialog"><form method="dialog"><h2>Import Sysmac variables</h2><p class="hint">Accepts Sysmac Name + Data Type tables or complete ST declarations. For structures, include TYPE ST_Motor : STRUCT ... END_STRUCT; END_TYPE and VAR_GLOBAL Motor : ST_Motor; END_VAR.</p><textarea id="pasteText" rows="16" placeholder="TYPE ST_Motor : STRUCT&#10;  Running : BOOL;&#10;  Setpoint : REAL;&#10;END_STRUCT; END_TYPE&#10;VAR_GLOBAL&#10;  Motor1 : ST_Motor;&#10;END_VAR"></textarea><div id="pasteError" class="error"></div><div class="dialog-actions"><button value="cancel">Cancel</button><button id="pasteImport" type="button" class="primary">Import</button></div></form></dialog>
+<dialog id="previewDialog" aria-label="Preview de WebHMI"><div class="dialog-wide"><div class="dialog-title"><h2>Preview</h2><span class="hint">Drag the bottom-right corner to resize</span><button id="closePreview" aria-label="Close preview">✕</button></div><iframe id="previewFrame" title="HMI preview"></iframe></div><div id="previewResizeHandle" role="separator" tabindex="0" aria-label="Resize preview" aria-orientation="horizontal" title="Drag to resize · Use arrow keys to adjust"></div></dialog>
+<dialog id="recoveryDialog"><div class="recovery-panel"><div class="dialog-title"><h2>Automatic backups</h2><button id="closeRecovery">✕</button></div><p class="hint">Backups are stored only in this browser. Recovery replaces the open project after backing it up.</p><div id="recoveryList"></div><div class="dialog-actions"><button id="discardDrafts" class="danger">Delete local backups</button><button id="closeRecovery2">Close</button></div></div></dialog>
 <input id="projectFile" type="file" accept=".json,.nxst" hidden>
-<div id="widgetMenu" class="widget-menu" role="menu" hidden><button type="button" role="menuitem" data-widget-action="copy">Copiar · Ctrl+C</button><button type="button" role="menuitem" data-widget-action="paste">Pegar · Ctrl+V</button><button type="button" role="menuitem" data-widget-action="front">Traer al frente</button><button type="button" role="menuitem" data-widget-action="back">Enviar al fondo</button><button type="button" role="menuitem" data-widget-action="delete" class="delete">Eliminar</button></div>
+<div id="widgetMenu" class="widget-menu" role="menu" hidden><button type="button" role="menuitem" data-widget-action="copy">Copy · Ctrl+C</button><button type="button" role="menuitem" data-widget-action="paste">Paste · Ctrl+V</button><button type="button" role="menuitem" data-widget-action="front">Bring to front</button><button type="button" role="menuitem" data-widget-action="back">Send to back</button><button type="button" role="menuitem" data-widget-action="delete" class="delete">Delete</button></div>
 <div id="toast"></div>
 </body>
 </html>

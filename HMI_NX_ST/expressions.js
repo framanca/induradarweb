@@ -5,35 +5,35 @@
 function evaluate(source, variables){
   const input=String(source||'').trim();
   if(!input)return undefined;
-  if(input.length>500)throw Error('Expresion demasiado larga (max. 500 caracteres)');
+  if(input.length>500)throw Error('Expression too long (max. 500 characters)');
   const tokens=[],rx=/\s*(?:([0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?|("(?:\\.|[^"\\])*")|([A-Za-z_][A-Za-z_0-9.]*)|(>=|<=|===|!==|==|!=|&&|\|\||[?:()+*\/!%<>-]))/gy;
   let i=0;
   while(i<input.length){
     if(/^\s+$/.test(input.slice(i)))break;
     rx.lastIndex=i;
     const match=rx.exec(input);
-    if(!match||rx.lastIndex===i)throw Error('Simbolo no permitido cerca de: '+input.slice(i,i+18));
+    if(!match||rx.lastIndex===i)throw Error('Disallowed symbol near: '+input.slice(i,i+18));
     tokens.push(match[1]!==undefined?{t:'number',v:Number(match[0].trim())}:match[2]?{t:'string',v:JSON.parse(match[2])}:match[3]?{t:'name',v:match[3]}:{t:'operator',v:match[4]});
-    if(tokens.length>160)throw Error('Expresion demasiado compleja');
+    if(tokens.length>160)throw Error('Expression too complex');
     i=rx.lastIndex;
   }
   const priority={'||':1,'&&':2,'==':3,'!=':3,'===':3,'!==':3,'>':4,'<':4,'>=':4,'<=':4,'+':5,'-':5,'*':6,'/':6,'%':6};
   let pos=0;
   const peek=()=>tokens[pos]&&tokens[pos].v;
-  const consume=x=>{if(peek()!==x)throw Error('Se esperaba '+x);pos++};
+  const consume=x=>{if(peek()!==x)throw Error('Expected '+x);pos++};
   function prefix(){
-    const t=tokens[pos++];if(!t)throw Error('Expresion incompleta');
+    const t=tokens[pos++];if(!t)throw Error('Incomplete expression');
     if(t.t==='number'||t.t==='string')return()=>t.v;
     if(t.t==='name'){
       if(t.v==='true'||t.v==='TRUE')return()=>true;
       if(t.v==='false'||t.v==='FALSE')return()=>false;
       if(t.v==='null')return()=>null;
-      if(['__proto__','constructor','prototype'].some(x=>t.v.split('.').includes(x)))throw Error('Identificador no permitido');
+      if(['__proto__','constructor','prototype'].some(x=>t.v.split('.').includes(x)))throw Error('Disallowed identifier');
       return()=>{const v=variables||{},key=t.v.startsWith('PLC.')?t.v.slice(4):t.v;return Object.prototype.hasOwnProperty.call(v,key)?v[key]:undefined};
     }
     if(t.v==='('){const f=expression(0);consume(')');return f}
     if(t.v==='!'||t.v==='-'||t.v==='+'){const f=prefix();return()=>t.v==='!'?!f():t.v==='-'?-Number(f()):Number(f())}
-    throw Error('Elemento inesperado: '+t.v);
+    throw Error('Unexpected element: '+t.v);
   }
   function expression(min){
     let left=prefix();
@@ -61,7 +61,7 @@ function evaluate(source, variables){
     return left;
   }
   const result=expression(0);
-  if(pos!==tokens.length)throw Error('Expresion incorrecta cerca de '+peek());
+  if(pos!==tokens.length)throw Error('Invalid expression near '+peek());
   return result();
 }
 function validate(source){try{evaluate(source,{});return ''}catch(e){return e.message}}

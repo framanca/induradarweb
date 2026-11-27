@@ -94,15 +94,15 @@ test('base widgets are validated and can navigate only to real screens', () => {
   project.baseScreen.objects.push({...C.newObject('button'), text:'Go', actionType:'navigate', targetScreenId:project.screens[1].id});
   assert.deepEqual(C.validate(project), []);
   project.baseScreen.objects.at(-1).targetScreenId = project.baseScreen.id;
-  assert.match(C.validate(project).join('\n'), /selecciona pantalla destino/);
+  assert.match(C.validate(project).join('\n'), /select a target screen/);
 });
 
 test('editor contains one base editor and per-screen layer toggle', () => {
   const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
   const app = fs.readFileSync(path.join(__dirname, '../app.js'), 'utf8');
   assert.doesNotMatch(html, /id="baseScreenBtn"/);
-  assert.match(html, /id="screenSettingsIsBase" type="checkbox"> Convertir en pantalla base/);
-  assert.match(html, /id="screenSettingsUseBase" type="checkbox"> Utilizar pantalla base/);
+  assert.match(html, /id="screenSettingsIsBase" type="checkbox"> Make this the base screen/);
+  assert.match(html, /id="screenSettingsUseBase" type="checkbox"> Use the base screen/);
   assert.match(app, /refreshScreenSettingsMode\('convert'\)/);
   assert.match(app, /refreshScreenSettingsMode\('use'\)/);
   assert.match(app, /function isBaseScreen\(\)/);
@@ -133,8 +133,8 @@ test('only one base can exist and no screen can use itself as base', () => {
  const project = C.newProject(),a=project.screens[0],b=C.newScreen('B',2);
  project.screens.push(b);
  C.setScreenMode(project,a.id,'base');
- assert.throws(()=>C.setScreenMode(project,b.id,'base'),/Ya hay una pantalla base/);
- assert.throws(()=>C.setScreenMode(project,a.id,'useBase'),/no puede heredarse/);
+ assert.throws(()=>C.setScreenMode(project,b.id,'base'),/A base screen already exists/);
+ assert.throws(()=>C.setScreenMode(project,a.id,'useBase'),/cannot inherit itself/);
  assert.equal(project.baseScreen.id,a.id);
  assert.equal(project.screens[0].id,b.id);
 });
@@ -173,7 +173,7 @@ test('explicit normal, base and inherited states retain unique numbers after und
 
 test('inheritance cannot activate without a base, and any screen can remain independent',()=>{
  const project=C.newProject(),s=project.screens[0];
- assert.throws(()=>C.setScreenMode(project,s.id,'useBase'),/Primero convierte/);
+ assert.throws(()=>C.setScreenMode(project,s.id,'useBase'),/First make/);
  C.setScreenMode(project,s.id,'normal');
  assert.equal(s.useBase,false);
 });

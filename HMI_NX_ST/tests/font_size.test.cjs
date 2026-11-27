@@ -43,14 +43,14 @@ test('font sizes outside the permitted 8-120px range block export',()=>{
  const p=C.demoProject(),o=p.screens[0].objects[0];
  for(const value of [7,121,20.4,'not-a-number']){
   o.fontSize=value;
-  assert.ok(C.validate(p).some(x=>x.includes('tamaño de letra')),String(value));
+  assert.ok(C.validate(p).some(x=>x.includes('font size')),String(value));
  }
  for(const valid of [8,12,48,120]){
   o.fontSize=valid;
-  assert.ok(!C.validate(p).some(x=>x.includes('tamaño de letra')),String(valid));
+  assert.ok(!C.validate(p).some(x=>x.includes('font size')),String(valid));
  }
  o.fontSize=null;
- assert.ok(!C.validate(p).some(x=>x.includes('tamaño de letra')));
+ assert.ok(!C.validate(p).some(x=>x.includes('font size')));
 });
 test('existing popup and screen base objects preserve font sizes',()=>{
  const p=C.demoProject(),base=C.newBaseScreen();

@@ -91,7 +91,7 @@ test('editor exposes color picker and accessible layer controls without raster a
  const app=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8');
  const index=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
  assert.match(app,/data-p="lampOnColor"/);
- assert.match(app,/Color de lámpara encendida/);
+ assert.match(app,/Lamp ON color/);
  assert.match(app,/id="layerSelect"/);
  assert.match(app,/function changeWidgetLayer\(where\)/);
  assert.match(app,/C\.moveWidgetLayer\(objects,selected,where\)/);

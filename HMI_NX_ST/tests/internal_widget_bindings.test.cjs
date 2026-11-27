@@ -47,22 +47,22 @@ test('internal BOOL image and local button feedback do not require exposing PLC 
 });
 test('wrong internal variable type is still rejected for status, numeric controls and selectors',()=>{
  const p=setup();const first=p.screens[0].objects[0];first.binding='Count_Local';
- assert.ok(C.validate(p).some(msg=>msg.includes('requiere BOOL')));
+ assert.ok(C.validate(p).some(msg=>msg.includes('requires BOOL')));
  first.binding='Run_Local';
  const slider=p.screens[0].objects.find(o=>o.kind==='slider');
  slider.binding='Title_Local';
- assert.ok(C.validate(p).some(msg=>msg.includes('requiere tipo numérico')));
+ assert.ok(C.validate(p).some(msg=>msg.includes('requires a numeric type')));
  slider.binding='Speed_Local';
  const selector=p.screens[0].objects.find(o=>o.kind==='selector');
  selector.binding='Speed_Local';
- assert.ok(C.validate(p).some(msg=>msg.includes('requiere variable entera')));
+ assert.ok(C.validate(p).some(msg=>msg.includes('requires an integer variable')));
 });
 test('PLC bindings still require RW while local write widgets are always locally writable',()=>{
  const p=setup();p.variables=[{id:1,name:'PLC_ReadOnly',type:'REAL',access:'R',expose:true,live:true,writeSupported:true}];
  const slider=p.screens[0].objects.find(o=>o.kind==='slider');
  assert.deepEqual(Array.from(C.validate(p)),[]);
  slider.binding='PLC_ReadOnly';
- assert.ok(C.validate(p).some(x=>x.includes('requiere variable RW')));
+ assert.ok(C.validate(p).some(x=>x.includes('requires an RW variable')));
  slider.binding='Speed_Local';
  assert.deepEqual(Array.from(C.validate(p)),[]);
 });
@@ -70,7 +70,7 @@ test('editor lists both namespaces and runtime switches/stepper use local values
  const editor=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8');
  const runtime=fs.readFileSync(path.join(__dirname,'..','runtime.js'),'utf8');
  assert.match(editor,/function opts\(value,filter=\(\)=>true,includeInternal=true\)/);
- assert.match(editor,/optgroup label="Variables internas"/);
+ assert.match(editor,/optgroup label="Internal variables"/);
  assert.match(editor,/opts\(o\.binding,BOOL\)/);
  assert.match(editor,/opts\(o\.feedbackBinding,BOOL\)/);
  assert.match(editor,/opts\(a\.binding,\(\)=>true,true\)/); // Alarm definitions also offer HMI internal variables.
