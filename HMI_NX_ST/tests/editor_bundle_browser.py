@@ -910,7 +910,7 @@ with sync_playwright() as pw:
     page.locator('[data-recipe-value="0"][data-name="Internal_1"]').press("Tab")
     assert "1 / 20 variables" in page.locator('[data-recipe-capacity="0"]').inner_text()
     assert "1 / 3" in page.locator("#recipeCapacitySummary").inner_text()
-    assert "180 bytes" in page.locator("#recipeCapacitySummary").inner_text()
+    assert "180 JSON bytes" in page.locator("#recipeCapacitySummary").inner_text()
     assert page.locator("#diagnostics .diagnostic.error").count() == 0
     page.locator("#previewBtn").click()
     recipe_frame.locator("#recipeOpen").click()
