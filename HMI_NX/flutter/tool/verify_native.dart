@@ -35,7 +35,7 @@ Future<void> runNativeChecks() async {
       store.setValue(latestKey, jsonEncode(snapshot('stale')), 0);
       throw StateError('A stale writer was accepted');
     } on StateError catch (error) {
-      check(error.message.toString().contains('Otra ventana'), 'stale writer rejected');
+      check(error.message.toString().contains('Another window'), 'stale writer rejected');
     }
     check(store.revision == originalRevision, 'stale write cannot advance revision');
     Directory('${directory.path}/workspace.json.pending').createSync();
