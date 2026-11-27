@@ -59,12 +59,12 @@ test('mapped text validates missing bindings and invalid label definitions',()=>
   const p=C.newProject(),o=C.newObject('text');
   o.optionsText='0=Parado\n1=Marcha';
   p.screens[0].objects.push(o);
-  assert.ok(C.validate(p).some(message=>message.includes('asocia una variable')));
+  assert.ok(C.validate(p).some(message=>message.includes('assign a variable')));
   p.internalVariables=[{name:'Estado',type:'BOOL',value:false}];
   o.binding='Estado';
   assert.equal(C.validate(p).length,0);
   o.optionsText='sin separador';
-  assert.ok(C.validate(p).some(message=>message.includes('valor=texto')));
+  assert.ok(C.validate(p).some(message=>message.includes('value=text')));
 });
 test('unified text accepts a PLC BOOL as dynamic source and does not require RW',()=>{
   const p=C.demoProject(),o=C.newObject('text');

@@ -5,35 +5,35 @@
 function evaluate(source, variables){
   const input=String(source||'').trim();
   if(!input)return undefined;
-  if(input.length>500)throw Error('Expresion demasiado larga (max. 500 caracteres)');
+  if(input.length>500)throw Error('Expression too long (max. 500 characters)');
   const tokens=[],rx=/\s*(?:([0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?|("(?:\\.|[^"\\])*")|([A-Za-z_][A-Za-z_0-9.]*)|(>=|<=|===|!==|==|!=|&&|\|\||[?:()+*\/!%<>-]))/gy;
   let i=0;
   while(i<input.length){
     if(/^\s+$/.test(input.slice(i)))break;
     rx.lastIndex=i;
     const match=rx.exec(input);
-    if(!match||rx.lastIndex===i)throw Error('Simbolo no permitido cerca de: '+input.slice(i,i+18));
+    if(!match||rx.lastIndex===i)throw Error('Disallowed symbol near: '+input.slice(i,i+18));
     tokens.push(match[1]!==undefined?{t:'number',v:Number(match[0].trim())}:match[2]?{t:'string',v:JSON.parse(match[2])}:match[3]?{t:'name',v:match[3]}:{t:'operator',v:match[4]});
-    if(tokens.length>160)throw Error('Expresion demasiado compleja');
+    if(tokens.length>160)throw Error('Expression too complex');
     i=rx.lastIndex;
   }
   const priority={'||':1,'&&':2,'==':3,'!=':3,'===':3,'!==':3,'>':4,'<':4,'>=':4,'<=':4,'+':5,'-':5,'*':6,'/':6,'%':6};
   let pos=0;
   const peek=()=>tokens[pos]&&tokens[pos].v;
-  const consume=x=>{if(peek()!==x)throw Error('Se esperaba '+x);pos++};
+  const consume=x=>{if(peek()!==x)throw Error('Expected '+x);pos++};
   function prefix(){
-    const t=tokens[pos++];if(!t)throw Error('Expresion incompleta');
+    const t=tokens[pos++];if(!t)throw Error('Incomplete expression');
     if(t.t==='number'||t.t==='string')return()=>t.v;
     if(t.t==='name'){
       if(t.v==='true'||t.v==='TRUE')return()=>true;
       if(t.v==='false'||t.v==='FALSE')return()=>false;
       if(t.v==='null')return()=>null;
-      if(['__proto__','constructor','prototype'].some(x=>t.v.split('.').includes(x)))throw Error('Identificador no permitido');
+      if(['__proto__','constructor','prototype'].some(x=>t.v.split('.').includes(x)))throw Error('Disallowed identifier');
       return()=>{const v=variables||{},key=t.v.startsWith('PLC.')?t.v.slice(4):t.v;return Object.prototype.hasOwnProperty.call(v,key)?v[key]:undefined};
     }
     if(t.v==='('){const f=expression(0);consume(')');return f}
     if(t.v==='!'||t.v==='-'||t.v==='+'){const f=prefix();return()=>t.v==='!'?!f():t.v==='-'?-Number(f()):Number(f())}
-    throw Error('Elemento inesperado: '+t.v);
+    throw Error('Unexpected element: '+t.v);
   }
   function expression(min){
     let left=prefix();
@@ -61,7 +61,7 @@ function evaluate(source, variables){
     return left;
   }
   const result=expression(0);
-  if(pos!==tokens.length)throw Error('Expresion incorrecta cerca de '+peek());
+  if(pos!==tokens.length)throw Error('Invalid expression near '+peek());
   return result();
 }
 function validate(source){try{evaluate(source,{});return ''}catch(e){return e.message}}
@@ -78,7 +78,7 @@ const BOOL_WIDGETS=new Set(['status']);
 const STATUS_SYMBOLS=new Set(['lamp','motor','pump','valve','conveyor','sensor']);
 
 const SHAPE_TYPES=new Set(['rect','ellipse','line','arrow','triangle']);
-const SHAPE_LABELS={rect:'Rectángulo / cuadrado',ellipse:'Elipse / círculo',line:'Línea',arrow:'Flecha',triangle:'Triángulo libre'};
+const SHAPE_LABELS={rect:'Rectangle / square',ellipse:'Ellipse / circle',line:'Line',arrow:'Arrow',triangle:'Free triangle'};
 function defaultShapePoints(type){return type==='triangle'?'50,5 95,95 5,95':type==='line'?'5,50 95,50':type==='arrow'?'5,50 88,50':''}
 function shapeCoordinates(type,points){
  const count=type==='triangle'?3:type==='line'||type==='arrow'?2:0;
@@ -124,7 +124,7 @@ function shapeSvg(type,fill,stroke,width,points){
 }
 
 const LEGACY_STATUS_KINDS=new Set(['lamp','motor','pump','valve','conveyor','sensor']);
-const STATUS_LABELS={lamp:'Lámpara',motor:'Motor',pump:'Bomba',valve:'Válvula',conveyor:'Cinta',sensor:'Sensor'};
+const STATUS_LABELS={lamp:'Lamp',motor:'Motor',pump:'Pump',valve:'Valve',conveyor:'Conveyor',sensor:'Sensor'};
 const WIDGET_FILL_DEFAULTS={tank:'#38bdf8',bar:'#16a34a',gauge:'#16a34a',counter:'#16a34a'};
 const IMAGE_MAX_BYTES=64*1024,IMAGE_TOTAL_MAX_BYTES=256*1024,HTML_MAX_BYTES=512*1024,IMAGE_OPTIMIZE_MAX_DIM=1024;
 const enc=new TextEncoder();
@@ -138,23 +138,23 @@ function typeInfo(raw){const s=String(raw||'').trim().toUpperCase().replace(/\s+
 function nameOK(n){return /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$/.test(String(n||''));}
 function parseDelimited(text){text=String(text||'').replace(/^\uFEFF/,'').trim();if(!text)return[];const first=text.split(/\r?\n/)[0],sep=first.includes('\t')?'\t':first.includes(';')?';':',';let rows=[],row=[],field='',quoted=false;for(let i=0;i<text.length;i++){const c=text[i];if(c==='"'){if(quoted&&text[i+1]==='"'){field+='"';i++;}else quoted=!quoted;}else if(c===sep&&!quoted){row.push(field.trim());field='';}else if((c==='\n'||c==='\r')&&!quoted){if(c==='\r'&&text[i+1]==='\n')i++;row.push(field.trim());if(row.some(Boolean))rows.push(row);row=[];field='';}else field+=c;}row.push(field.trim());if(row.some(Boolean))rows.push(row);return rows;}
 function parseST(text){const out=[];for(const line of String(text||'').split(/\r?\n/)){const clean=line.replace(/\(\*.*?\*\)/g,'').replace(/\/\/.*$/,'').trim();const m=clean.match(/^([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*:\s*([A-Za-z][A-Za-z0-9_]*(?:\s*[\[(]\s*\d+\s*[\])])?)/);if(m){const t=typeInfo(m[2]);out.push({name:m[1],type:t.type,stringLength:t.length,comment:'',sourceType:t.raw});}}return out;}
-function importSysmac(text){const trimmed=String(text||'').trim();if(!trimmed)throw new Error('No hay contenido para importar.');let raw=[];if(/^\s*[A-Za-z_][A-Za-z0-9_.]*\s*:\s*[A-Za-z]/m.test(trimmed)&&!/^(?:Name|Nombre|Variable)[\t;,]/i.test(trimmed))raw=parseST(trimmed);const rows=parseDelimited(trimmed),norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\s_.\-/]/g,'');if(!raw.length&&rows.length){const h=rows[0].map(norm),ni=h.findIndex(x=>['name','nombre','variablename','variable','symbol','simbolo'].includes(x)),ti=h.findIndex(x=>['datatype','type','tipo','tipodedatos','datatypeofvariable'].includes(x)),ci=h.findIndex(x=>['comment','comments','comentario','description','descripcion'].includes(x));if(ni>=0&&ti>=0){for(const row of rows.slice(1)){if(!row[ni])continue;const t=typeInfo(row[ti]);raw.push({name:row[ni],type:t.type,stringLength:t.length,comment:row[ci]||''});}}else if(rows[0].length>=2&&!trimmed.includes(':=')){for(const row of rows){const t=typeInfo(row[1]);raw.push({name:row[0],type:t.type,stringLength:t.length,comment:row[2]||''});}}}if(!raw.length)raw=parseST(trimmed);if(!raw.length)throw new Error('No se reconocen variables. Usa Name/Nombre + Data Type/Tipo, o declaraciones ST simples.');const seen=new Set(),errors=[],vars=[];for(const r of raw){if(!nameOK(r.name)){errors.push('Nombre no compatible: '+r.name);continue;}if(seen.has(r.name)){errors.push('Duplicada: '+r.name);continue;}seen.add(r.name);const live=LIVE_TYPES.has(r.type),stringLength=r.stringLength||255;vars.push({id:vars.length+1,name:r.name,type:r.type,stringLength,comment:r.comment||'',access:'R',expose:live,live,writeSupported:WRITE_TYPES.has(r.type)&&(r.type!=='STRING'||stringLength<=512)});}if(errors.length)throw new Error(errors.slice(0,12).join('\n'));return vars;}
-function newScreen(name='Principal',number=null){return{id:id(),name,number,background:'#ffffff',useBase:false,objects:[]};}
-function newBaseScreen(){return newScreen('Pantalla base',null);}
+function importSysmac(text){const trimmed=String(text||'').trim();if(!trimmed)throw new Error('There is no content to import.');let raw=[];if(/^\s*[A-Za-z_][A-Za-z0-9_.]*\s*:\s*[A-Za-z]/m.test(trimmed)&&!/^(?:Name|Nombre|Variable)[\t;,]/i.test(trimmed))raw=parseST(trimmed);const rows=parseDelimited(trimmed),norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\s_.\-/]/g,'');if(!raw.length&&rows.length){const h=rows[0].map(norm),ni=h.findIndex(x=>['name','nombre','variablename','variable','symbol','simbolo'].includes(x)),ti=h.findIndex(x=>['datatype','type','tipo','tipodedatos','datatypeofvariable'].includes(x)),ci=h.findIndex(x=>['comment','comments','comentario','description','descripcion'].includes(x));if(ni>=0&&ti>=0){for(const row of rows.slice(1)){if(!row[ni])continue;const t=typeInfo(row[ti]);raw.push({name:row[ni],type:t.type,stringLength:t.length,comment:row[ci]||''});}}else if(rows[0].length>=2&&!trimmed.includes(':=')){for(const row of rows){const t=typeInfo(row[1]);raw.push({name:row[0],type:t.type,stringLength:t.length,comment:row[2]||''});}}}if(!raw.length)raw=parseST(trimmed);if(!raw.length)throw new Error('No variables recognized. Use Name + Data Type columns or simple ST declarations.');const seen=new Set(),errors=[],vars=[];for(const r of raw){if(!nameOK(r.name)){errors.push('Invalid variable name: '+r.name);continue;}if(seen.has(r.name)){errors.push('Duplicate: '+r.name);continue;}seen.add(r.name);const live=LIVE_TYPES.has(r.type),stringLength=r.stringLength||255;vars.push({id:vars.length+1,name:r.name,type:r.type,stringLength,comment:r.comment||'',access:'R',expose:live,live,writeSupported:WRITE_TYPES.has(r.type)&&(r.type!=='STRING'||stringLength<=512)});}if(errors.length)throw new Error(errors.slice(0,12).join('\n'));return vars;}
+function newScreen(name='Main',number=null){return{id:id(),name,number,background:'#ffffff',useBase:false,objects:[]};}
+function newBaseScreen(){return newScreen('Base screen',null);}
 function screenObjects(project,screen){return project.baseScreen&&screen!==project.baseScreen&&screen.useBase?[...project.baseScreen.objects,...screen.objects]:screen.objects;}
 function moveWidgetLayer(objects,id,where){if(!Array.isArray(objects)||!['front','back'].includes(where))return false;const index=objects.findIndex(o=>o.id===id);if(index<0||where==='front'&&index===objects.length-1||where==='back'&&index===0)return false;const [item]=objects.splice(index,1);if(where==='front')objects.push(item);else objects.unshift(item);return true;}
 function setScreenMode(project,screenId,mode){
- if(!['normal','base','useBase'].includes(mode))throw new Error('Tipo de pantalla desconocido.');
+ if(!['normal','base','useBase'].includes(mode))throw new Error('Unknown screen type.');
  const base=project.baseScreen&&project.baseScreen.id===screenId;
  const screen=base?project.baseScreen:project.screens.find(s=>s.id===screenId);
- if(!screen)throw new Error('Pantalla no encontrada.');
+ if(!screen)throw new Error('Screen not found.');
  if(mode==='base'){
   if(base)return screen;
-  if(project.baseScreen)throw new Error('Ya hay una pantalla base. Desmarca primero su propiedad.');
+  if(project.baseScreen)throw new Error('A base screen already exists. Uncheck it first.');
   const originalIndex=project.screens.indexOf(screen);
   project.screens.splice(originalIndex,1);
   if(!project.screens.length){
-   const name=screen.name.toLowerCase()==='principal'?'Pantalla principal':'Principal';
+   const name=screen.name.toLowerCase()==='principal'?'Main screen':'Main';
    project.screens.push(newScreen(name,nextScreenNumber([screen])));
   }
   screen.previousNumber=screen.number;
@@ -169,7 +169,7 @@ function setScreenMode(project,screenId,mode){
   return screen;
  }
  if(base){
-  if(mode==='useBase')throw new Error('Una pantalla base no puede heredarse a sí misma.');
+  if(mode==='useBase')throw new Error('A base screen cannot inherit itself.');
   project.baseScreen=null;
   const desired=Number(screen.previousNumber);
   screen.number=Number.isInteger(desired)&&desired>=1&&desired<=MAX_SCREEN_NUMBER&&!project.screens.some(s=>s.number===desired)
@@ -182,13 +182,13 @@ function setScreenMode(project,screenId,mode){
   for(const s of project.screens)s.useBase=false;
   return screen;
  }
- if(mode==='useBase'&&!project.baseScreen)throw new Error('Primero convierte una pantalla en pantalla base.');
+ if(mode==='useBase'&&!project.baseScreen)throw new Error('First make a screen the base screen.');
  screen.useBase=mode==='useBase';
  return screen;
 }
-function nextScreenNumber(screens){const used=new Set(screens.map(s=>Number(s.number)));for(let n=1;n<=MAX_SCREEN_NUMBER;n++)if(!used.has(n))return n;throw new Error('No quedan números de pantalla disponibles.');}
+function nextScreenNumber(screens){const used=new Set(screens.map(s=>Number(s.number)));for(let n=1;n<=MAX_SCREEN_NUMBER;n++)if(!used.has(n))return n;throw new Error('No screen numbers are available.');}
 function duplicateScreen(original,name,number=null){const clone=copy(original);clone.id=id();clone.name=name;clone.number=number;clone.objects=(clone.objects||[]).map(o=>({...o,id:id(),targetScreenId:o.actionType==='navigate'&&o.targetScreenId===original.id?clone.id:o.targetScreenId}));return clone;}
-function newProject(){return{name:'WebHMI ST',port:8080,pollMs:500,keyboardMode:'auto',width:1024,height:600,minDisplayWidth:480,maxDisplayWidth:1920,screenBinding:'',variables:[],internalVariables:[],screens:[newScreen('Principal',1)],baseScreen:null,assets:[],alarms:[],recipes:[],recipeEnabled:false,recipeSlots:12,recipeBytes:500,recipeVariables:[],recipeKey:id()};}
+function newProject(){return{name:'WebHMI ST',port:8080,pollMs:500,keyboardMode:'auto',width:1024,height:600,minDisplayWidth:480,maxDisplayWidth:1920,screenBinding:'',variables:[],internalVariables:[],screens:[newScreen('Main',1)],baseScreen:null,assets:[],alarms:[],recipes:[],recipeEnabled:false,recipeSlots:12,recipeBytes:500,recipeVariables:[],recipeKey:id()};}
 function normalize(input){const p=copy(input||newProject());p.minDisplayWidth=Number(p.minDisplayWidth??480);p.maxDisplayWidth=Number(p.maxDisplayWidth??1920);p.screenBinding=typeof p.screenBinding==='string'?p.screenBinding:'';p.keyboardMode=['auto','webhmi','off'].includes(p.keyboardMode)?p.keyboardMode:'auto';p.baseScreen=p.baseScreen&&typeof p.baseScreen==='object'&&!Array.isArray(p.baseScreen)?p.baseScreen:null;p.variables=Array.isArray(p.variables)?p.variables:[];for(const v of p.variables){const t=typeInfo(v.type);v.type=t.type;v.stringLength=Number(v.stringLength||t.length||255);v.live=LIVE_TYPES.has(v.type);v.writeSupported=WRITE_TYPES.has(v.type)&&(v.type!=='STRING'||v.stringLength<=512);if(v.access!=='R'&&v.access!=='RW')v.access='R';if(typeof v.expose!=='boolean')v.expose=v.live;}p.internalVariables=Array.isArray(p.internalVariables)?p.internalVariables:[];for(const v of p.internalVariables){v.name=String(v.name||'').trim();v.type=['BOOL','INT','REAL','STRING'].includes(v.type)?v.type:'BOOL';v.value=v.value??(v.type==='BOOL'?false:v.type==='STRING'?'':0);}p.assets=Array.isArray(p.assets)?p.assets:[];p.alarms=Array.isArray(p.alarms)?p.alarms:[];p.recipes=Array.isArray(p.recipes)?p.recipes:[];
 p.recipeEnabled=typeof p.recipeEnabled==='boolean'?p.recipeEnabled:p.recipes.length>0;
 p.recipeSlots=p.recipeSlots===undefined?12:Number(p.recipeSlots);
@@ -204,26 +204,26 @@ for(const name of new Set([...oldRecipeNames,...p.recipeVariables])){
  if(v&&v.live&&v.access==='RW'&&v.writeSupported)v.expose=true;
 }
 for(const r of p.recipes){r.id=typeof r.id==='string'&&r.id?r.id:id();r.name=String(r.name||'');r.values=r.values&&typeof r.values==='object'&&!Array.isArray(r.values)?r.values:{};r.scope='shared';}
-if(!Array.isArray(p.screens)||!p.screens.length){p.screens=[{id:id(),name:'Principal',objects:Array.isArray(p.objects)?p.objects:[]}];delete p.objects;}const occupied=new Set(p.screens.filter(s=>s.number!==null&&s.number!==undefined&&Number.isInteger(Number(s.number))&&Number(s.number)>=1&&Number(s.number)<=MAX_SCREEN_NUMBER).map(s=>Number(s.number)));let nextNumber=1;for(const s of [...p.screens,...(p.baseScreen?[p.baseScreen]:[])]){const isBase=s===p.baseScreen;s.id=s.id||id();s.name=s.name||(isBase?'Pantalla base':'Pantalla');s.useBase=!isBase&&s.useBase===true;if(isBase)s.number=null;else if(s.number===null||s.number===undefined){while(occupied.has(nextNumber))nextNumber++;s.number=nextNumber;occupied.add(nextNumber);}else s.number=Number(s.number);s.background=/^#[0-9a-f]{6}$/i.test(s.background||'')?s.background:'#ffffff';s.objects=Array.isArray(s.objects)?s.objects:[];for(const o of s.objects){if(LEGACY_STATUS_KINDS.has(o.kind)){o.symbolType=o.kind;o.kind='status';}
+if(!Array.isArray(p.screens)||!p.screens.length){p.screens=[{id:id(),name:'Main',objects:Array.isArray(p.objects)?p.objects:[]}];delete p.objects;}const occupied=new Set(p.screens.filter(s=>s.number!==null&&s.number!==undefined&&Number.isInteger(Number(s.number))&&Number(s.number)>=1&&Number(s.number)<=MAX_SCREEN_NUMBER).map(s=>Number(s.number)));let nextNumber=1;for(const s of [...p.screens,...(p.baseScreen?[p.baseScreen]:[])]){const isBase=s===p.baseScreen;s.id=s.id||id();s.name=s.name||(isBase?'Base screen':'Screen');s.useBase=!isBase&&s.useBase===true;if(isBase)s.number=null;else if(s.number===null||s.number===undefined){while(occupied.has(nextNumber))nextNumber++;s.number=nextNumber;occupied.add(nextNumber);}else s.number=Number(s.number);s.background=/^#[0-9a-f]{6}$/i.test(s.background||'')?s.background:'#ffffff';s.objects=Array.isArray(s.objects)?s.objects:[];for(const o of s.objects){if(LEGACY_STATUS_KINDS.has(o.kind)){o.symbolType=o.kind;o.kind='status';}
 if(o.kind==='dynamicText')o.kind='text';
-if(o.kind==='text'&&!o.binding&&o.optionsText==='0=Paro\n1=Manual\n2=Automático')o.optionsText='';
+if(o.kind==='text'&&!o.binding&&(o.optionsText==='0=Paro\n1=Manual\n2=Automático'||o.optionsText==='0=Stopped\n1=Manual\n2=Automatic'))o.optionsText='';
 o.autoWidth=o.kind==='text'&&o.autoWidth===true; // Legacy text objects retain their saved manual widths.
-if(WIDGET_FILL_DEFAULTS[o.kind])o.fillColor=/^#[0-9a-f]{6}$/i.test(o.fillColor||'')?o.fillColor:WIDGET_FILL_DEFAULTS[o.kind];o.symbolType=STATUS_SYMBOLS.has(o.symbolType)?o.symbolType:'lamp';o.stateOnWhen=o.stateOnWhen==='false'?'false':'true';if(o.kind==='status')o.lampOnColor=/^#[0-9a-f]{6}$/i.test(o.lampOnColor||'')?o.lampOnColor:'#86efac';o.assetOnId=o.assetOnId||'';o.actionType=o.actionType||'write';o.targetScreenId=o.targetScreenId||'';o.confirmationText=typeof o.confirmationText==='string'?o.confirmationText:'';for(const key of ['expressionText','expressionColor','expressionBackground','expressionVisible'])o[key]=typeof o[key]==='string'?o[key]:'';o.actionMode=o.actionMode||'set';o.feedbackBinding=o.feedbackBinding||'';o.feedbackColorOff=/^#[0-9a-f]{6}$/i.test(o.feedbackColorOff||'')?o.feedbackColorOff:'#2563eb';o.feedbackColorOn=/^#[0-9a-f]{6}$/i.test(o.feedbackColorOn||'')?o.feedbackColorOn:'#16a34a';if(o.kind==='button'){o.feedbackTextOff=typeof o.feedbackTextOff==='string'?o.feedbackTextOff:'';o.feedbackTextOn=typeof o.feedbackTextOn==='string'?o.feedbackTextOn:'';}if(o.kind==='shape'){o.shapeType=SHAPE_TYPES.has(o.shapeType)?o.shapeType:'rect';o.shapeFill=typeof o.shapeFill==='string'?o.shapeFill:'#bfdbfe';o.shapeStroke=typeof o.shapeStroke==='string'?o.shapeStroke:'#1e40af';o.shapeStrokeWidth=o.shapeStrokeWidth===undefined?3:Number(o.shapeStrokeWidth);o.shapePoints=typeof o.shapePoints==='string'?o.shapePoints:defaultShapePoints(o.shapeType);}o.fontSize=o.fontSize===null||o.fontSize===undefined||o.fontSize===''?null:Number(o.fontSize);o.decimals=Number.isInteger(Number(o.decimals))?Number(o.decimals):2;o.inputMin=optionalNumber(o.inputMin);o.inputMax=optionalNumber(o.inputMax);o.min=Number.isFinite(Number(o.min))?Number(o.min):0;o.max=Number.isFinite(Number(o.max))?Number(o.max):100;o.step=Number.isFinite(Number(o.step))&&Number(o.step)>0?Number(o.step):1;o.optionsText=typeof o.optionsText==='string'?o.optionsText:'0=Paro\n1=Manual\n2=Automático';o.unit=typeof o.unit==='string'?o.unit:'';o.target=Number.isFinite(Number(o.target))?Number(o.target):100;}}return p;}
-function newObject(kind){if(kind==='dynamicText')kind='text';const base={id:id(),kind,x:40,y:40,w:150,h:50,text:'',binding:'',assetId:'',assetOnId:'',symbolType:'lamp',stateOnWhen:'true',actionType:'write',targetScreenId:'',confirmationText:'',expressionText:'',expressionColor:'',expressionBackground:'',expressionVisible:'',actionMode:'set',feedbackBinding:'',feedbackColorOff:'#2563eb',feedbackColorOn:'#16a34a',fontSize:null,decimals:2,inputMin:null,inputMax:null,min:0,max:100,step:1,optionsText:'0=Paro\n1=Manual\n2=Automático',unit:'',target:100};const m={text:{w:220,h:40,text:'Texto',optionsText:'',autoWidth:true},status:{w:110,h:100,text:'Estado',lampOnColor:'#86efac'},value:{w:160,h:50,text:'Valor'},input:{w:210,h:55,text:'Entrada'},button:{w:170,h:58,text:'Botón',feedbackTextOff:'',feedbackTextOn:''},bar:{w:240,h:36,text:'Barra'},image:{w:240,h:160,text:'Imagen'},shape:{w:170,h:110,text:'Figura',shapeType:'rect',shapeFill:'#bfdbfe',shapeStroke:'#1e40af',shapeStrokeWidth:3,shapePoints:''},tank:{w:140,h:190,text:'Depósito'},slider:{w:300,h:90,text:'Consigna'},switch:{w:160,h:65,text:'Activar'},selector:{w:320,h:95,text:'Modo'},multistate:{w:200,h:70,text:'Estado'},gauge:{w:170,h:170,text:'Indicador'},stepper:{w:230,h:75,text:'Ajuste'},counter:{w:220,h:95,text:'Producción'},dropdown:{w:220,h:70,text:'Selección'}};return Object.assign(base,m[kind]||{},WIDGET_FILL_DEFAULTS[kind]?{fillColor:WIDGET_FILL_DEFAULTS[kind]}:{});}
-function demoProject(){const p=newProject();p.name='Demo NX ST';p.variables=[{id:1,name:'Machine_Running',type:'BOOL',stringLength:255,comment:'Máquina en marcha',access:'RW',expose:true,live:true,writeSupported:true},{id:2,name:'Process_Setpoint',type:'REAL',stringLength:255,comment:'Consigna',access:'RW',expose:true,live:true,writeSupported:true},{id:3,name:'Process_Level',type:'REAL',stringLength:255,comment:'Nivel',access:'R',expose:true,live:true,writeSupported:true},{id:4,name:'Start_Request',type:'BOOL',stringLength:255,comment:'Solicitud marcha',access:'RW',expose:true,live:true,writeSupported:true}];const s=p.screens[0];s.objects=[Object.assign(newObject('text'),{x:30,y:24,text:'HMI NX · servidor ST embebido'}),Object.assign(newObject('status'),{x:40,y:100,binding:'Machine_Running',symbolType:'motor',text:'Motor'}),Object.assign(newObject('value'),{x:200,y:105,text:'Nivel',binding:'Process_Level'}),Object.assign(newObject('tank'),{x:430,y:90,binding:'Process_Level'}),Object.assign(newObject('input'),{x:200,y:190,text:'Consigna',binding:'Process_Setpoint'}),Object.assign(newObject('button'),{x:40,y:270,text:'Marcha SET',binding:'Start_Request',actionMode:'set'})];p.alarms=[{id:id(),name:'Nivel alto',binding:'Process_Level',operator:'gt',value:90,severity:'high'}];p.recipes=[{id:id(),name:'Producción 50',scope:'shared',values:{Process_Setpoint:50}}];p.recipeEnabled=true;return p;}
+if(WIDGET_FILL_DEFAULTS[o.kind])o.fillColor=/^#[0-9a-f]{6}$/i.test(o.fillColor||'')?o.fillColor:WIDGET_FILL_DEFAULTS[o.kind];o.symbolType=STATUS_SYMBOLS.has(o.symbolType)?o.symbolType:'lamp';o.stateOnWhen=o.stateOnWhen==='false'?'false':'true';if(o.kind==='status')o.lampOnColor=/^#[0-9a-f]{6}$/i.test(o.lampOnColor||'')?o.lampOnColor:'#86efac';o.assetOnId=o.assetOnId||'';o.actionType=o.actionType||'write';o.targetScreenId=o.targetScreenId||'';o.confirmationText=typeof o.confirmationText==='string'?o.confirmationText:'';for(const key of ['expressionText','expressionColor','expressionBackground','expressionVisible'])o[key]=typeof o[key]==='string'?o[key]:'';o.actionMode=o.actionMode||'set';o.feedbackBinding=o.feedbackBinding||'';o.feedbackColorOff=/^#[0-9a-f]{6}$/i.test(o.feedbackColorOff||'')?o.feedbackColorOff:'#2563eb';o.feedbackColorOn=/^#[0-9a-f]{6}$/i.test(o.feedbackColorOn||'')?o.feedbackColorOn:'#16a34a';if(o.kind==='button'){o.feedbackTextOff=typeof o.feedbackTextOff==='string'?o.feedbackTextOff:'';o.feedbackTextOn=typeof o.feedbackTextOn==='string'?o.feedbackTextOn:'';}if(o.kind==='shape'){o.shapeType=SHAPE_TYPES.has(o.shapeType)?o.shapeType:'rect';o.shapeFill=typeof o.shapeFill==='string'?o.shapeFill:'#bfdbfe';o.shapeStroke=typeof o.shapeStroke==='string'?o.shapeStroke:'#1e40af';o.shapeStrokeWidth=o.shapeStrokeWidth===undefined?3:Number(o.shapeStrokeWidth);o.shapePoints=typeof o.shapePoints==='string'?o.shapePoints:defaultShapePoints(o.shapeType);}o.fontSize=o.fontSize===null||o.fontSize===undefined||o.fontSize===''?null:Number(o.fontSize);o.decimals=Number.isInteger(Number(o.decimals))?Number(o.decimals):2;o.inputMin=optionalNumber(o.inputMin);o.inputMax=optionalNumber(o.inputMax);o.min=Number.isFinite(Number(o.min))?Number(o.min):0;o.max=Number.isFinite(Number(o.max))?Number(o.max):100;o.step=Number.isFinite(Number(o.step))&&Number(o.step)>0?Number(o.step):1;o.optionsText=typeof o.optionsText==='string'?o.optionsText:'0=Stopped\n1=Manual\n2=Automatic';o.unit=typeof o.unit==='string'?o.unit:'';o.target=Number.isFinite(Number(o.target))?Number(o.target):100;}}return p;}
+function newObject(kind){if(kind==='dynamicText')kind='text';const base={id:id(),kind,x:40,y:40,w:150,h:50,text:'',binding:'',assetId:'',assetOnId:'',symbolType:'lamp',stateOnWhen:'true',actionType:'write',targetScreenId:'',confirmationText:'',expressionText:'',expressionColor:'',expressionBackground:'',expressionVisible:'',actionMode:'set',feedbackBinding:'',feedbackColorOff:'#2563eb',feedbackColorOn:'#16a34a',fontSize:null,decimals:2,inputMin:null,inputMax:null,min:0,max:100,step:1,optionsText:'0=Stopped\n1=Manual\n2=Automatic',unit:'',target:100};const m={text:{w:220,h:40,text:'Text',optionsText:'',autoWidth:true},status:{w:110,h:100,text:'Status',lampOnColor:'#86efac'},value:{w:160,h:50,text:'Value'},input:{w:210,h:55,text:'Input'},button:{w:170,h:58,text:'Button',feedbackTextOff:'',feedbackTextOn:''},bar:{w:240,h:36,text:'Bar'},image:{w:240,h:160,text:'Image'},shape:{w:170,h:110,text:'Shape',shapeType:'rect',shapeFill:'#bfdbfe',shapeStroke:'#1e40af',shapeStrokeWidth:3,shapePoints:''},tank:{w:140,h:190,text:'Tank'},slider:{w:300,h:90,text:'Setpoint'},switch:{w:160,h:65,text:'Enable'},selector:{w:320,h:95,text:'Mode'},multistate:{w:200,h:70,text:'Status'},gauge:{w:170,h:170,text:'Gauge'},stepper:{w:230,h:75,text:'Adjustment'},counter:{w:220,h:95,text:'Production'},dropdown:{w:220,h:70,text:'Selection'}};return Object.assign(base,m[kind]||{},WIDGET_FILL_DEFAULTS[kind]?{fillColor:WIDGET_FILL_DEFAULTS[kind]}:{});}
+function demoProject(){const p=newProject();p.name='Demo NX ST';p.variables=[{id:1,name:'Machine_Running',type:'BOOL',stringLength:255,comment:'Machine running',access:'RW',expose:true,live:true,writeSupported:true},{id:2,name:'Process_Setpoint',type:'REAL',stringLength:255,comment:'Setpoint',access:'RW',expose:true,live:true,writeSupported:true},{id:3,name:'Process_Level',type:'REAL',stringLength:255,comment:'Level',access:'R',expose:true,live:true,writeSupported:true},{id:4,name:'Start_Request',type:'BOOL',stringLength:255,comment:'Start request',access:'RW',expose:true,live:true,writeSupported:true}];const s=p.screens[0];s.objects=[Object.assign(newObject('text'),{x:30,y:24,text:'HMI NX · embedded ST server'}),Object.assign(newObject('status'),{x:40,y:100,binding:'Machine_Running',symbolType:'motor',text:'Motor'}),Object.assign(newObject('value'),{x:200,y:105,text:'Level',binding:'Process_Level'}),Object.assign(newObject('tank'),{x:430,y:90,binding:'Process_Level'}),Object.assign(newObject('input'),{x:200,y:190,text:'Setpoint',binding:'Process_Setpoint'}),Object.assign(newObject('button'),{x:40,y:270,text:'Start SET',binding:'Start_Request',actionMode:'set'})];p.alarms=[{id:id(),name:'High level',binding:'Process_Level',operator:'gt',value:90,severity:'high'}];p.recipes=[{id:id(),name:'Production 50',scope:'shared',values:{Process_Setpoint:50}}];p.recipeEnabled=true;return p;}
 function variableMap(p){return new Map(p.variables.map(v=>[v.name,v]));}
-function typedFor(v,value){if(v.type==='BOOL'){if(value===true||value===false)return value;if(String(value).toLowerCase()==='true'||String(value)==='1')return true;if(String(value).toLowerCase()==='false'||String(value)==='0')return false;throw new Error('BOOL inválido');}if(NUMERIC_TYPES.has(v.type)){const n=Number(value);if(!Number.isFinite(n))throw new Error('Número inválido');return n;}return String(value);}
+function typedFor(v,value){if(v.type==='BOOL'){if(value===true||value===false)return value;if(String(value).toLowerCase()==='true'||String(value)==='1')return true;if(String(value).toLowerCase()==='false'||String(value)==='0')return false;throw new Error('Invalid BOOL');}if(NUMERIC_TYPES.has(v.type)){const n=Number(value);if(!Number.isFinite(n))throw new Error('Invalid number');return n;}return String(value);}
 const RECIPE_SHARED_MAX=12,RECIPE_LOCAL_MAX=24,RECIPE_BYTES_MAX=500;
 function recipeWireJSON(r){return JSON.stringify({id:r.id,name:r.name,values:r.values||{}}).replace(/[^\x00-\x7F]/g,c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0'));}
 function recipeDefaultValue(v){return v.type==='BOOL'?false:v.type==='STRING'?'':0;}
 function nextRecipeCopyName(source,recipes){
  const used=new Set(recipes.filter(r=>r.scope===source.scope).map(r=>r.name.trim().toLocaleLowerCase()));
  for(let n=1;n<=999;n++){
-  const suffix=n===1?' (copia)':' (copia '+n+')';
-  const candidate=String(source.name||'Receta').slice(0,48-suffix.length).trimEnd()+suffix;
+  const suffix=n===1?' (copy)':' (copy '+n+')';
+  const candidate=String(source.name||'Recipe').slice(0,48-suffix.length).trimEnd()+suffix;
   if(!used.has(candidate.trim().toLocaleLowerCase()))return candidate;
  }
- throw new Error('No queda un nombre disponible para duplicar esta receta');
+ throw new Error('No available name for duplicating this recipe');
 }
 function duplicateRecipe(source,recipes){
  const clone=copy(source);
@@ -233,33 +233,33 @@ function duplicateRecipe(source,recipes){
  return clone;
 }
 
-function validate(input){const p=normalize(input),e=[];if(!Number.isInteger(+p.port)||p.port<1024||p.port>65535)e.push('Puerto: use 1024..65535.');if(!Number.isInteger(+p.pollMs)||p.pollMs<100||p.pollMs>5000)e.push('Polling: 100..5000 ms.');if(!Number.isInteger(+p.width)||p.width<320||p.width>3840)e.push('Ancho de diseño: 320..3840 px.');if(!Number.isInteger(+p.height)||p.height<240||p.height>2160)e.push('Alto de diseño: 240..2160 px.');if(p.minDisplayWidth>p.maxDisplayWidth)e.push('El ancho mínimo no puede superar al máximo.');if(p.screens.length>20)e.push('Máximo 20 pantallas en esta versión.');const exposed=p.variables.filter(v=>v.expose&&v.live);if(exposed.length>32)e.push('máximo 32 variables expuestas en esta versión.');const vm=variableMap(p),internalNames=new Set();for(const v of p.internalVariables){if(!nameOK(v.name)||v.name.startsWith('PLC.')||v.name.startsWith('HMI.'))e.push('Variable interna: nombre no válido '+v.name);if(vm.has(v.name)||internalNames.has(v.name))e.push('Variable interna duplicada: '+v.name);internalNames.add(v.name);if(v.type==='BOOL'&&!['true','false','1','0'].includes(String(v.value).toLowerCase()))e.push(v.name+': valor BOOL interno no válido');if(['INT','REAL'].includes(v.type)&&!Number.isFinite(Number(v.value)))e.push(v.name+': valor numérico interno no válido');}const assetIds=new Set(p.assets.map(a=>a.id)),screenIds=new Set(p.screens.map(s=>s.id));if(p.screenBinding){const screenTag=vm.get(p.screenBinding);if(!screenTag)e.push('Control de pantalla PLC: variable no encontrada.');else if(!INTEGER_TYPES.has(screenTag.type)||!screenTag.live||!screenTag.expose)e.push('Control de pantalla PLC: selecciona una variable entera expuesta (SINT/USINT/INT/UINT/DINT/UDINT/LINT/ULINT).');}const screenNumbers=new Set();let assetTotal=0;for(const a of p.assets){const bytes=dataUrlBytes(a.data);assetTotal+=bytes;if(!/^data:image\/(png|jpeg|webp|svg\+xml);base64,[A-Za-z0-9+\/\s]*={0,2}$/i.test(String(a.data||'')))e.push('Imagen '+(a.name||a.id)+': formato embebido no válido.');if(bytes>IMAGE_MAX_BYTES)e.push('Imagen '+(a.name||a.id)+': supera el límite estricto de 64 KB.');}if(assetTotal>IMAGE_TOTAL_MAX_BYTES)e.push('Imágenes del proyecto: superan el límite total estricto de 256 KB.');for(const v of p.variables){if(v.access==='RW'&&!v.writeSupported)e.push(v.name+': escritura no soportada para '+v.type+(v.type==='STRING'?' (máximo 512 bytes en esta versión)':'')+'.');}
- for(const s of [...p.screens,...(p.baseScreen?[p.baseScreen]:[])]){if(!s.name)e.push('Pantalla sin nombre.');if(s!==p.baseScreen){if(s.useBase&&!p.baseScreen)e.push(s.name+': pantalla base no disponible.');if(!Number.isInteger(s.number)||s.number<1||s.number>MAX_SCREEN_NUMBER)e.push('Número de pantalla no válido (1..'+MAX_SCREEN_NUMBER+'): '+s.name);else if(screenNumbers.has(s.number))e.push('Número de pantalla duplicado: '+s.number);else screenNumbers.add(s.number);}if(!/^#[0-9a-f]{6}$/i.test(s.background))e.push('Color de fondo no válido: '+s.name);for(const o of s.objects){if(o.fontSize!==null&&(!Number.isInteger(o.fontSize)||o.fontSize<8||o.fontSize>120))e.push(s.name+' / '+(o.text||o.kind)+': tamaño de letra entre 8 y 120 px.');for(const key of ['expressionText','expressionColor','expressionBackground','expressionVisible'])if(o[key]){const error=globalThis.NXExpressions?.validate(o[key]);if(error)e.push(s.name+' / '+(o.text||o.kind)+' / '+key+': '+error);}if(o.kind==='shape'){if(!SHAPE_TYPES.has(o.shapeType))e.push(s.name+' / '+o.text+': figura no válida.');if(!/^#[0-9a-f]{6}$/i.test(o.shapeFill)||!/^#[0-9a-f]{6}$/i.test(o.shapeStroke))e.push(s.name+' / '+o.text+': colores de figura no válidos.');if(!Number.isFinite(o.shapeStrokeWidth)||o.shapeStrokeWidth<0||o.shapeStrokeWidth>20)e.push(s.name+' / '+o.text+': grosor de trazo 0..20.');if(shapeCoordinates(o.shapeType,o.shapePoints)===null)e.push(s.name+' / '+o.text+': define vértices o extremos válidos de 0 a 100 sin repetir ni alinear los tres vértices.');continue;}if(o.kind==='text'){
+function validate(input){const p=normalize(input),e=[];if(!Number.isInteger(+p.port)||p.port<1024||p.port>65535)e.push('Port: use 1024..65535.');if(!Number.isInteger(+p.pollMs)||p.pollMs<100||p.pollMs>5000)e.push('Polling: 100..5000 ms.');if(!Number.isInteger(+p.width)||p.width<320||p.width>3840)e.push('Design width: 320..3840 px.');if(!Number.isInteger(+p.height)||p.height<240||p.height>2160)e.push('Design height: 240..2160 px.');if(p.minDisplayWidth>p.maxDisplayWidth)e.push('Minimum width cannot exceed maximum width.');if(p.screens.length>20)e.push('Maximum 20 screens in this version.');const exposed=p.variables.filter(v=>v.expose&&v.live);if(exposed.length>32)e.push('maximum 32 exposed variables in this version.');const vm=variableMap(p),internalNames=new Set();for(const v of p.internalVariables){if(!nameOK(v.name)||v.name.startsWith('PLC.')||v.name.startsWith('HMI.'))e.push('Internal variable: invalid name '+v.name);if(vm.has(v.name)||internalNames.has(v.name))e.push('Duplicate internal variable: '+v.name);internalNames.add(v.name);if(v.type==='BOOL'&&!['true','false','1','0'].includes(String(v.value).toLowerCase()))e.push(v.name+': invalid internal BOOL value');if(['INT','REAL'].includes(v.type)&&!Number.isFinite(Number(v.value)))e.push(v.name+': invalid internal numeric value');}const assetIds=new Set(p.assets.map(a=>a.id)),screenIds=new Set(p.screens.map(s=>s.id));if(p.screenBinding){const screenTag=vm.get(p.screenBinding);if(!screenTag)e.push('PLC screen control: variable not found.');else if(!INTEGER_TYPES.has(screenTag.type)||!screenTag.live||!screenTag.expose)e.push('PLC screen control: select an exposed integer variable (SINT/USINT/INT/UINT/DINT/UDINT/LINT/ULINT).');}const screenNumbers=new Set();let assetTotal=0;for(const a of p.assets){const bytes=dataUrlBytes(a.data);assetTotal+=bytes;if(!/^data:image\/(png|jpeg|webp|svg\+xml);base64,[A-Za-z0-9+\/\s]*={0,2}$/i.test(String(a.data||'')))e.push('Image '+(a.name||a.id)+': invalid embedded format.');if(bytes>IMAGE_MAX_BYTES)e.push('Image '+(a.name||a.id)+': exceeds the strict 64 KB limit.');}if(assetTotal>IMAGE_TOTAL_MAX_BYTES)e.push('Project images: exceed the strict 256 KB total limit.');for(const v of p.variables){if(v.access==='RW'&&!v.writeSupported)e.push(v.name+': writing is not supported for '+v.type+(v.type==='STRING'?' (maximum 512 bytes in this version)':'')+'.');}
+ for(const s of [...p.screens,...(p.baseScreen?[p.baseScreen]:[])]){if(!s.name)e.push('Screen has no name.');if(s!==p.baseScreen){if(s.useBase&&!p.baseScreen)e.push(s.name+': base screen unavailable.');if(!Number.isInteger(s.number)||s.number<1||s.number>MAX_SCREEN_NUMBER)e.push('Invalid screen number (1..'+MAX_SCREEN_NUMBER+'): '+s.name);else if(screenNumbers.has(s.number))e.push('Duplicate screen number: '+s.number);else screenNumbers.add(s.number);}if(!/^#[0-9a-f]{6}$/i.test(s.background))e.push('Invalid background color: '+s.name);for(const o of s.objects){if(o.fontSize!==null&&(!Number.isInteger(o.fontSize)||o.fontSize<8||o.fontSize>120))e.push(s.name+' / '+(o.text||o.kind)+': font size must be 8–120 px.');for(const key of ['expressionText','expressionColor','expressionBackground','expressionVisible'])if(o[key]){const error=globalThis.NXExpressions?.validate(o[key]);if(error)e.push(s.name+' / '+(o.text||o.kind)+' / '+key+': '+error);}if(o.kind==='shape'){if(!SHAPE_TYPES.has(o.shapeType))e.push(s.name+' / '+o.text+': invalid shape.');if(!/^#[0-9a-f]{6}$/i.test(o.shapeFill)||!/^#[0-9a-f]{6}$/i.test(o.shapeStroke))e.push(s.name+' / '+o.text+': invalid shape colors.');if(!Number.isFinite(o.shapeStrokeWidth)||o.shapeStrokeWidth<0||o.shapeStrokeWidth>20)e.push(s.name+' / '+o.text+': stroke width must be 0..20.');if(shapeCoordinates(o.shapeType,o.shapePoints)===null)e.push(s.name+' / '+o.text+': define valid vertices or endpoints from 0 to 100; the three vertices must be distinct and non-collinear.');continue;}if(o.kind==='text'){
  if(o.optionsText.trim()){
-  if(!o.binding)e.push(s.name+' / '+(o.text||'Texto')+': asocia una variable para los mensajes dinámicos.');
+  if(!o.binding)e.push(s.name+' / '+(o.text||'Text')+': assign a variable for dynamic messages.');
   const lines=o.optionsText.split(/\r?\n/).filter(line=>line.trim());
-  if(lines.some(line=>!/^\s*[^=\s][^=]*\s*=\s*\S.*$/.test(line)))e.push((o.text||'Texto')+': los mensajes requieren formato valor=texto.');
+  if(lines.some(line=>!/^\s*[^=\s][^=]*\s*=\s*\S.*$/.test(line)))e.push((o.text||'Text')+': messages must use value=text format.');
   const tag=vm.get(o.binding)||p.internalVariables.find(v=>v.name===o.binding);
-  if(o.binding&&!tag)e.push(s.name+' / '+(o.text||'Texto')+': variable dinámica no encontrada.');
-  else if(o.binding&&tag&&p.variables.some(v=>v.name===o.binding)&&!tag.expose)e.push(s.name+' / '+(o.text||'Texto')+': variable dinámica no expuesta.');
+  if(o.binding&&!tag)e.push(s.name+' / '+(o.text||'Text')+': dynamic variable not found.');
+  else if(o.binding&&tag&&p.variables.some(v=>v.name===o.binding)&&!tag.expose)e.push(s.name+' / '+(o.text||'Text')+': dynamic variable is not exposed.');
  }
  continue;
-}if(['slider','gauge','stepper','counter'].includes(o.kind)){if(!(Number.isFinite(o.min)&&Number.isFinite(o.max)&&o.max>o.min))e.push(o.text+': rango mínimo/máximo inválido.');if(['slider','stepper'].includes(o.kind)&&(!Number.isFinite(o.step)||o.step<=0))e.push(o.text+': paso inválido.');}if(['selector','multistate','dropdown'].includes(o.kind)){const pairs=o.optionsText.split(/\r?\n/).filter(x=>x.trim());if(!pairs.length||pairs.some(x=>!/^\s*-?\d+\s*=.+$/.test(x)))e.push(o.text+': opciones deben tener formato número=etiqueta.');}if(o.kind==='image'){if(!assetIds.has(o.assetId))e.push(s.name+': selecciona imagen FALSE/OFF para '+o.text);if(o.binding){const iv=vm.get(o.binding)||p.internalVariables.find(v=>v.name===o.binding);if(!iv)e.push(o.text+': variable BOOL de imagen no válida.');else{if(iv.type!=='BOOL')e.push(o.text+': el cambio de imagen requiere BOOL.');if(vm.has(o.binding)&&!iv.expose)e.push(o.text+': la variable de cambio de imagen debe estar expuesta.');}if(!assetIds.has(o.assetOnId))e.push(s.name+': selecciona imagen TRUE/ON para '+o.text);}continue;}if(o.kind==='button'&&['navigate','popup'].includes(o.actionType)){if(!screenIds.has(o.targetScreenId))e.push(o.text+': selecciona pantalla destino.');if(o.feedbackBinding){const fb=vm.get(o.feedbackBinding)||p.internalVariables.find(v=>v.name===o.feedbackBinding);if(!fb)e.push(o.text+': variable de feedback no válida.');else{if(fb.type!=='BOOL')e.push(o.text+': feedback requiere BOOL.');if(vm.has(o.feedbackBinding)&&!fb.expose)e.push(o.text+': la variable de feedback debe estar expuesta.');}if(!/^#[0-9a-f]{6}$/i.test(o.feedbackColorOff||'')||!/^#[0-9a-f]{6}$/i.test(o.feedbackColorOn||''))e.push(o.text+': colores de feedback no válidos.');}continue;}if(o.kind==='button'&&o.actionType==='closePopup')continue;const v=vm.get(o.binding)||p.internalVariables.find(v=>v.name===o.binding);if(!v)e.push(s.name+' / '+o.text+': selecciona variable.');else{if(['button','input','slider','switch','selector','stepper','dropdown'].includes(o.kind)&&vm.has(o.binding)&&v.access!=='RW')e.push(o.text+': requiere variable RW.');if((BOOL_WIDGETS.has(o.kind)||['button','switch'].includes(o.kind))&&v.type!=='BOOL')if(!e.includes(o.text+': requiere BOOL.'))e.push(o.text+': requiere BOOL.');if(['bar','tank','slider','gauge','stepper','counter'].includes(o.kind)&&!NUMERIC_TYPES.has(v.type))e.push(o.text+': requiere tipo numérico.');if(['selector','multistate','dropdown'].includes(o.kind)&&!['INT','UINT','DINT','UDINT','SINT','USINT','LINT','ULINT'].includes(v.type))e.push(o.text+': requiere variable entera.');if(o.kind==='input'&&!(NUMERIC_TYPES.has(v.type)||v.type==='STRING'||['BYTE','WORD','DWORD','LWORD','TIME','DATE','TIME_OF_DAY','DATE_AND_TIME'].includes(v.type)))e.push(o.text+': requiere tipo numérico, bitstring, temporal o STRING.');}if(o.kind==='status'){if(!STATUS_SYMBOLS.has(o.symbolType))e.push(o.text+': símbolo de estado no válido.');if(!['true','false'].includes(o.stateOnWhen))e.push(o.text+': mapeo ON/OFF no válido.');}if(o.kind==='input'&&v&&NUMERIC_TYPES.has(v.type)){if(o.inputMin!==null&&!Number.isFinite(Number(o.inputMin)))e.push(o.text+': límite inferior no válido.');if(o.inputMax!==null&&!Number.isFinite(Number(o.inputMax)))e.push(o.text+': límite superior no válido.');if(o.inputMin!==null&&o.inputMax!==null&&Number(o.inputMin)>Number(o.inputMax))e.push(o.text+': el límite inferior no puede superar al superior.');}if(o.kind==='button'){if(!['set','reset','toggle'].includes(o.actionMode))e.push(o.text+': modo SET/RESET/TOGGLE no válido.');if(o.feedbackBinding){const fb=vm.get(o.feedbackBinding)||p.internalVariables.find(v=>v.name===o.feedbackBinding);if(!fb)e.push(o.text+': variable de feedback no válida.');else{if(fb.type!=='BOOL')e.push(o.text+': feedback requiere BOOL.');if(vm.has(o.feedbackBinding)&&!fb.expose)e.push(o.text+': la variable de feedback debe estar expuesta.');}if(!/^#[0-9a-f]{6}$/i.test(o.feedbackColorOff||'')||!/^#[0-9a-f]{6}$/i.test(o.feedbackColorOn||''))e.push(o.text+': colores de feedback no válidos.');}}if(o.kind==='dynamicText'&&!o.optionsText.trim()&&!o.expressionText.trim())e.push(o.text+': configura mensajes valor=texto o una expresión de texto.');if(['value','input','slider','stepper','gauge','counter'].includes(o.kind)&&(o.decimals<0||o.decimals>6))e.push(o.text+': decimales 0..6.');}}
- const alarmIds=new Set();for(const a of p.alarms){if(alarmIds.has(a.id))e.push('ID de alarma duplicado.');alarmIds.add(a.id);const v=vm.get(a.binding)||p.internalVariables.find(v=>v.name===a.binding);if(!v)e.push('Alarma '+a.name+': variable no válida.');if(!['eq','ne','gt','ge','lt','le'].includes(a.operator))e.push('Alarma '+a.name+': operador no válido.');if(v&&v.type==='STRING'&&!['eq','ne'].includes(a.operator))e.push('Alarma '+a.name+': STRING sólo admite = o ≠.');if(v&&v.type==='BOOL'&&!['eq','ne'].includes(a.operator))e.push('Alarma '+a.name+': BOOL sólo admite = o ≠.');if(v)try{typedFor(v,a.value)}catch{e.push('Alarma '+a.name+': umbral no válido.');}}
+}if(['slider','gauge','stepper','counter'].includes(o.kind)){if(!(Number.isFinite(o.min)&&Number.isFinite(o.max)&&o.max>o.min))e.push(o.text+': invalid minimum/maximum range.');if(['slider','stepper'].includes(o.kind)&&(!Number.isFinite(o.step)||o.step<=0))e.push(o.text+': invalid step.');}if(['selector','multistate','dropdown'].includes(o.kind)){const pairs=o.optionsText.split(/\r?\n/).filter(x=>x.trim());if(!pairs.length||pairs.some(x=>!/^\s*-?\d+\s*=.+$/.test(x)))e.push(o.text+': options must use number=label format.');}if(o.kind==='image'){if(!assetIds.has(o.assetId))e.push(s.name+': select a FALSE/OFF image for '+o.text);if(o.binding){const iv=vm.get(o.binding)||p.internalVariables.find(v=>v.name===o.binding);if(!iv)e.push(o.text+': invalid image BOOL variable.');else{if(iv.type!=='BOOL')e.push(o.text+': image switching requires BOOL.');if(vm.has(o.binding)&&!iv.expose)e.push(o.text+': the image switching variable must be exposed.');}if(!assetIds.has(o.assetOnId))e.push(s.name+': select a TRUE/ON image for '+o.text);}continue;}if(o.kind==='button'&&['navigate','popup'].includes(o.actionType)){if(!screenIds.has(o.targetScreenId))e.push(o.text+': select a target screen.');if(o.feedbackBinding){const fb=vm.get(o.feedbackBinding)||p.internalVariables.find(v=>v.name===o.feedbackBinding);if(!fb)e.push(o.text+': invalid feedback variable.');else{if(fb.type!=='BOOL')e.push(o.text+': feedback requires BOOL.');if(vm.has(o.feedbackBinding)&&!fb.expose)e.push(o.text+': the feedback variable must be exposed.');}if(!/^#[0-9a-f]{6}$/i.test(o.feedbackColorOff||'')||!/^#[0-9a-f]{6}$/i.test(o.feedbackColorOn||''))e.push(o.text+': invalid feedback colors.');}continue;}if(o.kind==='button'&&o.actionType==='closePopup')continue;const v=vm.get(o.binding)||p.internalVariables.find(v=>v.name===o.binding);if(!v)e.push(s.name+' / '+o.text+': select a variable.');else{if(['button','input','slider','switch','selector','stepper','dropdown'].includes(o.kind)&&vm.has(o.binding)&&v.access!=='RW')e.push(o.text+': requires an RW variable.');if((BOOL_WIDGETS.has(o.kind)||['button','switch'].includes(o.kind))&&v.type!=='BOOL')if(!e.includes(o.text+': requires BOOL.'))e.push(o.text+': requires BOOL.');if(['bar','tank','slider','gauge','stepper','counter'].includes(o.kind)&&!NUMERIC_TYPES.has(v.type))e.push(o.text+': requires a numeric type.');if(['selector','multistate','dropdown'].includes(o.kind)&&!['INT','UINT','DINT','UDINT','SINT','USINT','LINT','ULINT'].includes(v.type))e.push(o.text+': requires an integer variable.');if(o.kind==='input'&&!(NUMERIC_TYPES.has(v.type)||v.type==='STRING'||['BYTE','WORD','DWORD','LWORD','TIME','DATE','TIME_OF_DAY','DATE_AND_TIME'].includes(v.type)))e.push(o.text+': requires a numeric, bit string, temporal, or STRING type.');}if(o.kind==='status'){if(!STATUS_SYMBOLS.has(o.symbolType))e.push(o.text+': invalid status symbol.');if(!['true','false'].includes(o.stateOnWhen))e.push(o.text+': invalid ON/OFF mapping.');}if(o.kind==='input'&&v&&NUMERIC_TYPES.has(v.type)){if(o.inputMin!==null&&!Number.isFinite(Number(o.inputMin)))e.push(o.text+': invalid lower limit.');if(o.inputMax!==null&&!Number.isFinite(Number(o.inputMax)))e.push(o.text+': invalid upper limit.');if(o.inputMin!==null&&o.inputMax!==null&&Number(o.inputMin)>Number(o.inputMax))e.push(o.text+': lower limit cannot exceed upper limit.');}if(o.kind==='button'){if(!['set','reset','toggle'].includes(o.actionMode))e.push(o.text+': invalid SET/RESET/TOGGLE mode.');if(o.feedbackBinding){const fb=vm.get(o.feedbackBinding)||p.internalVariables.find(v=>v.name===o.feedbackBinding);if(!fb)e.push(o.text+': invalid feedback variable.');else{if(fb.type!=='BOOL')e.push(o.text+': feedback requires BOOL.');if(vm.has(o.feedbackBinding)&&!fb.expose)e.push(o.text+': the feedback variable must be exposed.');}if(!/^#[0-9a-f]{6}$/i.test(o.feedbackColorOff||'')||!/^#[0-9a-f]{6}$/i.test(o.feedbackColorOn||''))e.push(o.text+': invalid feedback colors.');}}if(o.kind==='dynamicText'&&!o.optionsText.trim()&&!o.expressionText.trim())e.push(o.text+': configure value=text messages or a text expression.');if(['value','input','slider','stepper','gauge','counter'].includes(o.kind)&&(o.decimals<0||o.decimals>6))e.push(o.text+': decimals 0..6.');}}
+ const alarmIds=new Set();for(const a of p.alarms){if(alarmIds.has(a.id))e.push('Duplicate alarm ID.');alarmIds.add(a.id);const v=vm.get(a.binding)||p.internalVariables.find(v=>v.name===a.binding);if(!v)e.push('Alarm '+a.name+': invalid variable.');if(!['eq','ne','gt','ge','lt','le'].includes(a.operator))e.push('Alarm '+a.name+': invalid operator.');if(v&&v.type==='STRING'&&!['eq','ne'].includes(a.operator))e.push('Alarm '+a.name+': STRING supports only = or ≠.');if(v&&v.type==='BOOL'&&!['eq','ne'].includes(a.operator))e.push('Alarm '+a.name+': BOOL supports only = or ≠.');if(v)try{typedFor(v,a.value)}catch{e.push('Alarm '+a.name+': invalid threshold.');}}
  if(p.recipeEnabled){
  const eligible=new Map([...p.variables.filter(v=>v.access==='RW'&&v.writeSupported&&v.live),...p.internalVariables].map(v=>[v.name,v]));
- if(!Number.isInteger(p.recipeSlots)||p.recipeSlots<1||p.recipeSlots>32)e.push('Banco NX: número de recetas entre 1 y 32.');
- if(!Number.isInteger(p.recipeBytes)||p.recipeBytes<64||p.recipeBytes>500)e.push('Banco NX: bytes por receta entre 64 y 500.');
- if(p.recipeEnabled&&p.recipes.length>p.recipeSlots)e.push('Banco NX: máximo '+p.recipeSlots+' recetas con la capacidad configurada.');
+ if(!Number.isInteger(p.recipeSlots)||p.recipeSlots<1||p.recipeSlots>32)e.push('NX bank: recipe count must be 1–32.');
+ if(!Number.isInteger(p.recipeBytes)||p.recipeBytes<64||p.recipeBytes>500)e.push('NX bank: bytes per recipe must be 64–500.');
+ if(p.recipeEnabled&&p.recipes.length>p.recipeSlots)e.push('NX bank: maximum '+p.recipeSlots+' recipes with the configured capacity.');
  const recipeNames=new Set(),recipeIds=new Set();
  for(const r of p.recipes){
-  if(!r.name.trim()||r.name.length>48)e.push('Receta: nombre obligatorio (máximo 48 caracteres).');
-  if(recipeIds.has(r.id))e.push('ID de receta duplicado: '+r.name);recipeIds.add(r.id);
-  if(r.scope!=='shared')e.push('Receta '+r.name+': almacenamiento obligatorio NX Retain.');
-  const key=r.scope+':'+r.name.trim().toLocaleLowerCase();if(recipeNames.has(key))e.push('Nombre de receta repetido: '+r.name);recipeNames.add(key);
-  if(Object.keys(r.values||{}).length>20)e.push('Receta '+r.name+': máximo 20 valores.');
-  for(const [name,val] of Object.entries(r.values||{})){const v=eligible.get(name);if(!v)e.push('Receta '+r.name+': '+name+' requiere variable PLC RW compatible o HMI interna.');else{try{typedFor(v,val)}catch{e.push('Receta '+r.name+': valor inválido en '+name);}}}
-  if(p.recipeEnabled&&new TextEncoder().encode(recipeWireJSON(r)).length>p.recipeBytes)e.push('Receta '+r.name+': supera '+p.recipeBytes+' bytes en memoria NX.');
+  if(!r.name.trim()||r.name.length>48)e.push('Recipe: a name is required (maximum 48 characters).');
+  if(recipeIds.has(r.id))e.push('Duplicate recipe ID: '+r.name);recipeIds.add(r.id);
+  if(r.scope!=='shared')e.push('Recipe '+r.name+': NX Retain storage is required.');
+  const key=r.scope+':'+r.name.trim().toLocaleLowerCase();if(recipeNames.has(key))e.push('Duplicate recipe name: '+r.name);recipeNames.add(key);
+  if(Object.keys(r.values||{}).length>20)e.push('Recipe '+r.name+': maximum 20 values.');
+  for(const [name,val] of Object.entries(r.values||{})){const v=eligible.get(name);if(!v)e.push('Recipe '+r.name+': '+name+' requires a compatible RW PLC variable or an internal HMI variable.');else{try{typedFor(v,val)}catch{e.push('Recipe '+r.name+': invalid value in '+name);}}}
+  if(p.recipeEnabled&&new TextEncoder().encode(recipeWireJSON(r)).length>p.recipeBytes)e.push('Recipe '+r.name+': exceeds '+p.recipeBytes+' bytes in NX memory.');
  }
  }
  return [...new Set(e)];}
@@ -270,69 +270,69 @@ const LITE_KINDS=new Set(['text','value','status','button','input','bar']);
 const LITE_TYPES=new Set(['BOOL','INT','REAL']);
 const LITE_MAX_VARS=16;
 function liteWidgetIssue(o,variables){
- if(!LITE_KINDS.has(o.kind))return 'tipo '+o.kind+' no disponible';
- if(['expressionText','expressionColor','expressionBackground','expressionVisible'].some(k=>String(o[k]||'').trim()))return 'expresiones dinámicas no disponibles';
- if(o.kind==='text')return o.binding||String(o.optionsText||'').trim()?'texto dinámico no disponible':'';
- if(o.kind==='status'&&o.symbolType!=='lamp')return 'símbolo '+o.symbolType+' no disponible (usar lámpara)';
+ if(!LITE_KINDS.has(o.kind))return 'type '+o.kind+' unavailable';
+ if(['expressionText','expressionColor','expressionBackground','expressionVisible'].some(k=>String(o[k]||'').trim()))return 'dynamic expressions unavailable';
+ if(o.kind==='text')return o.binding||String(o.optionsText||'').trim()?'dynamic text unavailable':'';
+ if(o.kind==='status'&&o.symbolType!=='lamp')return 'symbol '+o.symbolType+' unavailable (use a lamp)';
  if(o.kind==='button'){
-  if(o.actionType!=='write'||!['set','reset'].includes(o.actionMode))return 'pulsador: solamente SET/RESET de BOOL';
-  if(o.feedbackBinding||o.feedbackTextOn||o.feedbackTextOff)return 'feedback avanzado no disponible';
+  if(o.actionType!=='write'||!['set','reset'].includes(o.actionMode))return 'button: BOOL SET/RESET only';
+  if(o.feedbackBinding||o.feedbackTextOn||o.feedbackTextOff)return 'advanced feedback unavailable';
  }
  const v=variables.get(o.binding);
- if(!v)return 'variable PLC '+(o.binding||'(sin asociar)')+' no disponible';
- if(!v.expose||!v.live)return 'variable '+v.name+' no expuesta';
- if(!LITE_TYPES.has(v.type))return 'tipo de variable '+v.type+' no disponible';
- if(['status','button'].includes(o.kind)&&v.type!=='BOOL')return 'requiere variable BOOL';
- if(['value','input','bar'].includes(o.kind)&&!['INT','REAL'].includes(v.type))return 'requiere INT o REAL';
- if(['button','input'].includes(o.kind)&&(v.access!=='RW'||!v.writeSupported))return 'variable '+v.name+' sin permiso de escritura';
- if(o.kind==='bar'&&!(o.max>o.min))return 'rango de barra incorrecto';
- if(o.kind==='input'&&o.inputMin!==null&&o.inputMax!==null&&o.inputMin>o.inputMax)return 'límites de entrada invertidos';
+ if(!v)return 'PLC variable '+(o.binding||'(unassigned)')+' unavailable';
+ if(!v.expose||!v.live)return 'variable '+v.name+' not exposed';
+ if(!LITE_TYPES.has(v.type))return 'variable type '+v.type+' unavailable';
+ if(['status','button'].includes(o.kind)&&v.type!=='BOOL')return 'requires a BOOL variable';
+ if(['value','input','bar'].includes(o.kind)&&!['INT','REAL'].includes(v.type))return 'requires INT or REAL';
+ if(['button','input'].includes(o.kind)&&(v.access!=='RW'||!v.writeSupported))return 'variable '+v.name+' without write permission';
+ if(o.kind==='bar'&&!(o.max>o.min))return 'invalid bar range';
+ if(o.kind==='input'&&o.inputMin!==null&&o.inputMax!==null&&o.inputMin>o.inputMax)return 'input limits reversed';
  return '';
 }
 function liteAnalysis(input,screenId){
  const p=normalize(input),s=p.screens.find(s=>s.id===screenId)||p.screens[0];
  const variables=new Map(p.variables.map(v=>[v.name,v]));
  const issues=[],omitted=[],used=new Set(),supported=[];
- if(p.screens.length!==1)issues.push('Extra Light permite una pantalla; el proyecto tiene '+p.screens.length+'.');
- if(p.recipeEnabled||p.recipes.length)issues.push('Las recetas no se incluyen en Extra Light.');
- if(p.alarms.length)issues.push('Las '+p.alarms.length+' alarmas no se incluyen en Extra Light.');
- if(p.assets.length)issues.push('Las imágenes embebidas no están disponibles en Extra Light.');
- if(p.screenBinding)issues.push('La navegación gobernada por PLC no está disponible.');
+ if(p.screens.length!==1)issues.push('Extra Light supports one screen; this project has '+p.screens.length+'.');
+ if(p.recipeEnabled||p.recipes.length)issues.push('Recipes are not included in Extra Light.');
+ if(p.alarms.length)issues.push('The '+p.alarms.length+' alarms are not included in Extra Light.');
+ if(p.assets.length)issues.push('Embedded images are unavailable in Extra Light.');
+ if(p.screenBinding)issues.push('PLC-controlled navigation is unavailable.');
  const objects=screenObjects(p,s);
  for(const o of objects){
   const why=liteWidgetIssue(o,variables);
   if(why){const message=s.name+' / '+(o.text||o.kind)+': '+why;omitted.push(message);issues.push(message);}
   else{supported.push(o);if(o.kind!=='text')used.add(o.binding);}
  }
- if(used.size>LITE_MAX_VARS)issues.push('Se usan '+used.size+' variables PLC; Extra Light admite hasta '+LITE_MAX_VARS+'.');
+ if(used.size>LITE_MAX_VARS)issues.push('Using '+used.size+' PLC variables; Extra Light supports up to '+LITE_MAX_VARS+'.');
  // Do not bypass existing project validation when exporting the untouched design.
- for(const err of validate(p))if(!issues.includes(err))issues.push('Proyecto: '+err);
+ for(const err of validate(p))if(!issues.includes(err))issues.push('Project: '+err);
  return {screenId:s.id,screenName:s.name,issues,omitted,usedVariables:[...used],supportedCount:supported.length,totalCount:objects.length};
 }
 function liteCopy(input,screenId){
  const p=normalize(input),screen=p.screens.find(s=>s.id===screenId);
- if(!screen)throw Error('Selecciona una pantalla válida para la copia Extra Light.');
+ if(!screen)throw Error('Select a valid screen for the Extra Light copy.');
  const variables=new Map(p.variables.map(v=>[v.name,v])),kept=[],omitted=[],used=new Set();
  for(const o of screenObjects(p,screen)){
   const problem=liteWidgetIssue(o,variables);
   if(problem){omitted.push((o.text||o.kind)+': '+problem);continue}
   kept.push(copy(o));if(o.kind!=='text')used.add(o.binding);
  }
- if(used.size>LITE_MAX_VARS)throw Error('La pantalla seleccionada usa '+used.size+' variables compatibles; reduce a '+LITE_MAX_VARS+' antes de generar una copia.');
+ if(used.size>LITE_MAX_VARS)throw Error('The selected screen uses '+used.size+' compatible variables; reduce to '+LITE_MAX_VARS+' before generating a copy.');
  const q=copy(p);q.name=(p.name+' Extra Light').slice(0,100);
  q.screens=[{...copy(screen),objects:kept,useBase:false}];q.baseScreen=null;
  q.variables=p.variables.filter(v=>used.has(v.name)).map(copy);q.internalVariables=[];
  q.screenBinding='';q.alarms=[];q.assets=[];q.recipes=[];q.recipeVariables=[];
  q.recipeEnabled=false;
  const normalized=normalize(q),errors=validate(normalized);
- if(errors.length)throw Error('La copia requiere corregir: '+errors.join('; '));
+ if(errors.length)throw Error('The copy requires corrections: '+errors.join('; '));
  const changes=[];
- if(p.screens.length>1)changes.push((p.screens.length-1)+' pantallas excluidas');
- if(p.alarms.length)changes.push(p.alarms.length+' alarmas excluidas');
- if(p.recipeEnabled||p.recipes.length)changes.push('banco de recetas excluido');
- if(p.assets.length)changes.push(p.assets.length+' imágenes excluidas');
- if(p.screenBinding)changes.push('navegación PLC excluida');
- if(p.baseScreen&&screen.useBase)changes.push('capa base incorporada como elementos independientes');
+ if(p.screens.length>1)changes.push((p.screens.length-1)+' screens excluded');
+ if(p.alarms.length)changes.push(p.alarms.length+' alarms excluded');
+ if(p.recipeEnabled||p.recipes.length)changes.push('recipe bank excluded');
+ if(p.assets.length)changes.push(p.assets.length+' images excluded');
+ if(p.screenBinding)changes.push('PLC navigation excluded');
+ if(p.baseScreen&&screen.useBase)changes.push('base layer included as independent elements');
  return {project:normalized,omitted,changes,retained:kept.length};
 }
 root.NXST=Object.assign(root.NXST||{},{LIVE_TYPES,WRITE_TYPES,NUMERIC_TYPES,INTEGER_TYPES,MAX_SCREEN_NUMBER,BOOL_WIDGETS,STATUS_SYMBOLS,STATUS_LABELS,SHAPE_TYPES,SHAPE_LABELS,defaultShapePoints,shapeCoordinates,shapeSvg,LEGACY_STATUS_KINDS,statusSvg,optionalNumber,IMAGE_MAX_BYTES,IMAGE_TOTAL_MAX_BYTES,HTML_MAX_BYTES,IMAGE_OPTIMIZE_MAX_DIM,dataUrlBytes,id,copy,esc,typeInfo,nameOK,parseDelimited,importSysmac,RECIPE_SHARED_MAX,RECIPE_LOCAL_MAX,RECIPE_BYTES_MAX,recipeWireJSON,recipeDefaultValue,nextRecipeCopyName,duplicateRecipe,newProject,newScreen,newBaseScreen,screenObjects,moveWidgetLayer,setScreenMode,nextScreenNumber,duplicateScreen,newObject,demoProject,normalize,typedFor,validate,LITE_KINDS,LITE_MAX_VARS,liteWidgetIssue,liteAnalysis,liteCopy});
@@ -359,16 +359,16 @@ function typeDefs(text){
  const source=String(text||'');
  const structure=/(?:\bTYPE\s+)?([A-Za-z_]\w*)\s*:\s*(STRUCT|UNION)\b([\s\S]*?)\bEND_(STRUCT|UNION)\b\s*;?/gi;
  for(const match of source.matchAll(structure)){
-  if(match[2].toUpperCase()!==match[4].toUpperCase())throw Error('END_ incorrecto en '+match[1]);
+  if(match[2].toUpperCase()!==match[4].toUpperCase())throw Error('Incorrect END_ in '+match[1]);
   const body=match[3].replace(/\(\*[\s\S]*?\*\)/g,'').replace(/\/\/[^\r\n]*/g,'');
   const members=[];
   for(const section of body.split(';')){
    const m=section.trim().match(/^([A-Za-z_]\w*)\s*:\s*([\s\S]+)$/);
    if(!m)continue;
-   if(!identifier.test(m[1]))throw Error('Miembro invalido '+m[1]);
+   if(!identifier.test(m[1]))throw Error('Invalid member '+m[1]);
    members.push({name:m[1],type:m[2].trim().replace(/\s*:=\s*[\s\S]*$/,'')});
   }
-  if(!members.length)throw Error('Tipo '+match[1]+' sin miembros');
+  if(!members.length)throw Error('Tipo '+match[1]+' has no members');
   out.set(match[1].toUpperCase(),{name:match[1],kind:match[2].toUpperCase(),members});
   remove.push([match.index,match.index+match[0].length]);
  }
@@ -379,9 +379,9 @@ function typeDefs(text){
   let next=0;const values={};
   for(const item of match[2].split(',')){
    const m=item.trim().match(/^([A-Za-z_]\w*)(?:\s*:=\s*(-?\d+))?$/);
-   if(!m)throw Error('Enumeracion invalida: '+match[1]);
+   if(!m)throw Error('Invalid enumeration: '+match[1]);
    if(m[2]!==undefined)next=Number(m[2]);
-   if(!Number.isSafeInteger(next)||next< -2147483648||next>2147483647)throw Error('Enumeracion fuera de DINT: '+match[1]);
+   if(!Number.isSafeInteger(next)||next< -2147483648||next>2147483647)throw Error('Enumeration outside DINT range: '+match[1]);
    values[m[1]]=next++;
   }
   out.set(match[1].toUpperCase(),{name:match[1],kind:'ENUM',values});
@@ -416,41 +416,41 @@ function csvDeclarations(text){
 function expand(rootName,rootType,defs){
  const results=[];
  function walk(name,type,depth,stack){
-  if(depth>8)throw Error('Anidamiento mayor de 8 en '+rootName);
+  if(depth>8)throw Error('Nesting depth exceeds 8 in '+rootName);
   const raw=String(type||'').trim(),array=raw.match(/^ARRAY\s*\[([^\]]+)\]\s*OF\s*(.+)$/i);
   if(array){
-   const dims=array[1].split(',').map(x=>{const m=x.trim().match(/^(-?\d+)\s*\.\.\s*(-?\d+)$/);if(!m)throw Error('Rango ARRAY invalido: '+x);const a=Number(m[1]),b=Number(m[2]);if(!Number.isSafeInteger(a)||!Number.isSafeInteger(b)||b<a)throw Error('Rango ARRAY invalido: '+x);return [a,b]});
-   if(dims.length>3)throw Error('Sysmac admite hasta 3 dimensiones: '+name);
+   const dims=array[1].split(',').map(x=>{const m=x.trim().match(/^(-?\d+)\s*\.\.\s*(-?\d+)$/);if(!m)throw Error('Invalid ARRAY range: '+x);const a=Number(m[1]),b=Number(m[2]);if(!Number.isSafeInteger(a)||!Number.isSafeInteger(b)||b<a)throw Error('Invalid ARRAY range: '+x);return [a,b]});
+   if(dims.length>3)throw Error('Sysmac supports up to 3 dimensions: '+name);
    const count=dims.reduce((v,[a,b])=>v*(b-a+1),1);
-   if(count>MAX_IMPORTED_LEAVES||results.length+count>MAX_IMPORTED_LEAVES)throw Error('ARRAY muy grande: limita la seleccion a '+MAX_IMPORTED_LEAVES+' miembros por importacion');
+   if(count>MAX_IMPORTED_LEAVES||results.length+count>MAX_IMPORTED_LEAVES)throw Error('ARRAY too large: limit the selection to '+MAX_IMPORTED_LEAVES+' members per import');
    function indices(depth2,selection){if(depth2===dims.length){walk(name+'['+selection.join(',')+']',array[2],depth+1,stack);return}const [start,end]=dims[depth2];for(let i=start;i<=end;i++)indices(depth2+1,[...selection,i])}
    indices(0,[]);return;
   }
   const info=C.typeInfo(raw),t=shortType(raw),custom=defs.get(t);
   if(custom){
-   if(stack.includes(t))throw Error('Tipo recursivo: '+[...stack,t].join(' -> '));
+   if(stack.includes(t))throw Error('Recursive type: '+[...stack,t].join(' -> '));
    if(custom.kind==='ENUM'){results.push({name,type:'DINT',sourceType:raw,enumType:custom.name,enumValues:custom.values})}
    else for(const member of custom.members)walk(name+'.'+member.name,member.type,depth+1,[...stack,t]);
   }else if(BASIC.has(t)){
    results.push({name,type:t,sourceType:raw,stringLength:info.length||255});
-  }else throw Error('Tipo Sysmac no definido: '+raw+' ('+name+'). Importa tambien su definicion STRUCT/UNION/ENUM.');
-  if(results.length>MAX_IMPORTED_LEAVES)throw Error('Limite de '+MAX_IMPORTED_LEAVES+' elementos por importacion');
+  }else throw Error('Undefined Sysmac type: '+raw+' ('+name+'). Import its STRUCT/UNION/ENUM definition too.');
+  if(results.length>MAX_IMPORTED_LEAVES)throw Error('Limit of '+MAX_IMPORTED_LEAVES+' elements per import');
  }
  walk(rootName,rootType,0,[]);
  return results.map(r=>({...r,plcRoot:rootName,plcRootType:rootType,plcExpression:r.name}));
 }
 function importSysmac(text){
- const raw=String(text||'').trim();if(!raw)throw Error('No hay variables para importar');
+ const raw=String(text||'').trim();if(!raw)throw Error('No variables to import');
  const parsed=typeDefs(raw),body=parsed.cleaned;
  let roots=/\b(?:VAR_GLOBAL|VAR_EXTERNAL|VAR|END_VAR)\b/i.test(body)||/^\s*[A-Za-z_]\w*\s*:/m.test(body)?variableDeclarations(body):csvDeclarations(body);
- if(!roots.length){try{return previousImport(raw)}catch{throw Error('No se reconocen declaraciones de variables Sysmac')}}
+ if(!roots.length){try{return previousImport(raw)}catch{throw Error('No Sysmac variable declarations were recognized')}}
  let result=[],seen=new Set(),active=0;
  for(const d of roots){
-  if(!identifier.test(d.name))throw Error('Nombre no valido: '+d.name);
-  if(seen.has(d.name))throw Error('Variable duplicada: '+d.name);
+  if(!identifier.test(d.name))throw Error('Invalid name: '+d.name);
+  if(seen.has(d.name))throw Error('Duplicate variable: '+d.name);
   seen.add(d.name);
   for(const leaf of expand(d.name,d.type,parsed.defs)){
-   if(result.some(v=>v.name===leaf.name))throw Error('Miembro duplicado: '+leaf.name);
+   if(result.some(v=>v.name===leaf.name))throw Error('Duplicate member: '+leaf.name);
    const originalType=leaf.type,writeSupported=originalType!=='STRING'||leaf.stringLength<=512;
    result.push({id:result.length+1,...leaf,comment:d.comment||'',access:'R',expose:active++<32,live:true,writeSupported});
   }
@@ -463,26 +463,26 @@ function validate(input){
  for(const r of p.recipes||[])for(const [name,value] of Object.entries(r.values||{})){
   const variable=p.variables.find(v=>v.name===name);
   if(!variable)continue;
-  if(variable.enumValues&&!Object.values(variable.enumValues).includes(Number(value)))errors.push('Receta '+r.name+': valor de enumeracion no definido en '+name);
-  if([...BIT_TYPES,...LONG_TYPES,'TIME','SINT','USINT','INT','UINT','DINT','UDINT',...DATE_TYPES].includes(variable.type))try{canonicalWrite(variable.type,value)}catch(e){errors.push('Receta '+r.name+' / '+name+': '+e.message)}
+  if(variable.enumValues&&!Object.values(variable.enumValues).includes(Number(value)))errors.push('Recipe '+r.name+': undefined enumeration value in '+name);
+  if([...BIT_TYPES,...LONG_TYPES,'TIME','SINT','USINT','INT','UINT','DINT','UDINT',...DATE_TYPES].includes(variable.type))try{canonicalWrite(variable.type,value)}catch(e){errors.push('Recipe '+r.name+' / '+name+': '+e.message)}
  }
  for(const alarm of p.alarms||[]){
   const variable=p.variables.find(v=>v.name===alarm.binding);
   if(!variable)continue;
-  if(variable.enumValues&&!Object.values(variable.enumValues).includes(Number(alarm.value)))errors.push('Alarma '+alarm.name+': valor de enumeracion no definido');
-  if([...BIT_TYPES,...LONG_TYPES,'TIME','SINT','USINT','INT','UINT','DINT','UDINT',...DATE_TYPES].includes(variable.type))try{canonicalWrite(variable.type,alarm.value)}catch(e){errors.push('Alarma '+alarm.name+': '+e.message)}
+  if(variable.enumValues&&!Object.values(variable.enumValues).includes(Number(alarm.value)))errors.push('Alarm '+alarm.name+': undefined enumeration value');
+  if([...BIT_TYPES,...LONG_TYPES,'TIME','SINT','USINT','INT','UINT','DINT','UDINT',...DATE_TYPES].includes(variable.type))try{canonicalWrite(variable.type,alarm.value)}catch(e){errors.push('Alarm '+alarm.name+': '+e.message)}
  }
  for(const v of p.variables){
-  if(!/^[A-Za-z_]\w*(?:\[-?\d+(?:,-?\d+){0,2}\])?(?:\.[A-Za-z_]\w*(?:\[-?\d+(?:,-?\d+){0,2}\])?)*$/.test(v.name))errors.push('Nombre Sysmac de variable no valido: '+v.name);
-  if(found.has(v.name))errors.push('Variable duplicada: '+v.name);
+  if(!/^[A-Za-z_]\w*(?:\[-?\d+(?:,-?\d+){0,2}\])?(?:\.[A-Za-z_]\w*(?:\[-?\d+(?:,-?\d+){0,2}\])?)*$/.test(v.name))errors.push('Invalid Sysmac variable name: '+v.name);
+  if(found.has(v.name))errors.push('Duplicate variable: '+v.name);
   found.add(v.name);
   if(v.plcRoot){
    const old=roots.get(v.plcRoot),now=v.plcRootType;
-   if(old&&old!==now)errors.push('Declaracion global incompatible para '+v.plcRoot);
+   if(old&&old!==now)errors.push('Incompatible global declaration for '+v.plcRoot);
    roots.set(v.plcRoot,now);
-   if(!/^[A-Za-z_]\w*$/.test(v.plcRoot)||!now||!/^(?:ARRAY\s*\[[^\]]+\]\s*OF\s*)*[A-Za-z_]\w*(?:\[\d+\])?$/i.test(now))errors.push('Tipo global invalido de '+v.name);
+   if(!/^[A-Za-z_]\w*$/.test(v.plcRoot)||!now||!/^(?:ARRAY\s*\[[^\]]+\]\s*OF\s*)*[A-Za-z_]\w*(?:\[\d+\])?$/i.test(now))errors.push('Invalid global type for '+v.name);
   }
-  if(v.enumType&&!/^[A-Za-z_]\w*$/.test(v.enumType))errors.push('Enumeracion no valida: '+v.name);
+  if(v.enumType&&!/^[A-Za-z_]\w*$/.test(v.enumType))errors.push('Invalid enumeration: '+v.name);
  }
  return errors;
 }
@@ -500,28 +500,28 @@ function canonicalWrite(type,value){
  const t=shortType(type);
  if(BIT_TYPES.has(t)){
   const width={BYTE:2,WORD:4,DWORD:8,LWORD:16}[t],s=String(value).trim().replace(/^(?:16#|0x)/i,'');
-  if(!/^[0-9a-f]+$/i.test(s)||s.length>width)throw Error(t+': escribe de 1 a '+width+' digitos hexadecimales');
+  if(!/^[0-9a-f]+$/i.test(s)||s.length>width)throw Error(t+': enter 1 to '+width+' hexadecimal digits');
   return s.toUpperCase().padStart(width,'0');
  }
  if([...LONG_TYPES,'TIME'].includes(t)||/^(?:SINT|USINT|INT|UINT|DINT|UDINT)$/.test(t)){
   const raw=String(value).trim();
-  if(!/^[+-]?\d+$/.test(raw))throw Error(t+': se requiere numero entero exacto');
+  if(!/^[+-]?\d+$/.test(raw))throw Error(t+': an exact integer is required');
   const n=BigInt(raw),limit=range[t];
-  if(limit&&(n<limit[0]||n>limit[1]))throw Error(t+': fuera de rango');
+  if(limit&&(n<limit[0]||n>limit[1]))throw Error(t+': out of range');
   return n.toString();
  }
  if(DATE_TYPES.has(t)){
   const text=String(value).trim();
   const datePattern=/^\d{4}-\d{2}-\d{2}$/;
   const timePattern=/^([01]\d|2[0-3]):([0-5]\d):([0-5]\d)$/;
-  if(t==='TIME_OF_DAY'){const match=text.match(timePattern);if(!match)throw Error('TOD: formato HH:mm:ss, resolucion 1 s');return String(Number(match[1])*3600+Number(match[2])*60+Number(match[3]))}
+  if(t==='TIME_OF_DAY'){const match=text.match(timePattern);if(!match)throw Error('TOD: HH:mm:ss format, 1 s resolution');return String(Number(match[1])*3600+Number(match[2])*60+Number(match[3]))}
   const date=t==='DATE'?text:text.slice(0,10),clock=t==='DATE'?'00:00:00':text.slice(11);
-  if(!datePattern.test(date)||(t==='DATE_AND_TIME'&&(!/^\d{4}-\d{2}-\d{2}-(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d$/.test(text)||!timePattern.test(clock))))throw Error('DATE/DT: usa YYYY-MM-DD o YYYY-MM-DD-HH:mm:ss sin fracciones');
+  if(!datePattern.test(date)||(t==='DATE_AND_TIME'&&(!/^\d{4}-\d{2}-\d{2}-(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d$/.test(text)||!timePattern.test(clock))))throw Error('DATE/DT: use YYYY-MM-DD or YYYY-MM-DD-HH:mm:ss without fractions');
   const [year,month,day]=date.split('-').map(Number),[hh,mm,ss]=clock.split(':').map(Number);
-  if(year<1970||year>9999)throw Error('Fecha fuera del rango 1970..9999');
+  if(year<1970||year>9999)throw Error('Date outside range 1970..9999');
   const ms=Date.UTC(year,month-1,day,hh,mm,ss);
   const actual=new Date(ms);
-  if(!Number.isFinite(ms)||actual.getUTCFullYear()!==year||actual.getUTCMonth()!==month-1||actual.getUTCDate()!==day)throw Error('Fecha no valida');
+  if(!Number.isFinite(ms)||actual.getUTCFullYear()!==year||actual.getUTCMonth()!==month-1||actual.getUTCDate()!==day)throw Error('Invalid date');
   return String(Math.floor(ms/1000));
  }
  return String(value);
@@ -1661,7 +1661,7 @@ Object.assign(C,{buildST,localVariablesTSV,externalVariablesTSV,readme});
 (function(root){'use strict';const C=root.NXST,enc=new TextEncoder();
 function crc32(bytes){let c=0xffffffff;for(const b of bytes){c^=b;for(let i=0;i<8;i++)c=(c>>>1)^((c&1)?0xedb88320:0);}return(c^0xffffffff)>>>0;}
 function zip(files){const parts=[],central=[];let offset=0;const u16=(v,p,n)=>v.setUint16(p,n,true),u32=(v,p,n)=>v.setUint32(p,n>>>0,true);for(const [name,val] of Object.entries(files)){const nb=enc.encode(name),b=val instanceof Uint8Array?val:enc.encode(val),crc=crc32(b),h=new Uint8Array(30+nb.length),dv=new DataView(h.buffer);u32(dv,0,0x04034b50);u16(dv,4,20);u16(dv,6,0x800);u32(dv,14,crc);u32(dv,18,b.length);u32(dv,22,b.length);u16(dv,26,nb.length);h.set(nb,30);parts.push(h,b);const ch=new Uint8Array(46+nb.length),cv=new DataView(ch.buffer);u32(cv,0,0x02014b50);u16(cv,4,20);u16(cv,6,20);u16(cv,8,0x800);u32(cv,16,crc);u32(cv,20,b.length);u32(cv,24,b.length);u16(cv,28,nb.length);u32(cv,42,offset);ch.set(nb,46);central.push(ch);offset+=h.length+b.length;}const end=new Uint8Array(22),ev=new DataView(end.buffer),cs=central.reduce((a,b)=>a+b.length,0);u32(ev,0,0x06054b50);u16(ev,8,central.length);u16(ev,10,central.length);u32(ev,12,cs);u32(ev,16,offset);const all=[...parts,...central,end],out=new Uint8Array(all.reduce((a,b)=>a+b.length,0));let at=0;for(const b of all){out.set(b,at);at+=b.length;}return out;}
-function exportPackage(p){const errors=C.validate(p);if(errors.length)throw new Error(errors.join('\n'));const html=C.buildRuntimeHTML(p);if(enc.encode(html).length>C.HTML_MAX_BYTES)throw new Error('HTML embebido supera el límite estricto de 512 KB. Reduzca imágenes, pantallas u objetos.');const st=C.buildST(p),files={'WebHMI_Server.st':st,'WebHMI_LocalVariables.tsv':C.localVariablesTSV(p),'WebHMI_ExternalVariables.tsv':C.externalVariablesTSV(p),'HMI_Embedded.html':html,'project.nxst':JSON.stringify(p,null,2)};files['README.txt']=C.readme(p,html,st);return{files,zip:zip(files),html,st};}
+function exportPackage(p){const errors=C.validate(p);if(errors.length)throw new Error(errors.join('\n'));const html=C.buildRuntimeHTML(p);if(enc.encode(html).length>C.HTML_MAX_BYTES)throw new Error('Embedded HTML exceeds the strict 512 KB limit. Reduce images, screens, or elements.');const st=C.buildST(p),files={'WebHMI_Server.st':st,'WebHMI_LocalVariables.tsv':C.localVariablesTSV(p),'WebHMI_ExternalVariables.tsv':C.externalVariablesTSV(p),'HMI_Embedded.html':html,'project.nxst':JSON.stringify(p,null,2)};files['README.txt']=C.readme(p,html,st);return{files,zip:zip(files),html,st};}
 
 Object.assign(C,{zip,exportPackage});
 })(globalThis);
@@ -1674,17 +1674,17 @@ function jsJSON(value){return JSON.stringify(value).replace(/</g,'\\u003c').repl
 function number(value,fallback){const n=Number(value);return Number.isFinite(n)?String(n):String(fallback);}
 function liteProjection(input){
  const original=C.normalize(input),report=C.liteAnalysis(original);
- if(report.issues.length)throw Error('Extra Light no compatible:\n'+report.issues.join('\n'));
+ if(report.issues.length)throw Error('Extra Light is incompatible:\n'+report.issues.join('\n'));
  const screen=original.screens[0],objects=C.screenObjects(original,screen).map(o=>C.copy(o));
  const used=new Set(objects.filter(o=>o.kind!=='text').map(o=>o.binding));
  const p=C.copy(original);
  p.variables=original.variables.filter(v=>used.has(v.name)).map(v=>C.copy(v));
  p.screens=[{...C.copy(screen),objects,useBase:false}];
  p.baseScreen=null;p.assets=[];p.alarms=[];p.recipes=[];p.recipeEnabled=false;p.recipeVariables=[];p.internalVariables=[];p.screenBinding='';
- if(p.variables.some(v=>!Number.isInteger(Number(v.id))||Number(v.id)<1||Number(v.id)>65535))throw Error('Extra Light requiere IDs de variables entre 1 y 65535.');
- if(new Set(p.variables.map(v=>Number(v.id))).size!==p.variables.length)throw Error('Hay IDs de variables PLC duplicados.');
+ if(p.variables.some(v=>!Number.isInteger(Number(v.id))||Number(v.id)<1||Number(v.id)>65535))throw Error('Extra Light requires variable IDs between 1 and 65535.');
+ if(new Set(p.variables.map(v=>Number(v.id))).size!==p.variables.length)throw Error('Duplicate PLC variable IDs.');
  const errors=C.validate(p);
- if(errors.length)throw Error('Error en proyecto Extra Light: '+errors.join('; '));
+ if(errors.length)throw Error('Error in Extra Light project: '+errors.join('; '));
  return p;
 }
 function widgetHTML(o,vars){
@@ -1753,7 +1753,7 @@ function liteBrowser(){
   finally{schedule(online?Math.max(150,Number(L.poll)||500):Math.min(5000,500*Math.pow(2,Math.min(failures,3))))}
  }
  function validate(id,raw,element){
-  const tag=tags[id];if(!tag||!tag.write)throw Error('Variable no escribible');
+  const tag=tags[id];if(!tag||!tag.write)throw Error('Variable is read-only');
   const txt=String(raw).trim();
   if(tag.type==='BOOL'){if(txt!=='1'&&txt!=='0')throw Error('Solo 0 o 1');return txt}
   if(tag.type==='INT'){
@@ -1810,7 +1810,7 @@ function buildLiteRuntimeHTML(input,options){
  const p=liteProjection(input),view=p.screens[0],vm=new Map(p.variables.map(v=>[v.name,v]));
  const widgets=view.objects.map(o=>widgetHTML(o,vm)).join('');
  const withKeyboard=p.keyboardMode==='webhmi'&&view.objects.some(o=>o.kind==='input');
- const keypad=withKeyboard?'<div id="keyboard" hidden role="dialog" aria-modal="true" aria-label="Teclado numerico"><div class="kbd"><input id="kbValue" inputmode="none" aria-label="Valor"><div class="keys">'+['7','8','9','4','5','6','1','2','3','sign','0','dot','back','clear'].map(key=>'<button type="button" data-key="'+key+'">'+({sign:'±',dot:'.',back:'Borrar',clear:'Limpiar'}[key]||key)+'</button>').join('')+'</div><div id="kbError" role="alert"></div><div class="kbd-actions"><button id="kbCancel" type="button">Cancelar</button><button id="kbAccept" type="button">Aceptar</button></div></div></div>':'';
+ const keypad=withKeyboard?'<div id="keyboard" hidden role="dialog" aria-modal="true" aria-label="Numeric keypad"><div class="kbd"><input id="kbValue" inputmode="none" aria-label="Value"><div class="keys">'+['7','8','9','4','5','6','1','2','3','sign','0','dot','back','clear'].map(key=>'<button type="button" data-key="'+key+'">'+({sign:'±',dot:'.',back:'Backspace',clear:'Clear'}[key]||key)+'</button>').join('')+'</div><div id="kbError" role="alert"></div><div class="kbd-actions"><button id="kbCancel" type="button">Cancel</button><button id="kbAccept" type="button">OK</button></div></div></div>':'';
  const config={w:p.width,h:p.height,poll:p.pollMs,preview:Boolean(options&&options.preview),keyboard:withKeyboard,v:p.variables.map(v=>[Number(v.id),v.type,v.access==='RW'?1:0])};
  const html='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+htmlText(p.name)+'</title><style>'+liteCSS+'</style></head><body><header><span>'+htmlText(p.name)+'</span><span id="state">Conectando</span></header><main id="viewport"><div id="fit"><div id="stage" style="background:'+htmlText(view.background)+'">'+widgets+'</div></div></main><div id="shield">Sin conexion con PLC</div>'+keypad+'<script>const L='+jsJSON(config)+';('+liteBrowser.toString()+')();</script></body></html>';
  // The Omron ST source embeds HTML in STRING chunks; keep it 7-bit ASCII.
@@ -1823,7 +1823,7 @@ function buildLiteST(input){
  let st=C.buildST(p);
  const head='    CASE Web_Chunk OF\n',tail="\n    ELSE\n        Web_TxText := '';\n    END_CASE;";
  const a=st.indexOf(head),b=st.indexOf(tail,a);
- if(a<0||b<a)throw Error('La estructura ST de fragmentos HTTP ha cambiado.');
+ if(a<0||b<a)throw Error('The ST structure of HTTP fragments has changed.');
  const cases=parts.map((chunk,i)=>'            '+i+": Web_TxText := '"+stEscape(chunk)+"';").join('\n');
  st=st.slice(0,a)+head+cases+st.slice(b);
  st=st.replace(/HTML embebido: \d+ bytes \/ \d+ fragmentos/,'HTML embebido: '+enc.encode(html).length+' bytes / '+parts.length+' fragmentos (Extra Light)');
@@ -1834,7 +1834,7 @@ function buildLiteST(input){
  st=st.replace(/\n\s*ELSIF FIND\(Web_RxText, 'POST \/api\/recipe\?slot='\)[\s\S]*?(?=\n\s*ELSIF FIND\(Web_RxText, 'POST \/api\/ack\?')/,'');
  st=st.replace(/\n\s*ELSIF FIND\(Web_RxText, 'POST \/api\/ack\?'\) = 1 THEN\s+Web_Request := UINT#5;/,'');
  st=st.replace(/\n    4:[\s\S]*?(?=\n    ELSE\n        Web_ApiBody := 'NOT FOUND';)/,'');
- if(st.includes('Web_Recipe')||st.includes('Web_AlarmAck')||st.includes('/api/ack')||st.includes('/api/recipe'))throw Error('Rutas o variables no permitidas en ST Extra Light');
+ if(st.includes('Web_Recipe')||st.includes('Web_AlarmAck')||st.includes('/api/ack')||st.includes('/api/recipe'))throw Error('Routes or variables not permitted in Extra Light ST');
  return st;
 }
 function liteLocalVariablesTSV(input){
@@ -1846,7 +1846,7 @@ function liteReadme(input,html,st){
 }
 function exportLitePackage(input){
  const p=liteProjection(input),html=buildLiteRuntimeHTML(p);
- if(enc.encode(html).length>LITE_HTML_LIMIT)throw Error('Extra Light supera 128 KB de HTML; reduce elementos o utiliza la version completa.');
+ if(enc.encode(html).length>LITE_HTML_LIMIT)throw Error('Extra Light exceeds 128 KB of HTML; reduce elements or use the full version.');
  const st=buildLiteST(p),files={
  'WebHMI_Server.st':st,
  'WebHMI_LocalVariables.tsv':liteLocalVariablesTSV(p),

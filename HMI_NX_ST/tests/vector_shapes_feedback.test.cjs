@@ -43,7 +43,7 @@ test('standalone geometry needs no PLC tag, assets or fonts and preserves saved 
  assert.match(html,/\.o\.shape \.shape-visual svg/);
  assert.ok(html.length<C.HTML_MAX_BYTES);
  const bad=C.copy(p);bad.screens[0].objects[4].shapePoints='0,0 40,40 80,80';
- assert.ok(C.validate(bad).some(x=>x.includes('vértices')));
+ assert.ok(C.validate(bad).some(x=>x.includes('vertices')));
 });
 test('button feedback has independent OFF and ON captions with backwards-compatible fallback',()=>{
  const p=C.newProject();
@@ -64,10 +64,10 @@ test('editor lists shape tools and properties and pointer vertex handling',()=>{
  const index=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
  const app=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8');
  const css=fs.readFileSync(path.join(__dirname,'..','style.css'),'utf8');
- assert.match(index,/<button data-kind="shape"[^>]*>Figuras<\/button>/);
+ assert.match(index,/<button data-kind="shape"[^>]*>Shapes<\/button>/);
  assert.equal((index.match(/data-kind="shape"/g)||[]).length,1,'Un único botón Figuras en el editor');
  assert.doesNotMatch(index,/data-shape="/);
- assert.match(app,/if\(b\.dataset\.kind==='shape'\)\{o\.text='Figura';\}/);
+ assert.match(app,/if\(b\.dataset\.kind==='shape'\)\{o\.text='Shape';\}/);
  for(const kind of ['rect','ellipse','line','arrow','triangle'])assert.ok(Object.hasOwn(C.SHAPE_LABELS,kind));
  for(const prop of ['shapeType','shapeFill','shapeStroke','shapeStrokeWidth','shapePoints','feedbackTextOff','feedbackTextOn'])assert.match(app,new RegExp('data-p="'+prop+'"'));
  assert.match(app,/pointIndex:point\?Number\(point\.dataset\.point\):-1/);

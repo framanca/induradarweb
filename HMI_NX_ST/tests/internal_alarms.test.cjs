@@ -55,16 +55,16 @@ test('alarm validation accepts all four HMI internal types and exports without P
 test('invalid, missing, and incompatible internal alarm thresholds are rejected',()=>{
  const p=setup();
  p.alarms[0].binding='MissingLocal';
- assert.ok(C.validate(p).some(x=>x.includes('variable no válida')));
+ assert.ok(C.validate(p).some(x=>x.includes('invalid variable')));
  p.alarms[0].binding='RunLocal';
  p.alarms[0].operator='gt';
- assert.ok(C.validate(p).some(x=>x.includes('BOOL sólo admite')));
+ assert.ok(C.validate(p).some(x=>x.includes('BOOL supports only')));
  p.alarms[0].operator='eq';
  p.alarms[3].operator='ge';
- assert.ok(C.validate(p).some(x=>x.includes('STRING sólo admite')));
+ assert.ok(C.validate(p).some(x=>x.includes('STRING supports only')));
  p.alarms[3].operator='eq';
  p.alarms[2].value='this-is-not-a-number';
- assert.ok(C.validate(p).some(x=>x.includes('umbral no válido')));
+ assert.ok(C.validate(p).some(x=>x.includes('invalid threshold')));
  p.alarms[2].value=9.5;
  assert.deepEqual(Array.from(C.validate(p)),[]);
 });
@@ -90,7 +90,7 @@ test('alarm editor offers PLC and HMI internal variables and preserves saved ala
  assert.deepEqual(Array.from(n.alarms,x=>x.binding),p.alarms.map(x=>x.binding));
  const app=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8');
  assert.match(app,/opts\(a\.binding,\(\)=>true,true\)/);
- assert.match(app,/Variables internas/);
+ assert.match(app,/Internal variables/);
  assert.match(app,/p\.variables\.find\(v=>v\.live\)\|\|p\.internalVariables\.find\(v=>v\.name\)/);
- assert.match(app,/se evalúan y reconocen solo en este navegador/);
+ assert.match(app,/are evaluated and acknowledged only in this browser/);
 });

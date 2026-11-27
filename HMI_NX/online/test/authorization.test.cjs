@@ -59,7 +59,7 @@ test('server refuses an image that injects HTML attributes',async()=>{
 
 test('frontend offers anonymous guest access without shipping compiler code',()=>{
  const client=fs.readFileSync(path.join(base,'client/online.js'),'utf8');
- assert.ok(client.includes('Entrar como invitado'));
+ assert.ok(client.includes('Continue as guest'));
  assert.ok(client.includes("/auth/v1/signup"));
  assert.ok(!client.includes('compiler.js'));
 });

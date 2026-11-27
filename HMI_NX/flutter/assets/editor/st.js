@@ -1,25 +1,77 @@
 (function(root){'use strict';const C=root.NXST,enc=new TextEncoder();
 function stLiteral(s){return String(s).replace(/\$/g,()=> '$$').replace(/'/g,()=> "$'").replace(/\r/g,()=> '$r').replace(/\n/g,()=> '$n');}
 function chunks(text,max=1400){const out=[];for(let i=0;i<text.length;i+=max)out.push(text.slice(i,i+max));return out;}
-function toStringExpr(v){if(v.type==='BOOL')return null;if(v.type==='STRING')return v.name;return v.type+'_TO_STRING('+v.name+')';}
-function fromStringExpr(v){if(v.type==='BOOL')return null;if(v.type==='STRING')return 'Web_ValueText';return 'STRING_TO_'+v.type+'(Web_ValueText)';}
-function stTyped(v,value){if(v.type==='BOOL')return (value===true||String(value)==='1'||String(value).toLowerCase()==='true')?'TRUE':'FALSE';if(v.type==='STRING')return "'"+stLiteral(String(value))+"'";if(v.type==='REAL'||v.type==='LREAL'){const n=Number(value);return v.type+'#'+(Number.isInteger(n)?n.toFixed(1):String(n));}if(C.NUMERIC_TYPES.has(v.type))return v.type+'#'+String(Math.trunc(Number(value)));throw new Error('Tipo no escribible: '+v.type);}
-function alarmExpr(v,a){const op={eq:'=',ne:'<>',gt:'>',ge:'>=',lt:'<',le:'<='}[a.operator]||'=';return '('+v.name+' '+op+' '+stTyped(v,a.value)+')';}
+function toStringExpr(v){
+ if(v.type==='BOOL')return null;
+ if(v.enumType)return 'DINT_TO_STRING(EnumToNum('+v.name+'))';
+ if(v.type==='STRING')return v.name;
+ if(v.type==='TIME')return 'LINT_TO_STRING(TimeToNanoSec('+v.name+'))';
+ if(v.type==='DATE')return 'DateToString('+v.name+')';
+ if(v.type==='TIME_OF_DAY')return 'TodToString('+v.name+')';
+ if(v.type==='DATE_AND_TIME')return 'DtToString('+v.name+')';
+ return v.type+'_TO_STRING('+v.name+')';
+}
+function fromStringExpr(v){
+ if(v.type==='BOOL')return null;
+ if(v.type==='STRING')return 'Web_ValueText';
+ if(v.type==='TIME')return 'NanoSecToTime(STRING_TO_LINT(Web_ValueText))';
+ if(v.type==='DATE')return 'SecToDate(STRING_TO_LINT(Web_ValueText))';
+ if(v.type==='TIME_OF_DAY')return 'SecToTod(STRING_TO_LINT(Web_ValueText))';
+ if(v.type==='DATE_AND_TIME')return 'SecToDt(STRING_TO_LINT(Web_ValueText))';
+ return 'STRING_TO_'+v.type+'(Web_ValueText)';
+}
+function stTyped(v,value){
+ const t=v.type,canonical=C.sysmacTypes&&C.sysmacTypes.canonicalWrite;
+ if(t==='BOOL')return (value===true||String(value)==='1'||String(value).toLowerCase()==='true')?'TRUE':'FALSE';
+ if(t==='STRING')return "'"+stLiteral(String(value))+"'";
+ if(t==='REAL'||t==='LREAL'){const n=Number(value);if(!Number.isFinite(n))throw Error(t+': valor invalido');return t+'#'+(Number.isInteger(n)?n.toFixed(1):String(n));}
+ if(['BYTE','WORD','DWORD','LWORD'].includes(t))return t+'#16#'+(canonical?canonical(t,value):String(value));
+ if(t==='TIME')return 'NanoSecToTime(LINT#'+(canonical?canonical(t,value):String(value))+')';
+ if(t==='DATE'){if(!/^\d{4}-\d{2}-\d{2}$/.test(String(value)))throw Error('DATE: formato YYYY-MM-DD');return 'D#'+value}
+ if(t==='TIME_OF_DAY'){if(!/^\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?$/.test(String(value)))throw Error('TOD: formato HH:mm:ss');return 'TOD#'+value}
+ if(t==='DATE_AND_TIME'){if(!/^\d{4}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?$/.test(String(value)))throw Error('DT: formato YYYY-MM-DD-HH:mm:ss');return 'DT#'+value}
+ if(C.NUMERIC_TYPES.has(t))return t+'#'+(canonical?canonical(t,value):String(Math.trunc(Number(value))));
+ throw Error('Tipo no soportado en constante ST: '+t);
+}
+function alarmExpr(v,a){const op={eq:'=',ne:'<>',gt:'>',ge:'>=',lt:'<',le:'<='}[a.operator]||'=';const lhs=v.enumType?'EnumToNum('+v.name+')':v.type==='TIME'?'TimeToNanoSec('+v.name+')':v.name;const rhs=v.type==='TIME'?'LINT#'+(C.sysmacTypes?C.sysmacTypes.canonicalWrite('TIME',a.value):String(a.value)):stTyped(v,a.value);return '('+lhs+' '+op+' '+rhs+')';}
 function buildST(input){
  const p=C.normalize(input),html=C.buildRuntimeHTML(p),parts=chunks(html),exposed=p.variables.filter(v=>v.expose&&v.live),rw=exposed.filter(v=>v.access==='RW'&&v.writeSupported),vm=new Map(p.variables.map(v=>[v.name,v]));
- const read=[];for(const v of exposed){if(v.type==='BOOL'){read.push(`IF ${v.name} THEN\n    Web_ApiBody := CONCAT(Web_ApiBody, '${v.id}=1$n');\nELSE\n    Web_ApiBody := CONCAT(Web_ApiBody, '${v.id}=0$n');\nEND_IF;`);}else{read.push(`Web_ApiBody := CONCAT(Web_ApiBody, '${v.id}=', ${toStringExpr(v)}, '$n');`);}}
- for(const [i,a] of p.alarms.entries()){const v=vm.get(a.binding);if(!v)continue;read.push(`IF ${alarmExpr(v,a)} THEN\n    Web_ApiBody := CONCAT(Web_ApiBody, 'A${i+1}=1$n');\nELSE\n    Web_ApiBody := CONCAT(Web_ApiBody, 'A${i+1}=0$n');\nEND_IF;`);}
- const writes=rw.map(v=>{if(v.type==='BOOL')return `${v.id}:\n                ${v.name} := (Web_ValueText = '1') OR (Web_ValueText = 'TRUE') OR (Web_ValueText = 'true');\n                Web_Found := TRUE;`;return `${v.id}:\n                ${v.name} := ${fromStringExpr(v)};\n                Web_Found := TRUE;`;}).join('\n            ');
- const recipeCases=p.recipes.map((r,i)=>{const assigns=[];for(const [name,value] of Object.entries(r.values||{})){const v=vm.get(name);if(v&&v.access==='RW'&&v.writeSupported)assigns.push(`${v.name} := ${stTyped(v,value)};`);}return `${i+1}:\n                ${assigns.join('\n                ')||';'}\n                Web_Found := TRUE;`;}).join('\n            ');
+ const read=[],readByName=new Map();for(const v of exposed){if(v.type==='BOOL'){read.push(`IF ${v.name} THEN\n    Web_ApiBody := CONCAT(Web_ApiBody, '${v.id}=1$n');\nELSE\n    Web_ApiBody := CONCAT(Web_ApiBody, '${v.id}=0$n');\nEND_IF;`);}else{read.push(`Web_ApiBody := CONCAT(Web_ApiBody, '${v.id}=', ${toStringExpr(v)}, '$n');`);}readByName.set(v.name,read[read.length-1]);}
+ for(const [i,a] of p.alarms.entries()){const v=vm.get(a.binding);if(!v)continue;read.push(`IF ${alarmExpr(v,a)} THEN\n    Web_ApiBody := CONCAT(Web_ApiBody, 'A${i+1}=1$n');\nELSE\n    Web_ApiBody := CONCAT(Web_ApiBody, 'A${i+1}=0$n');\nEND_IF;\nIF Web_AlarmAck[${i+1}] THEN\n    Web_ApiBody := CONCAT(Web_ApiBody, 'K${i+1}=1$n');\nELSE\n    Web_ApiBody := CONCAT(Web_ApiBody, 'K${i+1}=0$n');\nEND_IF;`);}
+ // Alarms are global: always append every PLC alarm and ACK, whatever the screen.
+ const alarmRead=read.slice(exposed.length);
+ const screenReadCases=p.screens.map((screen,i)=>`${i}:
+        Web_Found := TRUE;
+        ${[...C.screenReadNames(p,screen).map(name=>readByName.get(name)),...alarmRead].join('\n        ')}`).join('\n        ');
+ const writes=rw.map(v=>{
+ if(v.type==='BOOL')return `${v.id}:\n                ${v.name} := (Web_ValueText = '1') OR (Web_ValueText = 'TRUE') OR (Web_ValueText = 'true');\n                Web_Found := TRUE;`;
+ const statement=v.enumType?'NumToEnum(STRING_TO_DINT(Web_ValueText), '+v.name+')':v.name+' := '+fromStringExpr(v);
+ return `${v.id}:\n                ${statement};\n                Web_Found := TRUE;`;
+ }).join('\n            ');
+ const alarmReset=p.alarms.map((a,i)=>{const v=vm.get(a.binding);return v?`IF NOT ${alarmExpr(v,a)} THEN Web_AlarmAck[${i+1}] := FALSE; END_IF;`:''}).filter(Boolean).join('\n');
+ const alarmAckCases=p.alarms.map((a,i)=>{const v=vm.get(a.binding);return v?`${i+1}:\n IF ${alarmExpr(v,a)} THEN Web_AlarmAck[${i+1}] := TRUE; END_IF;\n Web_Found := TRUE;`:''}).filter(Boolean).join('\n');
+ const alarmAckAll=p.alarms.map((a,i)=>{const v=vm.get(a.binding);return v?`IF ${alarmExpr(v,a)} THEN Web_AlarmAck[${i+1}] := TRUE; END_IF;`:''}).filter(Boolean).join('\n');
+ const recipeCases=(p.recipeEnabled?p.recipes:[]).map((r,i)=>{const assigns=[];for(const [name,value] of Object.entries(r.values||{})){const v=vm.get(name);if(v&&v.access==='RW'&&v.writeSupported)assigns.push(v.enumType?`NumToEnum(${stTyped(v,value)}, ${v.name});`:`${v.name} := ${stTyped(v,value)};`);}return `${i+1}:\n                ${assigns.join('\n                ')||';'}\n                Web_Found := TRUE;`;}).join('\n            ');
+ const recipeInit=(p.recipeEnabled?p.recipes:[]).map((r,i)=>{
+  const blob=C.recipeWireJSON(r);
+  if(enc.encode(blob).length>p.recipeBytes)throw Error('Receta '+r.name+': exceso de capacidad NX');
+  return "Web_RecipeData["+(i+1)+"] := '"+stLiteral(blob)+"'; Web_RecipeRev["+(i+1)+"] := UDINT#1;";
+ }).join('\n    ');
  const chunkCases=parts.map((c,i)=>`${i}: Web_TxText := '${stLiteral(c)}';`).join('\n            ');
- return `(* HMI NX ST · servidor WebHMI generado
+ let program=`(* HMI NX ST · servidor WebHMI generado
    Proyecto: ${p.name}
    Puerto: ${p.port}
    HTML embebido: ${enc.encode(html).length} bytes / ${parts.length} fragmentos
-   Funciones: RW, pantallas, imágenes, widgets industriales, alarmas actuales y recetas.
+   Funciones: RW, pantallas, imágenes, widgets industriales, alarmas actuales${p.recipeEnabled?' y recetas':''}.
    Seguridad funcional e interlocks permanecen en el programa de máquina.
 *)
 
+${alarmReset}
+(* Banco de recetas retenido. Validar los atributos Retain de las variables en Sysmac. *)
+IF NOT Web_RecipeInit THEN
+    ${recipeInit}
+    Web_RecipeInit := TRUE;
+END_IF;
 IF Web_State = Web_PrevState THEN
     IF (Web_State <> UINT#10) AND (Web_StateTicks < UDINT#4294967294) THEN
         Web_StateTicks := Web_StateTicks + UDINT#1;
@@ -63,12 +115,20 @@ CASE Web_State OF
         Web_Request := UINT#0;
         IF (FIND(Web_RxText, 'GET / ') = 1) OR (FIND(Web_RxText, 'GET /index.html ') = 1) THEN
             Web_Request := UINT#1;
-        ELSIF FIND(Web_RxText, 'GET /api/read ') = 1 THEN
+        ELSIF (FIND(Web_RxText, 'GET /api/read ') = 1) OR (FIND(Web_RxText, 'GET /api/read?screen=') = 1) THEN
             Web_Request := UINT#2;
         ELSIF FIND(Web_RxText, 'POST /api/write?') = 1 THEN
             Web_Request := UINT#3;
+        ELSIF FIND(Web_RxText, 'POST /api/recipe?slot=') = 1 THEN
+            Web_Request := UINT#8;
+        ELSIF FIND(Web_RxText, 'GET /api/recipe?slot=') = 1 THEN
+            Web_Request := UINT#7;
+        ELSIF FIND(Web_RxText, 'GET /api/recipes ') = 1 THEN
+            Web_Request := UINT#6;
         ELSIF FIND(Web_RxText, 'POST /api/recipe?') = 1 THEN
             Web_Request := UINT#4;
+         ELSIF FIND(Web_RxText, 'POST /api/ack?') = 1 THEN
+             Web_Request := UINT#5;
         ELSE
             Web_Request := UINT#9;
         END_IF;
@@ -88,7 +148,24 @@ CASE Web_State OF
         Web_Seq := Web_Seq + UDINT#1;
         IF Web_Seq = UDINT#0 THEN Web_Seq := UDINT#1; END_IF;
         Web_ApiBody := CONCAT('SEQ=', UDINT_TO_STRING(Web_Seq), '$n');
-        ${read.join('\n        ')}
+        IF FIND(Web_RxText, 'GET /api/read?screen=') = 1 THEN
+            Web_PosId := FIND(Web_RxText, '?screen=');
+            Web_PosEnd := FIND(Web_RxText, ' HTTP/');
+            IF (Web_PosId > 0) AND (Web_PosEnd > Web_PosId + UINT#8) THEN
+                Web_IdText := MID(In:=Web_RxText, L:=Web_PosEnd-(Web_PosId+UINT#8), P:=Web_PosId+UINT#8);
+                Web_WriteId := STRING_TO_UINT(Web_IdText);
+                CASE Web_WriteId OF
+                ${screenReadCases}
+                ELSE
+                    Web_ApiBody := CONCAT(Web_ApiBody, 'BAD SCREEN$n');
+                END_CASE;
+            ELSE
+                Web_ApiBody := CONCAT(Web_ApiBody, 'BAD SCREEN$n');
+            END_IF;
+        ELSE
+            (* Legacy/full snapshot: also needed while editing or applying recipes. *)
+            ${read.join('\n            ')}
+        END_IF;
         Web_ApiBody := CONCAT(Web_ApiBody, 'END=', UDINT_TO_STRING(Web_Seq), '$n');
         Web_TxText := 'HTTP/1.0 200 OK$r$nContent-Type: text/plain; charset=utf-8$r$nCache-Control: no-store$r$nConnection: close$r$n$r$n';
 
@@ -133,6 +210,96 @@ CASE Web_State OF
             Web_TxText := 'HTTP/1.0 200 OK$r$nContent-Type: text/plain$r$nCache-Control: no-store$r$nConnection: close$r$n$r$n';
         ELSE
             Web_ApiBody := 'BAD RECIPE';
+            Web_TxText := 'HTTP/1.0 400 Bad Request$r$nContent-Type: text/plain$r$nConnection: close$r$n$r$n';
+        END_IF;
+
+
+    5:
+        Web_PosId := FIND(Web_RxText, '?id=');
+        Web_PosEnd := FIND(Web_RxText, ' HTTP/');
+        Web_Found := FALSE;
+        IF (Web_PosId > 0) AND (Web_PosEnd > Web_PosId) THEN
+            Web_IdText := MID(In:=Web_RxText, L:=Web_PosEnd-(Web_PosId+UINT#4), P:=Web_PosId+UINT#4);
+            Web_WriteId := STRING_TO_UINT(Web_IdText);
+            IF Web_WriteId = UINT#0 THEN
+                ${alarmAckAll}
+                Web_Found := TRUE;
+            ELSE
+                CASE Web_WriteId OF
+                ${alarmAckCases||'0: ;'}
+                ELSE
+                    ;
+                END_CASE;
+            END_IF;
+        END_IF;
+        IF Web_Found THEN
+            Web_ApiBody := 'OK';
+            Web_TxText := 'HTTP/1.0 200 OK$r$nContent-Type: text/plain$r$nCache-Control: no-store$r$nConnection: close$r$n$r$n';
+        ELSE
+            Web_ApiBody := 'BAD ACK';
+            Web_TxText := 'HTTP/1.0 400 Bad Request$r$nContent-Type: text/plain$r$nConnection: close$r$n$r$n';
+        END_IF;
+
+
+    6: (* Consulta ligera: version de las 12 ranuras sin cargar sus valores. *)
+        Web_ApiBody := 'RCPV=1$n';
+        FOR Web_RecipeIdx := UINT#1 TO UINT#12 DO
+            Web_ApiBody := CONCAT(Web_ApiBody, UINT_TO_STRING(Web_RecipeIdx), '=', UDINT_TO_STRING(Web_RecipeRev[Web_RecipeIdx]), '$n');
+        END_FOR;
+        Web_TxText := 'HTTP/1.0 200 OK$r$nContent-Type: text/plain; charset=utf-8$r$nCache-Control: no-store$r$nConnection: close$r$n$r$n';
+
+    7: (* Obtener blob ASCII de una ranura, maximo 500 bytes. *)
+        Web_PosSlot := FIND(Web_RxText, '?slot=');
+        Web_PosEnd := FIND(Web_RxText, ' HTTP/');
+        Web_Found := FALSE;
+        IF (Web_PosSlot > 0) AND (Web_PosEnd > Web_PosSlot + UINT#6) THEN
+            Web_SlotText := MID(In:=Web_RxText, L:=Web_PosEnd-(Web_PosSlot+UINT#6), P:=Web_PosSlot+UINT#6);
+            Web_RecipeSlot := STRING_TO_UINT(Web_SlotText);
+            IF (Web_RecipeSlot >= UINT#1) AND (Web_RecipeSlot <= UINT#12) THEN
+                Web_ApiBody := Web_RecipeData[Web_RecipeSlot];
+                Web_Found := TRUE;
+            END_IF;
+        END_IF;
+        IF Web_Found THEN
+            Web_TxText := 'HTTP/1.0 200 OK$r$nContent-Type: application/json; charset=utf-8$r$nCache-Control: no-store$r$nConnection: close$r$n$r$n';
+        ELSE
+            Web_ApiBody := 'BAD SLOT';
+            Web_TxText := 'HTTP/1.0 400 Bad Request$r$nContent-Type: text/plain$r$nConnection: close$r$n$r$n';
+        END_IF;
+
+    8: (* Escritura de receta atomica por ranura con revision CAS. No se interpreta el JSON en ST. *)
+        Web_PosSlot := FIND(Web_RxText, '?slot=');
+        Web_PosRev := FIND(Web_RxText, '&rev=');
+        Web_PosEnd := FIND(Web_RxText, ' HTTP/');
+        Web_PosBody := FIND(Web_RxText, '$r$n$r$n');
+        Web_Found := FALSE;
+        IF (Web_PosSlot > 0) AND (Web_PosRev > Web_PosSlot) AND (Web_PosEnd > Web_PosRev) AND (Web_PosBody > 0) THEN
+            Web_SlotText := MID(In:=Web_RxText, L:=Web_PosRev-(Web_PosSlot+UINT#6), P:=Web_PosSlot+UINT#6);
+            Web_RevText := MID(In:=Web_RxText, L:=Web_PosEnd-(Web_PosRev+UINT#5), P:=Web_PosRev+UINT#5);
+            Web_RecipeSlot := STRING_TO_UINT(Web_SlotText);
+            Web_RecipeExpected := STRING_TO_UDINT(Web_RevText);
+            Web_BodyLen := LEN(Web_RxText)-(Web_PosBody+UINT#3);
+            IF (Web_RecipeSlot >= UINT#1) AND (Web_RecipeSlot <= UINT#12) AND (Web_BodyLen <= UINT#500) THEN
+                Web_Found := TRUE;
+                IF Web_RecipeRev[Web_RecipeSlot] = Web_RecipeExpected THEN
+                    IF Web_BodyLen = UINT#0 THEN
+                        Web_ValueText := '';
+                    ELSE
+                        Web_ValueText := MID(In:=Web_RxText, L:=Web_BodyLen, P:=Web_PosBody+UINT#4);
+                    END_IF;
+                    Web_RecipeData[Web_RecipeSlot] := Web_ValueText;
+                    Web_RecipeRev[Web_RecipeSlot] := Web_RecipeRev[Web_RecipeSlot] + UDINT#1;
+                    IF Web_RecipeRev[Web_RecipeSlot] = UDINT#0 THEN Web_RecipeRev[Web_RecipeSlot] := UDINT#1; END_IF;
+                    Web_ApiBody := CONCAT('REV=', UDINT_TO_STRING(Web_RecipeRev[Web_RecipeSlot]));
+                    Web_TxText := 'HTTP/1.0 200 OK$r$nContent-Type: text/plain$r$nCache-Control: no-store$r$nConnection: close$r$n$r$n';
+                ELSE
+                    Web_ApiBody := CONCAT('CONFLICT REV=', UDINT_TO_STRING(Web_RecipeRev[Web_RecipeSlot]));
+                    Web_TxText := 'HTTP/1.0 409 Conflict$r$nContent-Type: text/plain$r$nConnection: close$r$n$r$n';
+                END_IF;
+            END_IF;
+        END_IF;
+        IF NOT Web_Found THEN
+            Web_ApiBody := 'BAD RECIPE DATA';
             Web_TxText := 'HTTP/1.0 400 Bad Request$r$nContent-Type: text/plain$r$nConnection: close$r$n$r$n';
         END_IF;
 
@@ -186,20 +353,42 @@ CASE Web_State OF
     END_IF;
 END_CASE;
 `;
+ // The server must never reference a non-existent recipe variable when disabled.
+ if(!p.recipeEnabled){
+  program=program.replace(/\n\(\* Banco de recetas retenido\.[\s\S]*?\nEND_IF;\n/,'\n');
+  program=program.replace(/\n        ELSIF FIND\(Web_RxText, 'POST \/api\/recipe\?slot='\)[\s\S]*?(?=\n         ELSIF FIND\(Web_RxText, 'POST \/api\/ack\?')/,'');
+  program=program.replace(/\n    4:[\s\S]*?(?=\n    5:)/,'');
+  program=program.replace(/\n    6:[\s\S]*?(?=\n    ELSE\n        Web_ApiBody := 'NOT FOUND';)/,'');
+  if(/Web_Recipe|Web_RecipeSlot|\/api\/recipes|\/api\/recipe/.test(program))throw Error('ST contiene referencias a recetas deshabilitadas');
+ }else{
+  program=program.replace('FOR Web_RecipeIdx := UINT#1 TO UINT#12 DO','FOR Web_RecipeIdx := UINT#1 TO UINT#'+p.recipeSlots+' DO');
+  program=program.replace(/Web_RecipeSlot <= UINT#12/g,'Web_RecipeSlot <= UINT#'+p.recipeSlots);
+  program=program.replace('Web_BodyLen <= UINT#500','Web_BodyLen <= UINT#'+p.recipeBytes);
+  program=program.replace('de las 12 ranuras','de las '+p.recipeSlots+' ranuras').replace('maximo 500 bytes','maximo '+p.recipeBytes+' bytes');
+ }
+ return program;
 }
-function referencedVariables(p){const n=C.normalize(p),set=new Set(n.variables.filter(v=>v.expose&&v.live).map(v=>v.name));for(const s of n.screens)for(const o of s.objects){if(o.binding)set.add(o.binding);if(o.feedbackBinding)set.add(o.feedbackBinding);}for(const a of n.alarms)if(a.binding)set.add(a.binding);for(const r of n.recipes)for(const k of Object.keys(r.values||{}))set.add(k);return n.variables.filter(v=>set.has(v.name));}
-function externalVariablesTSV(p){return referencedVariables(p).map(v=>[v.name,v.type].join('\t')).join('\r\n');}
-function localVariablesTSV(){const rows=[
+function referencedVariables(p){const n=C.normalize(p),set=new Set(n.variables.filter(v=>v.expose&&v.live).map(v=>v.name));if(n.screenBinding)set.add(n.screenBinding);for(const s of n.screens)for(const o of C.screenObjects(n,s)){if(o.binding)set.add(o.binding);if(o.feedbackBinding)set.add(o.feedbackBinding);}for(const a of n.alarms)if(a.binding)set.add(a.binding);for(const r of n.recipes)for(const k of Object.keys(r.values||{}))set.add(k);return n.variables.filter(v=>set.has(v.name));}
+function externalVariablesTSV(p){
+ const roots=new Map();
+ for(const v of referencedVariables(p)){
+  const name=v.plcRoot||v.name,type=v.plcRootType||v.type;
+  if(roots.has(name)&&roots.get(name)!==type)throw Error('Tipo externo conflictivo: '+name);
+  roots.set(name,type);
+ }
+ return [...roots].map(([name,type])=>name+'\t'+type).join('\r\n');
+}
+function localVariablesTSV(input){const p=C.normalize(input);const rows=[
 ['Web_State','UINT','0','','','','Estado servidor HTTP'],
 ['Web_PrevState','UINT','0','','','','Estado anterior watchdog'],
 ['Web_StateTicks','UDINT','0','','','','Ciclos en estado actual'],
 ['Web_WatchdogLimit','UDINT','5000','','','','Límite ciclos watchdog'],
 ['Web_Seq','UDINT','0','','','','Secuencia snapshot API'],
+ ['Web_AlarmAck',`ARRAY[1..${Math.max(1,p.alarms.length)}] OF BOOL`,'','','','','Alarmas reconocidas; rearme al desactivarse'],
 ['Web_Request','UINT','0','','','','Ruta solicitada'],
 ['Web_Chunk','UINT','0','','','','Fragmento HTML'],
 ['Web_WriteId','UINT','0','','','','ID escritura/receta'],
 ['Web_PosId','UINT','0','','','','Posición id'],
-['Web_PosVal','UINT','0','','','','Posición valor'],
 ['Web_PosEnd','UINT','0','','','','Fin request line'],
 ['Web_PosBody','UINT','0','','','','Inicio cuerpo HTTP'],
 ['Web_TxSize','UINT','0','','','','Bytes a enviar'],
@@ -211,12 +400,29 @@ function localVariablesTSV(){const rows=[
 ['Web_ApiBody','STRING[1985]','','','','','Datos API'],
 ['Web_IdText','STRING[12]','','','','','ID parseado'],
 ['Web_ValueText','STRING[512]','','','','','Valor de escritura'],
+['Web_RecipeInit','BOOL','FALSE','','True','','Banco de recetas inicializado - Retain'],
+ ['Web_RecipeData','ARRAY[1..12] OF STRING[512]','','','True','','Contenido ASCII del banco de recetas - Retain'],
+ ['Web_RecipeRev','ARRAY[1..12] OF UDINT','','','True','','Version de recetas - Retain'],
+ ['Web_RecipeSlot','UINT','0','','','','Ranura receta'],
+ ['Web_RecipeIdx','UINT','0','','','','Indice de resumen'],
+ ['Web_RecipeExpected','UDINT','0','','','','Version cliente CAS'],
+ ['Web_PosSlot','UINT','0','','','','Posicion slot'],
+ ['Web_PosRev','UINT','0','','','','Posicion rev'],
+ ['Web_BodyLen','UINT','0','','','','Longitud cuerpo receta'],
+ ['Web_SlotText','STRING[8]','','','','','Ranura'],
+ ['Web_RevText','STRING[16]','','','','','Version cliente'],
 ['Web_Socket','_sSOCKET','','','','','Socket aceptado'],
 ['Web_Accept','SktTCPAccept','','','','','Accept TCP'],
 ['Web_Rcv','SktTCPRcv','','','','','Receive TCP'],
 ['Web_Send','SktTCPSend','','','','','Send TCP'],
 ['Web_Close','SktClose','','','','','Close TCP']
-];return rows.map(r=>r.join('\t')).join('\r\n');}
+];
+ const selected=rows.filter(r=>p.recipeEnabled||!String(r[0]).startsWith('Web_Recipe')&&!['Web_PosSlot','Web_PosRev','Web_BodyLen','Web_SlotText','Web_RevText'].includes(r[0]));
+ return selected.map(r=>{
+  if(r[0]==='Web_RecipeData')r[1]='ARRAY[1..'+p.recipeSlots+'] OF STRING['+(p.recipeBytes+12)+']';
+  if(r[0]==='Web_RecipeRev')r[1]='ARRAY[1..'+p.recipeSlots+'] OF UDINT';
+  return r.join('\t');
+ }).join('\r\n');}
 function readme(input,html,st){const p=C.normalize(input);return `HMI NX ST · paquete generado
 
 Proyecto: ${p.name}
@@ -232,18 +438,24 @@ INSTALACIÓN
 - Pegar WebHMI_Server.st en un Program ST.
 - Pegar WebHMI_LocalVariables.tsv en Internals.
 - Pegar WebHMI_ExternalVariables.tsv en Externals.
+${p.recipeEnabled?'- Recetas habilitadas: importar Web_RecipeInit, Web_RecipeData y Web_RecipeRev con Retain activado.\n- Banco NX: '+p.recipeSlots+' recetas de hasta '+p.recipeBytes+' bytes JSON; STRING['+(p.recipeBytes+12)+'].\n- Las recetas iniciales se cargan una sola vez, cuando Web_RecipeInit está a FALSE. No borrar Retain sin exportar primero las recetas.':'- Recetas deshabilitadas: no importar ni crear variables Web_Recipe*. No se reserva memoria Retain para recetas.'}
 - Las variables referenciadas deben existir como Global Variables con el mismo nombre/tipo.
+- Si importaste una estructura, union, enumeracion o ARRAY, crea su tipo en Data Types de Sysmac y declara la raiz global. El TSV Externals contiene SOLO esa raiz, no miembros sueltos.
 - Asignar el Program a una tarea y transferir al NX.
 - Abrir http://IP_DEL_NX:${p.port}/
 
 FUNCIONES
 - Comunicación robusta: snapshots SEQ/END, actualización atómica y watchdog de estados.
-- Escritura directa BOOL, numérica y STRING RW; entradas numéricas con límites mínimo/máximo validados en navegador.
+- Lectura de los 20 tipos basicos NX, y de miembros de ARRAY/STRUCT/UNION/ENUM mediante variables raiz.
+- Escritura directa BOOL, numeros, bitstrings hexadecimales, TIME como nanosegundos, STRING y enumeraciones (NumToEnum).
+- DATE, TIME_OF_DAY y DATE_AND_TIME: lectura formateada y escritura con resolucion de 1 segundo usando SecToDate/SecToTod/SecToDt.
+- Importante: la escritura DATE/DT/TOD trunca/substituye fracciones de segundo; DATE/DT admiten desde 1970 y se interpretan sin zona horaria.
 - Botones SET/RESET/TOGGLE.
-- Varias pantallas.
+- Varias pantallas con número único, color de fondo y selección opcional por variable entera leída del PLC.
+- Si se configura control PLC, el valor de esa variable gobierna siempre la pantalla; si no coincide con ningún número (o es inválido), se muestra la principal. Sin comunicación válida, se mantiene la última pantalla y se indica pérdida de comunicación.
 - Imágenes embebidas como data URL, estáticas o con cambio OFF/ON gobernado por BOOL.
 - Estado BOOL con símbolos SVG integrados OFF/ON: lámpara, motor, bomba, válvula, cinta y sensor; mapeo TRUE/FALSE invertible.
-- Alarmas actuales evaluadas en ST, enviadas en /api/read y mostradas en ventana de alarmas.
+- Alarmas evaluadas en ST con ACK individual/total en /api/ack y estados K en /api/read.
 - Recetas compiladas en ST y aplicadas en una sola ejecución del CASE de receta.
 
 LÍMITES ACTUALES
@@ -251,11 +463,12 @@ LÍMITES ACTUALES
 - HTTP/1.0 con Connection: close.
 - Petición <=1900 bytes en una recepción.
 - Web_WatchdogLimit es un límite en ciclos de tarea (5000 por defecto), no tiempo absoluto.
-- Alarmas: estado actual, sin histórico/ACK persistente todavía.
-- Recetas: valores compilados con la exportación; editar una receta exige regenerar/transferir ST.
+- Alarmas: ACK en memoria PLC mientras sigan activas; no retentivas tras reinicio ni historial.
+- Recetas: ${p.recipeEnabled?'banco NX Retain de '+p.recipeSlots+' ranuras y '+p.recipeBytes+' bytes por receta; CRUD desde runtime':'deshabilitadas; sin banco NX ni gestor de recetas en runtime'}.
+- El botón Aplicar envía escrituras PLC secuenciales; NO es una operación atómica ni sustituye enclavamientos de máquina. Comprobar lectura posterior.
+- Las recetas habilitadas usan /api/recipes, /api/recipe y /api/write; no existe almacenamiento local de recetas.
 - Sin HTTPS ni gestión de usuarios todavía.
 - No usar la HMI para funciones de seguridad.
 `;}
 Object.assign(C,{buildST,localVariablesTSV,externalVariablesTSV,readme});
 })(globalThis);
-

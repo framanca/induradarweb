@@ -57,7 +57,7 @@ with tempfile.TemporaryDirectory(prefix="webhmi-browser-") as temporary, sync_pl
     page.on("dialog", lambda dialog: dialog.accept())
     try:
         page.goto(url, wait_until="load")
-        expect(page.locator("#saveStatus")).to_contain_text("Guardado en disco")
+        expect(page.locator("#saveStatus")).to_contain_text("Saved to disk")
         assert page.locator("#canvas .widget").count() == 0
         checks.append("first_launch_empty_project_no_demo")
         page.locator("#projectName").fill("Proyecto offline real")
@@ -87,13 +87,13 @@ with tempfile.TemporaryDirectory(prefix="webhmi-browser-") as temporary, sync_pl
         assert page.locator("#projectName").input_value() == "Proyecto offline real"
         checks.append("app_restart_with_different_origin_restores_disk_project")
         page.locator("#saveBtn").click()
-        expect(page.locator("#toast")).to_have_text("Proyecto guardado")
+        expect(page.locator("#toast")).to_have_text("Project saved")
         assert json.loads((directory / "Proyecto_offline_real.nxst").read_text())["name"] == "Proyecto offline real"
         checks.append("native_project_export_bytes")
         # A failing persistence API must prevent replacing the current project.
         page.route("**/_native/storage", lambda route: route.fulfill(status=507, content_type="application/json", body='{"error":"Fallo de disco simulado"}'))
         page.locator("#loadBtn").click()
-        expect(page.locator("#toast")).to_contain_text("No se puede respaldar")
+        expect(page.locator("#toast")).to_contain_text("Could not back up")
         assert page.locator("#projectName").input_value() == "Proyecto offline real"
         page.unroute("**/_native/storage")
         checks.append("failed_backup_prevents_project_replacement")
@@ -101,7 +101,7 @@ with tempfile.TemporaryDirectory(prefix="webhmi-browser-") as temporary, sync_pl
         expect(page.locator("#projectName")).to_have_value("Demo NX ST")
         checks.append("native_project_picker_import")
         page.locator("#exportBtn").click()
-        expect(page.locator("#toast")).to_have_text("Paquete Sysmac guardado")
+        expect(page.locator("#toast")).to_have_text("Sysmac package saved")
         with zipfile.ZipFile(directory / "Demo_NX_ST_Sysmac.zip") as archive:
             assert "WebHMI_Server.st" in archive.namelist()
             assert "HMI_Embedded.html" in archive.namelist()
@@ -112,26 +112,26 @@ with tempfile.TemporaryDirectory(prefix="webhmi-browser-") as temporary, sync_pl
         assert page.frame_locator("#previewFrame").locator("#stage").is_visible()
         page.locator("#closePreview").click()
         checks.append("runtime_preview_offline")
-        page.get_by_role("button", name="Versiones en disco", exact=True).click()
+        page.get_by_role("button", name="Disk versions", exact=True).click()
         page.wait_for_selector(".offline-versions[open]")
         assert page.locator(".offline-versions .recovery-item").count() > 0
-        page.locator(".offline-versions").get_by_role("button", name="Cerrar", exact=True).click()
+        page.locator(".offline-versions").get_by_role("button", name="Close", exact=True).click()
         checks.append("native_versions_accessible")
         page.set_viewport_size({"width": 390, "height": 844})
-        page.get_by_role("button", name="Propiedades", exact=True).click()
+        page.get_by_role("button", name="Properties", exact=True).click()
         assert page.locator(".right").is_visible()
-        page.get_by_role("button", name="Herramientas", exact=True).click()
+        page.get_by_role("button", name="Tools", exact=True).click()
         assert page.locator(".left").is_visible()
         assert page.locator(".tool-grid button").count() == 16
         assert page.locator('.tool-grid [data-kind="selector"]').count() == 0
         assert page.locator('.tool-grid [data-kind="shape"]').count() == 1
         page.locator("#sidebar-tab-elements").click()
         page.locator('.tool-grid [data-kind="shape"]').click()
-        page.get_by_role("button", name="Propiedades", exact=True).click()
+        page.get_by_role("button", name="Properties", exact=True).click()
         assert page.locator('#properties [data-p="shapeType"] option').count() == 5
         page.locator('#properties [data-p="shapeType"]').select_option("triangle")
         assert page.locator('#canvas .widget.shape polygon').count() == 1
-        page.get_by_role("button", name="Herramientas", exact=True).click()
+        page.get_by_role("button", name="Tools", exact=True).click()
         checks.append("all_widgets_and_properties_accessible_on_phone")
         page.locator("#newBtn").click()
         page.locator("#sidebar-tab-variables").click()
@@ -140,10 +140,10 @@ with tempfile.TemporaryDirectory(prefix="webhmi-browser-") as temporary, sync_pl
         checks.append("native_variables_import")
         page.locator("#sidebar-tab-elements").click()
         page.locator("#imageBtn").click()
-        expect(page.locator("#toast")).to_contain_text("Imagen añadida")
+        expect(page.locator("#toast")).to_contain_text("Image added")
         assert page.locator("#canvas .widget.image").count() == 1
         checks.append("native_image_import")
-        page.get_by_role("button", name="Lienzo", exact=True).click()
+        page.get_by_role("button", name="Canvas", exact=True).click()
         page.screenshot(path=str(OUT / "phone-editor.png"), full_page=True)
         page.set_viewport_size({"width": 1440, "height": 1000})
         page.screenshot(path=str(OUT / "desktop-editor.png"), full_page=True)
@@ -157,7 +157,7 @@ with tempfile.TemporaryDirectory(prefix="webhmi-browser-") as temporary, sync_pl
         page.locator("#loadBtn").click()
         expect(page.locator("#projectName")).to_have_value("Prueba de entrada no confiable")
         page.locator("#canvas .widget.image").click()
-        expect(page.locator("#diagnostics")).to_contain_text("formato embebido no válido")
+        expect(page.locator("#diagnostics")).to_contain_text("invalid embedded format")
         assert page.locator("[onerror]").count() == 0
         checks.append("imported_project_markup_never_executes_and_invalid_images_are_blocked")
         assert not errors, errors

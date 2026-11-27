@@ -63,11 +63,11 @@ test('Extra Light supports all six basic widgets, retain configured text, colors
 test('Full export unchanged; Extra Light blocks incompatible features with precise errors',()=>{
  const p=C.demoProject(),baseline=JSON.stringify(p),full=C.exportPackage(p);
  const check=C.liteAnalysis(p);
- assert.ok(check.issues.some(x=>x.includes('recetas')));
- assert.ok(check.issues.some(x=>x.includes('alarmas')));
- assert.ok(check.issues.some(x=>x.includes('Depósito')));
+ assert.ok(check.issues.some(x=>x.includes('Recipes')));
+ assert.ok(check.issues.some(x=>x.includes('alarms')));
+ assert.ok(check.issues.some(x=>x.includes('Tank')));
  assert.ok(check.issues.some(x=>x.includes('motor')));
- assert.throws(()=>C.exportLitePackage(p),/Extra Light no compatible/);
+ assert.throws(()=>C.exportLitePackage(p),/Extra Light is incompatible/);
  assert.equal(JSON.stringify(p),baseline);
  assert.ok(full.files['HMI_Embedded.html'].includes('recipe'));
 });
@@ -103,8 +103,8 @@ test('Compatible widgets are not arbitrarily limited; more than 16 *used* variab
  assert.equal(C.liteProjection(p).screens[0].objects.length,60);
  const x=C.newProject();
  for(let i=0;i<17;i++){withVar(x,'V'+i,'REAL');const o=C.newObject('value');o.binding='V'+i;x.screens[0].objects.push(o)}
- assert.ok(C.liteAnalysis(x).issues.some(e=>e.includes('17 variables')));
- assert.throws(()=>C.liteCopy(x,x.screens[0].id),/reduce a 16/);
+ assert.ok(C.liteAnalysis(x).issues.some(e=>e.includes('17 PLC variables')));
+ assert.throws(()=>C.liteCopy(x,x.screens[0].id),/reduce to 16/);
 });
 test('Extra Light export is safe against stored HTML and JavaScript markup injection',()=>{
  const p=C.newProject();p.name='Test </script><img src=x onerror=alert(1)>';

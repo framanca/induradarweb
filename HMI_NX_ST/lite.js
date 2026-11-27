@@ -6,17 +6,17 @@ function jsJSON(value){return JSON.stringify(value).replace(/</g,'\\u003c').repl
 function number(value,fallback){const n=Number(value);return Number.isFinite(n)?String(n):String(fallback);}
 function liteProjection(input){
  const original=C.normalize(input),report=C.liteAnalysis(original);
- if(report.issues.length)throw Error('Extra Light no compatible:\n'+report.issues.join('\n'));
+ if(report.issues.length)throw Error('Extra Light is incompatible:\n'+report.issues.join('\n'));
  const screen=original.screens[0],objects=C.screenObjects(original,screen).map(o=>C.copy(o));
  const used=new Set(objects.filter(o=>o.kind!=='text').map(o=>o.binding));
  const p=C.copy(original);
  p.variables=original.variables.filter(v=>used.has(v.name)).map(v=>C.copy(v));
  p.screens=[{...C.copy(screen),objects,useBase:false}];
  p.baseScreen=null;p.assets=[];p.alarms=[];p.recipes=[];p.recipeEnabled=false;p.recipeVariables=[];p.internalVariables=[];p.screenBinding='';
- if(p.variables.some(v=>!Number.isInteger(Number(v.id))||Number(v.id)<1||Number(v.id)>65535))throw Error('Extra Light requiere IDs de variables entre 1 y 65535.');
- if(new Set(p.variables.map(v=>Number(v.id))).size!==p.variables.length)throw Error('Hay IDs de variables PLC duplicados.');
+ if(p.variables.some(v=>!Number.isInteger(Number(v.id))||Number(v.id)<1||Number(v.id)>65535))throw Error('Extra Light requires variable IDs between 1 and 65535.');
+ if(new Set(p.variables.map(v=>Number(v.id))).size!==p.variables.length)throw Error('Duplicate PLC variable IDs.');
  const errors=C.validate(p);
- if(errors.length)throw Error('Error en proyecto Extra Light: '+errors.join('; '));
+ if(errors.length)throw Error('Error in Extra Light project: '+errors.join('; '));
  return p;
 }
 function widgetHTML(o,vars){
@@ -85,7 +85,7 @@ function liteBrowser(){
   finally{schedule(online?Math.max(150,Number(L.poll)||500):Math.min(5000,500*Math.pow(2,Math.min(failures,3))))}
  }
  function validate(id,raw,element){
-  const tag=tags[id];if(!tag||!tag.write)throw Error('Variable no escribible');
+  const tag=tags[id];if(!tag||!tag.write)throw Error('Variable is read-only');
   const txt=String(raw).trim();
   if(tag.type==='BOOL'){if(txt!=='1'&&txt!=='0')throw Error('Solo 0 o 1');return txt}
   if(tag.type==='INT'){
@@ -142,7 +142,7 @@ function buildLiteRuntimeHTML(input,options){
  const p=liteProjection(input),view=p.screens[0],vm=new Map(p.variables.map(v=>[v.name,v]));
  const widgets=view.objects.map(o=>widgetHTML(o,vm)).join('');
  const withKeyboard=p.keyboardMode==='webhmi'&&view.objects.some(o=>o.kind==='input');
- const keypad=withKeyboard?'<div id="keyboard" hidden role="dialog" aria-modal="true" aria-label="Teclado numerico"><div class="kbd"><input id="kbValue" inputmode="none" aria-label="Valor"><div class="keys">'+['7','8','9','4','5','6','1','2','3','sign','0','dot','back','clear'].map(key=>'<button type="button" data-key="'+key+'">'+({sign:'±',dot:'.',back:'Borrar',clear:'Limpiar'}[key]||key)+'</button>').join('')+'</div><div id="kbError" role="alert"></div><div class="kbd-actions"><button id="kbCancel" type="button">Cancelar</button><button id="kbAccept" type="button">Aceptar</button></div></div></div>':'';
+ const keypad=withKeyboard?'<div id="keyboard" hidden role="dialog" aria-modal="true" aria-label="Numeric keypad"><div class="kbd"><input id="kbValue" inputmode="none" aria-label="Value"><div class="keys">'+['7','8','9','4','5','6','1','2','3','sign','0','dot','back','clear'].map(key=>'<button type="button" data-key="'+key+'">'+({sign:'±',dot:'.',back:'Backspace',clear:'Clear'}[key]||key)+'</button>').join('')+'</div><div id="kbError" role="alert"></div><div class="kbd-actions"><button id="kbCancel" type="button">Cancel</button><button id="kbAccept" type="button">OK</button></div></div></div>':'';
  const config={w:p.width,h:p.height,poll:p.pollMs,preview:Boolean(options&&options.preview),keyboard:withKeyboard,v:p.variables.map(v=>[Number(v.id),v.type,v.access==='RW'?1:0])};
  const html='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+htmlText(p.name)+'</title><style>'+liteCSS+'</style></head><body><header><span>'+htmlText(p.name)+'</span><span id="state">Conectando</span></header><main id="viewport"><div id="fit"><div id="stage" style="background:'+htmlText(view.background)+'">'+widgets+'</div></div></main><div id="shield">Sin conexion con PLC</div>'+keypad+'<script>const L='+jsJSON(config)+';('+liteBrowser.toString()+')();</script></body></html>';
  // The Omron ST source embeds HTML in STRING chunks; keep it 7-bit ASCII.
@@ -155,7 +155,7 @@ function buildLiteST(input){
  let st=C.buildST(p);
  const head='    CASE Web_Chunk OF\n',tail="\n    ELSE\n        Web_TxText := '';\n    END_CASE;";
  const a=st.indexOf(head),b=st.indexOf(tail,a);
- if(a<0||b<a)throw Error('La estructura ST de fragmentos HTTP ha cambiado.');
+ if(a<0||b<a)throw Error('The ST structure of HTTP fragments has changed.');
  const cases=parts.map((chunk,i)=>'            '+i+": Web_TxText := '"+stEscape(chunk)+"';").join('\n');
  st=st.slice(0,a)+head+cases+st.slice(b);
  st=st.replace(/HTML embebido: \d+ bytes \/ \d+ fragmentos/,'HTML embebido: '+enc.encode(html).length+' bytes / '+parts.length+' fragmentos (Extra Light)');
@@ -166,7 +166,7 @@ function buildLiteST(input){
  st=st.replace(/\n\s*ELSIF FIND\(Web_RxText, 'POST \/api\/recipe\?slot='\)[\s\S]*?(?=\n\s*ELSIF FIND\(Web_RxText, 'POST \/api\/ack\?')/,'');
  st=st.replace(/\n\s*ELSIF FIND\(Web_RxText, 'POST \/api\/ack\?'\) = 1 THEN\s+Web_Request := UINT#5;/,'');
  st=st.replace(/\n    4:[\s\S]*?(?=\n    ELSE\n        Web_ApiBody := 'NOT FOUND';)/,'');
- if(st.includes('Web_Recipe')||st.includes('Web_AlarmAck')||st.includes('/api/ack')||st.includes('/api/recipe'))throw Error('Rutas o variables no permitidas en ST Extra Light');
+ if(st.includes('Web_Recipe')||st.includes('Web_AlarmAck')||st.includes('/api/ack')||st.includes('/api/recipe'))throw Error('Routes or variables not permitted in Extra Light ST');
  return st;
 }
 function liteLocalVariablesTSV(input){
@@ -178,7 +178,7 @@ function liteReadme(input,html,st){
 }
 function exportLitePackage(input){
  const p=liteProjection(input),html=buildLiteRuntimeHTML(p);
- if(enc.encode(html).length>LITE_HTML_LIMIT)throw Error('Extra Light supera 128 KB de HTML; reduce elementos o utiliza la version completa.');
+ if(enc.encode(html).length>LITE_HTML_LIMIT)throw Error('Extra Light exceeds 128 KB of HTML; reduce elements or use the full version.');
  const st=buildLiteST(p),files={
  'WebHMI_Server.st':st,
  'WebHMI_LocalVariables.tsv':liteLocalVariablesTSV(p),

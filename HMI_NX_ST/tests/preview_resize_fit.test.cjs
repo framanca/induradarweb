@@ -21,7 +21,7 @@ test('editor preview supports resizing without touching project geometry',()=>{
  const editor=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8');
  const css=fs.readFileSync(path.join(__dirname,'..','style.css'),'utf8');
  assert.match(html,/id="previewResizeHandle"/);
- assert.match(html,/aria-label="Redimensionar vista previa"/);
+ assert.match(html,/aria-label="Resize preview"/);
  assert.match(editor,/function previewResizeStart\(\)/);
  assert.match(editor,/function previewResizeTo\(width,height\)/);
  assert.match(editor,/handle\.setPointerCapture\(e\.pointerId\)/);

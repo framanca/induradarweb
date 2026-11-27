@@ -22,7 +22,7 @@ def build(dest):
                 text=replace(text,f'<script defer src="{module}"></script>\n','')
             text=replace(text,'<script defer src="app.js"></script>','<script defer src="config.js"></script>\n<script defer src="online.js"></script>\n<script defer src="app.js"></script>')
             text=replace(text,'<link rel="stylesheet" href="style.css">','<link rel="stylesheet" href="style.css"><link rel="stylesheet" href="online.css">')
-            text=replace(text,'<iframe id="previewFrame" title="Previsualización de la HMI">','<iframe id="previewFrame" sandbox="allow-scripts" title="Previsualización de la HMI">')
+            text=replace(text,'<iframe id="previewFrame" title="HMI preview">','<iframe id="previewFrame" sandbox="allow-scripts" title="HMI preview">')
             text=text.replace('HMI NX ST','HMI NX Online')
         if name == 'app.js':
             # Source editor already starts with an empty project (recipes disabled).
@@ -54,11 +54,11 @@ const onlineSize={
   if(key!==expectedKey){renderDiag();return}
   if(C.validate(snapshot).length)return;
   this.running=true;this.lastRequestAt=Date.now();
-  renderProjectSummary(null,'Calculando en Supabase…');
+  renderProjectSummary(null,'Calculating in Supabase…');
   try{
    const data=await NXOnline.request('size',snapshot);
    if(!Number.isSafeInteger(data.htmlBytes)||data.htmlBytes<0||data.limitBytes!==C.HTML_MAX_BYTES||data.optimized!==true)
-    throw Error('Respuesta de tamaño incorrecta');
+    throw Error('Invalid size response');
    this.measured={key,bytes:data.htmlBytes,rawBytes:data.originalHtmlBytes,overLimit:data.overLimit===true};
    this.errorKey=null;this.error='';
   }catch(error){this.errorKey=key;this.error=error.message;}
@@ -68,7 +68,7 @@ const onlineSize={
 function renderProjectSummary(htmlBytes=null,detail=''){
  const assetBytes=p.assets.reduce((n,a)=>n+C.dataUrlBytes(a.data),0);
  const htmlUsage=Number.isFinite(htmlBytes)?(htmlBytes/1024).toFixed(1)+' / 512 KB':'— / 512 KB';
- const text='HTML optimizado (Supabase): '+htmlUsage+(detail?' · '+detail:'')+' · imágenes: '+(assetBytes/1024).toFixed(1)+' / 256 KB · '+p.screens.length+' pantallas · '+p.variables.length+' variables · '+p.alarms.length+' alarmas · '+(p.recipeEnabled?p.recipes.length:0)+' recetas.';
+ const text='Optimized HTML (Supabase): '+htmlUsage+(detail?' · '+detail:'')+' · images: '+(assetBytes/1024).toFixed(1)+' / 256 KB · '+p.screens.length+' screens · '+p.variables.length+' variables · '+p.alarms.length+' alarms · '+(p.recipeEnabled?p.recipes.length:0)+' recipes.';
  const summary=$('#projectResourceSummary');summary.textContent=text;
  summary.parentElement.classList.toggle('over-limit',assetBytes>C.IMAGE_TOTAL_MAX_BYTES||Number.isFinite(htmlBytes)&&htmlBytes>C.HTML_MAX_BYTES);
  return text;
@@ -77,14 +77,14 @@ function renderDiag(){
  syncProjectInputs();
  const key=onlineSize.signature(),errors=C.validate(p),baseErrorCount=errors.length;
  const report=NXOnline.hasSession()&&onlineSize.measured?.key===key?onlineSize.measured:null;
- if(report?.overLimit)errors.push('HTML optimizado supera 512 KB: exportación bloqueada.');
- const detail=report?'Tamaño final verificado':!NXOnline.hasSession()?'Inicia sesión para calcular':baseErrorCount?'Corrige el proyecto para calcular':onlineSize.errorKey===key?'Error: '+onlineSize.error:'Calculando en Supabase…';
+ if(report?.overLimit)errors.push('Optimized HTML exceeds 512 KB: export blocked.');
+ const detail=report?'Final size verified':!NXOnline.hasSession()?'Sign in to calculate':baseErrorCount?'Fix project issues to calculate':onlineSize.errorKey===key?'Error: '+onlineSize.error:'Calculating in Supabase…';
  const projectSummary=renderProjectSummary(report?.bytes??null,detail);
  const ok=errors.length===0,button=$('#exportBtn');
  button.dataset.exportable=String(ok);
- button.title=ok?'Proyecto correcto: exportar Sysmac':'Pulsa para ver los problemas de validación';
+ button.title=ok?'Project ready: export Sysmac':'Click to see validation issues';
  $('#exportWarningIcon').hidden=ok;
- $('#diagnostics').innerHTML='<div class="diagnostic '+(ok?'ok':'error')+'">'+(ok?'Validación local correcta':'Bloqueos: '+errors.length)+'</div>'+errors.map(e=>'<div class="diagnostic error">'+C.esc(e)+'</div>').join('')+'<div class="diagnostic">'+C.esc(projectSummary)+'</div>';
+ $('#diagnostics').innerHTML='<div class="diagnostic '+(ok?'ok':'error')+'">'+(ok?'Local validation passed':'Blocking issues: '+errors.length)+'</div>'+errors.map(e=>'<div class="diagnostic error">'+C.esc(e)+'</div>').join('')+'<div class="diagnostic">'+C.esc(projectSummary)+'</div>';
  onlineSize.schedule(key);
  return ok;
 }'''+text[end:]
@@ -109,11 +109,11 @@ function renderDiag(){
   download((snapshot.name||'WebHMI_ST').replace(/[^A-Za-z0-9_-]+/g,'_')+'_Sysmac.zip',out,'application/zip');
   if(p0JSON()===json)p0Checkpoint();
   p0Snapshot('exportado-supabase',true);
-  toast('Paquete Sysmac generado en Supabase')
- }catch(error){openExportDiagnostics('No se pudo exportar: '+error.message)}
+  toast('Sysmac package generated in Supabase')
+ }catch(error){openExportDiagnostics('Could not export: '+error.message)}
 }'''+text[end:]
-            text = replace(text, "p0Snapshot('antes-abrir-archivo',true);if(p0Dirty()", "if(!p0Snapshot('antes-abrir-archivo',true)){toast('No se puede respaldar el proyecto actual. Guarda una copia antes de abrir otro.');e.target.value='';return}if(p0Dirty()")
-            text = replace(text, "p0Snapshot('antes-recuperar',true);p=C.normalize", "if(!p0Snapshot('antes-recuperar',true)){toast('No se puede respaldar el proyecto actual. Recuperación cancelada.');return}p=C.normalize")
+            text = replace(text, "p0Snapshot('antes-abrir-archivo',true);if(p0Dirty()", "if(!p0Snapshot('antes-abrir-archivo',true)){toast('Cannot back up the current project. Save a copy before opening another.');e.target.value='';return}if(p0Dirty()")
+            text = replace(text, "p0Snapshot('antes-recuperar',true);p=C.normalize", "if(!p0Snapshot('antes-recuperar',true)){toast('Cannot back up the current project. Recovery cancelled.');return}p=C.normalize")
             if any(x in text for x in ['buildRuntimeHTML','exportPackage','buildLiteRuntimeHTML','exportLitePackage']):
                 raise RuntimeError('A browser compiler call escaped the split')
         (dest/name).write_text(text)

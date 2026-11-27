@@ -45,7 +45,7 @@ test('alarm ACK writes and readback are generated into PLC ST and local variable
 });
 test('missing popup target and invalid expression block export',()=>{
  const p=C.demoProject(),button=C.newObject('button');button.actionType='popup';button.targetScreenId='missing';
- p.screens[0].objects.push(button);assert.ok(C.validate(p).some(x=>x.includes('pantalla destino')));
+ p.screens[0].objects.push(button);assert.ok(C.validate(p).some(x=>x.includes('target screen')));
  button.targetScreenId=p.screens[0].id;button.expressionVisible='Machine_Running &&';
  assert.ok(C.validate(p).some(x=>x.includes('expressionVisible')));
 });

@@ -9,8 +9,8 @@ const C = globalThis.NXST;
 
 test('editor shows separate Nueva pantalla and Copiar pantalla actions', () => {
   const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
-  assert.match(html, /id="addScreen"[^>]*>Nueva pantalla<\/button>/);
-  assert.match(html, /id="copyScreen"[^>]*>Copiar pantalla<\/button>/);
+  assert.match(html, /id="addScreen"[^>]*>New screen<\/button>/);
+  assert.match(html, /id="copyScreen"[^>]*>Copy screen<\/button>/);
   assert.doesNotMatch(html, />\+ Pantalla<\/button>/);
 });
 
@@ -96,19 +96,19 @@ test('new and cloned screens receive unique numbers and preserve colors independ
 test('validator rejects duplicated or invalid screen numbers and wrong PLC binding type', () => {
   const project = C.newProject();
   project.screens.push(C.newScreen('Segundo', 1));
-  assert.match(C.validate(project).join(';'), /Número de pantalla duplicado/);
+  assert.match(C.validate(project).join(';'), /Duplicate screen number/);
   project.screens[1].number = 0;
-  assert.match(C.validate(project).join(';'), /Número de pantalla no válido/);
+  assert.match(C.validate(project).join(';'), /Invalid screen number/);
   project.screens[1].number = 2.5;
-  assert.match(C.validate(project).join(';'), /Número de pantalla no válido/);
+  assert.match(C.validate(project).join(';'), /Invalid screen number/);
   project.screens[1].number = 2;
   project.screenBinding = 'NoExiste';
-  assert.match(C.validate(project).join(';'), /variable no encontrada/);
+  assert.match(C.validate(project).join(';'), /variable not found/);
   project.variables.push({id:1,name:'NoExiste',type:'REAL',access:'R',expose:true});
-  assert.match(C.validate(project).join(';'), /variable entera expuesta/);
+  assert.match(C.validate(project).join(';'), /exposed integer variable/);
   project.variables[0].type = 'INT';
   project.variables[0].expose = false;
-  assert.match(C.validate(project).join(';'), /variable entera expuesta/);
+  assert.match(C.validate(project).join(';'), /exposed integer variable/);
   project.variables[0].expose = true;
   assert.deepEqual(C.validate(project), []);
 });

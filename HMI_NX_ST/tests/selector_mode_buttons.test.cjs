@@ -83,7 +83,7 @@ test('legacy selector still renders but no new Selector can be inserted from the
  assert.match(editor,/if\(o\.kind==='selector'\)\{const options=String\(o\.optionsText/);
  assert.match(editor,/class="selector-mock-options"/);
  assert.match(editor,/class="selector-mock-choice"/);
- assert.match(editor,/Cada opción aparece como un botón visible/);
+ assert.match(editor,/Each option is a visible button/);
  assert.match(css,/\.widget\.selector \.selector-mock-options/);
  assert.match(css,/\.widget\.selector \.selector-mock-choice/);
  assert.doesNotThrow(()=>new Function(editor));

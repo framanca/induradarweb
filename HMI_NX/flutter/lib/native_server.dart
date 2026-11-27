@@ -87,11 +87,11 @@ class NativeServer {
 
   Future<Map<String, dynamic>> _body(HttpRequest request) async {
     const maxBytes = 12 * 1024 * 1024;
-    if (request.contentLength > maxBytes) throw const FormatException('Archivo demasiado grande');
+    if (request.contentLength > maxBytes) throw const FormatException('File too large');
     final chunks = BytesBuilder(copy: false);
     await for (final chunk in request) {
       chunks.add(chunk);
-      if (chunks.length > maxBytes) throw const FormatException('Archivo demasiado grande');
+      if (chunks.length > maxBytes) throw const FormatException('File too large');
     }
     return Map<String, dynamic>.from(jsonDecode(utf8.decode(chunks.takeBytes())) as Map);
   }
@@ -119,9 +119,9 @@ class NativeServer {
       final revision = store.setValue(data['key'] as String, data['value'] as String?, data['revision'] as int);
       _json(request, {'revision': revision});
     } else if (path == '_native/pick') {
-      if (_dialogBusy) throw StateError('Ya hay un diálogo de archivos abierto');
+      if (_dialogBusy) throw StateError('A file dialog is already open');
       final kind = data['kind'];
-      if (!{'imageFile', 'varsFile', 'projectFile'}.contains(kind)) throw const FormatException('Importación no permitida');
+      if (!{'imageFile', 'varsFile', 'projectFile'}.contains(kind)) throw const FormatException('Import not allowed');
       _dialogBusy = true;
       try {
         _json(request, {'file': await pickFile(kind as String)});
@@ -129,9 +129,9 @@ class NativeServer {
         _dialogBusy = false;
       }
     } else if (path == '_native/export') {
-      if (_dialogBusy) throw StateError('Ya hay un diálogo de archivos abierto');
+      if (_dialogBusy) throw StateError('A file dialog is already open');
       final name = (data['name'] as String).replaceAll(RegExp(r'[^A-Za-z0-9_.-]'), '_');
-      if (name.isEmpty || name.startsWith('.') || name.length > 180) throw const FormatException('Nombre de archivo no válido');
+      if (name.isEmpty || name.startsWith('.') || name.length > 180) throw const FormatException('Invalid file name');
       final bytes = base64Decode(data['base64'] as String);
       final exports = Directory('${store.directory.path}/exports')..createSync(recursive: true);
       // Preserve every generated export even if the external save dialog is cancelled.

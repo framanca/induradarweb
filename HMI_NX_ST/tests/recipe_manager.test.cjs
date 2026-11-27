@@ -75,7 +75,7 @@ test('generated runtime has NX-only recipe CRUD, apply read-back, backup and imp
  assert.doesNotMatch(html,/id="recipeScope"/);
  const editor=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8');
  assert.match(editor,/scope:'shared'/);
- assert.match(editor,/p\.recipes\.push\(\{id:C\.id\(\),name:'Receta '\+i,scope:'shared',values:\{\}\}\)/);
+ assert.match(editor,/p\.recipes\.push\(\{id:C\.id\(\),name:'Recipe '\+i,scope:'shared',values:\{\}\}\)/);
  for(const marker of ['recipeStoreShared','recipeRefreshShared','recipeImportFile','recipeExportJSON','recipeCaptureCurrent','checkRecipeApplyJob','recipeTypedValue','recipeApplySelected'])assert.ok(html.includes(marker),marker);
  assert.match(html,/recipeAlert\("Aplicando al PLC y comprobando valores recibidos/);
  assert.match(html,/recipeApplyJob=\{plc,local,started:Date\.now\(\)\}/);
@@ -95,7 +95,7 @@ test('NX-only JSON seed is ASCII and project capacity is validated',()=>{
  const huge=project();huge.recipes[0].values.HMIName='X'.repeat(510);
  assert.ok(C.validate(huge).some(msg=>msg.includes('500 bytes')));
  const many=project();many.recipes=Array.from({length:13},(_,i)=>({id:'r'+i,scope:'shared',name:'R'+i,values:{SpeedPLC:i}}));
- assert.ok(C.validate(many).some(msg=>msg.includes('máximo 12 recetas')));
+ assert.ok(C.validate(many).some(msg=>msg.includes('maximum 12 recipes')));
 });
 test('editor uses per-recipe checkboxes without a global recipe variable whitelist',()=>{
  const editor=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8'),markup=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
@@ -135,8 +135,8 @@ test('recipe checkboxes list all writable PLC/internal variables and pre-check o
  assert.match(html,/data-name="HMIName"[^>]*disabled/);
  assert.match(html,/data-name="SpeedPLC" checked/);
  assert.equal(sandbox.recipeTypedEditor(sandbox.p.variables[0],'50'),50);
- assert.throws(()=>sandbox.recipeTypedEditor(sandbox.p.variables[0],'1.5'),/entero/);
- assert.throws(()=>sandbox.recipeTypedEditor(sandbox.p.variables[0],''),/número/);
+ assert.throws(()=>sandbox.recipeTypedEditor(sandbox.p.variables[0],'1.5'),/integer/);
+ assert.throws(()=>sandbox.recipeTypedEditor(sandbox.p.variables[0],''),/number/);
  assert.equal(sandbox.recipeTypedEditor(sandbox.p.internalVariables[0],'true'),true);
 });
 
@@ -145,19 +145,19 @@ test('duplicating editor recipes keeps storage, deep-copies values and assigns u
  const original=p.recipes[0];
  const copy1=C.duplicateRecipe(original,p.recipes);
  assert.equal(copy1.scope,original.scope);
- assert.equal(copy1.name,'Formato estándar (copia)');
+ assert.equal(copy1.name,'Formato estándar (copy)');
  assert.notEqual(copy1.id,original.id);
  assert.deepEqual(JSON.parse(JSON.stringify(copy1.values)),JSON.parse(JSON.stringify(original.values)));
  copy1.values.SpeedPLC=100;
  assert.equal(original.values.SpeedPLC,60,'copy must not mutate original values');
  p.recipes.push(copy1);
  const copy2=C.duplicateRecipe(original,p.recipes);
- assert.equal(copy2.name,'Formato estándar (copia 2)');
+ assert.equal(copy2.name,'Formato estándar (copy 2)');
  assert.ok(C.validate({...p,recipes:[...p.recipes,copy2]}).length===0);
  const long={id:'long',scope:'shared',name:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKL',values:{HMIFlag:true}};
  const longCopy=C.duplicateRecipe(long,[long]);
  assert.ok(longCopy.name.length<=48);
- assert.ok(longCopy.name.endsWith(' (copia)'));
+ assert.ok(longCopy.name.endsWith(' (copy)'));
  const nxCopy=C.duplicateRecipe({...original,scope:'shared'},p.recipes);
  assert.equal(nxCopy.scope,'shared');
  const editor=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8');
@@ -191,7 +191,7 @@ test('more than 20 available variables is allowed while each individual recipe r
  assert.equal(C.validate(p).length,0,'a removed global 20-variable whitelist must not limit runtime');
  const huge={id:'many',name:'Demasiados campos',scope:'local',values:Object.fromEntries(p.internalVariables.slice(0,21).map(v=>[v.name,1]))};
  p.recipes.push(huge);
- assert.ok(C.validate(p).some(e=>e.includes('máximo 20 valores')));
+ assert.ok(C.validate(p).some(e=>e.includes('maximum 20 values')));
 });
 
 test('disabled recipes emit no Retain variables, recipe HTTP routes, buttons or manager JS',()=>{
@@ -215,7 +215,7 @@ test('configurable NX capacity affects ST arrays, runtime limits, and validation
  assert.match(html,/"recipeSlots":3/);
  assert.match(html,/"recipeBytes":180/);
  const tooMany=C.copy(p);tooMany.recipes.push({id:'third',name:'Third',scope:'shared',values:{}},{id:'fourth',name:'Fourth',scope:'shared',values:{}});
- assert.ok(C.validate(tooMany).some(x=>x.includes('máximo 3 recetas')));
+ assert.ok(C.validate(tooMany).some(x=>x.includes('maximum 3 recipes')));
  const tooLong=C.copy(p);tooLong.recipes[0].values.HMIName='X'.repeat(180);
  assert.ok(C.validate(tooLong).some(x=>x.includes('180 bytes')));
  for(const [k,val] of [['recipeSlots',0],['recipeSlots',33],['recipeBytes',63],['recipeBytes',501]]){
